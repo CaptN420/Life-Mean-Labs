@@ -261,3 +261,32 @@ def test_e_honest_backend_diagnostic_401_then_fix():
         assert "good-token" not in json.dumps(bm2)
     finally:
         server.shutdown()
+
+
+
+def test_settings_model_pools_covers_coding_debate_sandbox():
+    """Unified per-domain model pool: Settings owns coding + debate + a reserved
+    sandbox domain; role names are validated per domain."""
+    import experiments.settings as S
+    S.update_settings({"model_pools": {
+        "coding": {"planner": "m-A", "developer": "m-B", "critic": "m-C",
+                   "reviewer": "m-D", "judge": "m-E"},
+        "debate": {"existentialist": "m-X", "moderator": "m-Y"}}})
+    mp = S.model_pools()
+    assert mp["coding"]["planner"] == "m-A" and mp["coding"]["judge"] == "m-E"
+    assert mp["debate"]["existentialist"] == "m-X" and mp["debate"]["moderator"] == "m-Y"
+    assert "sandbox" in mp and mp["sandbox"] == {}  # reserved (future), empty
+    # domains catalog exposed
+    assert set(S._DOMAIN_MODEL_ROLES) == {"coding", "debate", "sandbox"}
+    # unknown role / unknown domain are rejected atomically
+    with pytest.raises(ValueError):
+        S.update_settings({"model_pools": {"coding": {"bogus_role": "m"}}})
+    with pytest.raises(ValueError):
+        S.update_settings({"model_pools": {"nonexistent_domain": {"a": "b"}}})
+    # empty value = dynamic routing (recorded honestly elsewhere)
+    S.update_settings({"model_pools": {
+        "coding": {r: "" for r in S._CODING_ROLES},
+        "debate": {r: "" for r in S._DEBATE_ROLES}}})
+    pools = S.model_pools()
+    assert all(v == "" for v in pools["coding"].values())
+    assert all(v == "" for v in pools["debate"].values())

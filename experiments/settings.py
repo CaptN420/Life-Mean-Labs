@@ -178,6 +178,37 @@ _DEBATE_CONNECTED = False
 _ROLE_TEMPLATE_SUBSYSTEMS = ("code_lab", "philosophical_debate")
 # Code Lab per-role model pool: roles Code Lab actually invokes.
 _CODING_ROLES = ("planner", "developer", "critic", "reviewer", "judge")
+_DEBATE_ROLES = ("existentialist", "stoic", "nihilist", "spiritual", "skeptic",
+                 "pragmatist", "moderator")
+_DOMAIN_MODEL_ROLES = {"coding": _CODING_ROLES, "debate": _DEBATE_ROLES, "sandbox": ()}
+
+
+def model_pools() -> Dict[str, Dict[str, str]]:
+    """Effective per-domain model pool (Settings-owned, unified).
+
+    domains: coding (Code Lab roles), debate (philosophical roles), sandbox
+    (reserved for the future interactive mode — empty for now). Empty value =
+    dynamic routing. Single view the Settings UI / controllers read for EVERY
+    domain, not just coding.
+    """
+    ov = _load_overrides()
+    coding = {r: "" for r in _CODING_ROLES}
+    _cp = ov.get("coding_pool", {})
+    if isinstance(_cp, dict):
+        coding = {r: str(_cp.get(r, "") or "") for r in _CODING_ROLES}
+    debate = {r: "" for r in _DEBATE_ROLES}
+    try:
+        from philosophical_council.config import Config
+        _cfg_models = Config.default().to_dict().get("models", {}) or {}
+    except Exception:
+        _cfg_models = {}
+    _mo = ov.get("models", {})
+    if isinstance(_mo, dict):
+        _cfg_models = {**_cfg_models, **_mo}
+    debate = {r: str(_cfg_models.get(r, "") or "") for r in _DEBATE_ROLES}
+    sb = ov.get("sandbox_pool", {})
+    sandbox = {r: str(m) for r, m in sb.items()} if isinstance(sb, dict) else {}
+    return {"coding": coding, "debate": debate, "sandbox": sandbox}
 
 
 def _role_template_default_overrides(raw: Dict[str, Any]) -> Dict[str, str]:
@@ -226,7 +257,8 @@ def get_coding_pool() -> Dict[str, str]:
 
     Empty value = dynamic routing. Called by the dashboard when building a Code
     Lab run so Settings -> CodeLabConfig.role_models -> CodingMultiAgent -> actual
-    LM Studio model is one connected path (S6).
+    LM Studio model is one connected path (S6). See `model_pools()` for the
+    unified per-domain view (coding + debate + reserved sandbox).
     """
     try:
         ov = _load_overrides().get("coding_pool", {})
@@ -312,6 +344,7 @@ def build_settings_snapshot() -> Dict[str, Any]:
         "coding_pool": {r: (str(overrides.get("coding_pool", {}).get(r, "")) or "")
                         if isinstance(overrides.get("coding_pool"), dict) else ""
                         for r in _CODING_ROLES},
+        "model_pools": model_pools(),
         "personas": [{"role": p["role"], "name": p["name"]} for p in personas],
         "router": {
             "method": router.get("method", "llm"),
@@ -417,6 +450,8 @@ def get_settings() -> Dict[str, Any]:
                         if isinstance(overrides.get("coding_pool"), dict) else ""
                         for r in _CODING_ROLES},
         "coding_roles": list(_CODING_ROLES),
+        "model_pools": model_pools(),
+        "model_domains": list(_DOMAIN_MODEL_ROLES),
         "available_models": avail,
         "personas": _current_personas(cfg.get("personas", {})),
         "role_templates": _role_templates_view(cfg.get("role_templates", {})),
@@ -514,6 +549,47 @@ def update_settings(patch: Dict[str, Any]) -> Dict[str, Any]:
                     existing = {}
                 existing.update(clean)
                 overrides["coding_pool"] = existing
+            continue
+        if key == "model_pools":
+            # Unified per-domain pool update: {"<domain>": {role: model}}.
+            # Routes by domain to the backing override bucket (coding_pool for
+            # coding, models for debate, sandbox_pool for the reserved sandbox),
+            # validating that every role belongs to its domain.
+            if not isinstance(value, dict):
+                errors[key] = "'model_pools' must be an object {domain -> {role: model}}"
+                continue
+            buckets: Dict[str, Dict[str, Dict[str, str]]] = {"coding": {}, "debate": {}, "sandbox": {}}
+            for domain, pool in value.items():
+                if domain not in _DOMAIN_MODEL_ROLES:
+                    errors[f"model_pools.{domain}"] = f"unknown domain '{domain}'"
+                    continue
+                if not isinstance(pool, dict):
+                    errors[f"model_pools.{domain}"] = "pool must be an object"
+                    continue
+                allowed = _DOMAIN_MODEL_ROLES[domain]
+                for role, model in pool.items():
+                    if role not in allowed:
+                        errors[f"model_pools.{domain}.{role}"] = f"unknown role '{role}' in {domain}"
+                    elif not isinstance(model, str):
+                        errors[f"model_pools.{domain}.{role}"] = "model must be a string"
+                    else:
+                        buckets[domain][role] = model
+            if not errors.get(key):
+                if buckets["coding"]:
+                    cp = overrides.get("coding_pool", {})
+                    if not isinstance(cp, dict):
+                        cp = {}
+                    cp.update(buckets["coding"]); overrides["coding_pool"] = cp
+                if buckets["debate"]:
+                    mo = overrides.get("models", {})
+                    if not isinstance(mo, dict):
+                        mo = {}
+                    mo.update(buckets["debate"]); overrides["models"] = mo
+                if buckets["sandbox"]:
+                    sb = overrides.get("sandbox_pool", {})
+                    if not isinstance(sb, dict):
+                        sb = {}
+                    sb.update(buckets["sandbox"]); overrides["sandbox_pool"] = sb
             continue
         if key == "personas":
             # persona list override: dict role -> {name, color, system_prompt}
