@@ -197,6 +197,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             from experiments import settings as _settings
             if not data.get("template_id"):
                 data["template_id"] = _settings.default_role_template("code_lab")
+            # Coding Pool (Settings-owned): inherit the per-role CL models unless
+            # the request explicitly overrides role_models (S5/S6). Empty value =
+            # dynamic routing, recorded honestly by the agent layer.
+            if not data.get("role_models"):
+                data["role_models"] = dict(_settings.get_coding_pool())
             cfg = CodeLabConfig.from_dict(data)
             view = self.code_lab_controller.create_run(cfg)
             # Start automatically like the experiment controller's auto-start.

@@ -221,6 +221,16 @@ class CodingMultiAgent:
             return self.model_config.get_model(key) or ""
         return ""
 
+    def _selection_mode(self, role: str) -> str:
+        """Explicit selection-mode provenance (S7): 'configured' when a specific
+        model was assigned for the role; 'dynamic' when the router/fallback
+        resolved it; 'backend_default' when no router is in play at all. An empty
+        configured model is never presented as if a specific model was selected.
+        """
+        if self.role_model(role):
+            return "configured"
+        return "dynamic" if self.use_router else "backend_default"
+
     def emit(self, ev_type: str, **payload):
         ev = {"type": ev_type, "time": time.time(), **payload}
         if self.run_id:
@@ -245,7 +255,8 @@ class CodingMultiAgent:
         agent = self._agent(role)
         self.emit("AGENT_STARTED", role=role, stage=stage,
                   model=agent.model_used or "auto",
-                  configured_model=self.role_model(role),
+                  configured_model=self.role_model(role) or None,
+                  selection_mode=self._selection_mode(role),
                   run_id=self.run_id)
 
     def _emit_agent_result(self, role: str, stage: str, result: Dict[str, Any],
@@ -265,7 +276,8 @@ class CodingMultiAgent:
             "role": role,
             "stage": stage,
             "model": actual,
-            "configured_model": configured,
+            "configured_model": configured or None,
+            "selection_mode": self._selection_mode(role),
             "run_id": self.run_id,
             "duration_ms": dur_ms,
             "response_present": bool(response.strip()),

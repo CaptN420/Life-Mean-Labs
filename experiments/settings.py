@@ -176,6 +176,8 @@ _ERROR_MESSAGES: Dict[str, str] = {
 _EXECUTABLE_EXECUTORS = {"code_lab"}
 _DEBATE_CONNECTED = False
 _ROLE_TEMPLATE_SUBSYSTEMS = ("code_lab", "philosophical_debate")
+# Code Lab per-role model pool: roles Code Lab actually invokes.
+_CODING_ROLES = ("planner", "developer", "critic", "reviewer", "judge")
 
 
 def _role_template_default_overrides(raw: Dict[str, Any]) -> Dict[str, str]:
@@ -217,6 +219,22 @@ def _role_templates_view(raw: Dict[str, Any]) -> Dict[str, Any]:
         for subsys in _ROLE_TEMPLATE_SUBSYSTEMS:
             view[subsys] = {"default_id": defaults[subsys], "status": "ERROR"}
     return view
+
+
+def get_coding_pool() -> Dict[str, str]:
+    """Settings-owned per-code-role model pool (planner/developer/critic/reviewer/judge).
+
+    Empty value = dynamic routing. Called by the dashboard when building a Code
+    Lab run so Settings -> CodeLabConfig.role_models -> CodingMultiAgent -> actual
+    LM Studio model is one connected path (S6).
+    """
+    try:
+        ov = _load_overrides().get("coding_pool", {})
+        if isinstance(ov, dict):
+            return {r: str(ov.get(r, "") or "") for r in _CODING_ROLES}
+        return {r: "" for r in _CODING_ROLES}
+    except Exception:  # pragma: no cover
+        return {r: "" for r in _CODING_ROLES}
 
 
 def default_role_template(subsystem: str) -> str:
@@ -291,6 +309,9 @@ def build_settings_snapshot() -> Dict[str, Any]:
         },
         "role_templates": _role_templates_view(rt_merged),
         "model_pool": {r: (m or "") for r, m in roles_eff.items()},
+        "coding_pool": {r: (str(overrides.get("coding_pool", {}).get(r, "")) or "")
+                        if isinstance(overrides.get("coding_pool"), dict) else ""
+                        for r in _CODING_ROLES},
         "personas": [{"role": p["role"], "name": p["name"]} for p in personas],
         "router": {
             "method": router.get("method", "llm"),
@@ -392,6 +413,10 @@ def get_settings() -> Dict[str, Any]:
             "pragmatist": models.get("pragmatist", ""),
             "moderator": models.get("moderator", ""),
         },
+        "coding_pool": {r: (overrides.get("coding_pool", {}).get(r, "") or "")
+                        if isinstance(overrides.get("coding_pool"), dict) else ""
+                        for r in _CODING_ROLES},
+        "coding_roles": list(_CODING_ROLES),
         "available_models": avail,
         "personas": _current_personas(cfg.get("personas", {})),
         "role_templates": _role_templates_view(cfg.get("role_templates", {})),
@@ -470,6 +495,25 @@ def update_settings(patch: Dict[str, Any]) -> Dict[str, Any]:
                     existing_models = {}
                 existing_models.update({k: v for k, v in clean.items()})
                 overrides["models"] = existing_models
+            continue
+        if key == "coding_pool":
+            if not isinstance(value, dict):
+                errors[key] = "'coding_pool' must be an object"
+                continue
+            clean = {}
+            for role, model in value.items():
+                if role not in _CODING_ROLES:
+                    errors[f"coding_pool.{role}"] = f"unknown coding role '{role}'"
+                elif not isinstance(model, str):
+                    errors[f"coding_pool.{role}"] = "model must be a string"
+                else:
+                    clean[role] = model
+            if not errors.get(key):
+                existing = overrides.get("coding_pool", {})
+                if not isinstance(existing, dict):
+                    existing = {}
+                existing.update(clean)
+                overrides["coding_pool"] = existing
             continue
         if key == "personas":
             # persona list override: dict role -> {name, color, system_prompt}

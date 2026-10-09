@@ -447,6 +447,11 @@ class CodeLabEngine:
         generated = gen.generate_files(self.config.prompt, self.config.seed)
         src_name = generated["source_filename"]
         test_name = generated["test_filename"]
+        # Free-form ("generic") tasks get NO deterministic oracle: the old
+        # run()->str test invented a contract the requested project (Tetris,
+        # GUI, library) never promised, producing FALSE FAILURES. Such tasks
+        # are validated with truthful structural checks instead (§1-3).
+        is_freeform = generated.get("plan_id") == "generic"
 
         ma = None
         if use_llm:
@@ -477,13 +482,14 @@ class CodeLabEngine:
                 dev_res2 = ma.develop(plan_res.get("response", ""), self.config.language)
                 agent_trace.append({"agent": "DEVELOPER", "attempt": 2, **dev_res2})
                 src = _developer_source(dev_res2.get("response", ""))
-            tests = generated.get("tests", "")  # deterministic tests remain the spec
+            tests = "" if is_freeform else generated.get("tests", "")  # free-form: NO oracle
             if not src.strip():
                 # GOAL 3/4: after the retry, an empty/phantom DEVELOPER output is
                 # an explicit, classified failure — NOT an opaque "completed".
                 # The AGENT_FAILED event is emitted by CodingMultiAgent._emit_agent
                 # (this is the multi-agent path), so no duplicate is added here.
                 errors.append({"stage": "agent_develop",
+                               "classification": "AGENT_OUTPUT_FAILURE",
                                "message": "DEVELOPER returned empty/phantom output after retry"})
                 return self._finalize(plan, env, files_created, iterations, errors,
                                       judge_status="NOT_REACHED",
@@ -492,26 +498,73 @@ class CodeLabEngine:
                                       agent_trace=agent_trace)
         else:
             src = (generated.get("source") or "").strip()
-            tests = (generated.get("tests") or "").strip()
-            if not src or not tests:
+            # Free-form tasks carry no invented oracle; only source is required.
+            tests = "" if is_freeform else (generated.get("tests") or "").strip()
+            if not src or (not tests and not is_freeform):
                 self._emit("AGENT_FAILED", run_id=self.config.run_id,
                            role="DEVELOPER", stage="generate",
                            error_type="empty_response",
                            message="Deterministic generator produced no usable output.")
-                errors.append({"stage": "generate", "message": "empty deterministic output"})
+                errors.append({"stage": "generate", "classification": "AGENT_OUTPUT_FAILURE",
+                               "message": "empty deterministic output"})
                 return self._finalize(plan, env, files_created, iterations, errors,
                                       judge_status="NOT_REACHED",
                                       judge_reason="generate_failed",
                                       det_status="NOT_REACHED")
 
-        self._write_files([(src_name, src), (test_name, tests)])
-        files_created = [src_name, test_name]
+        to_write = [(src_name, src)]
+        if tests.strip():
+            to_write.append((test_name, tests))
+        self._write_files(to_write)
+        files_created = [name for name, _ in to_write]
         # GOAL 8: explicit per-file events (relative paths only, never abs).
         for fname in files_created:
             self._emit(FILE_CREATED, run_id=self.config.run_id, file=fname,
                        operation="created", stage="develop",
                        agent_role="DEVELOPER",
                        mode="multi_agent" if use_llm else "deterministic")
+
+        # ── FREE-FORM: truthful structural validation (no invented oracle) ──
+        # Free-form tasks (Tetris, GUI, libraries, multi-file apps) are NOT
+        # validated against a fabricated run()->str contract. We validate only
+        # what is actually established: syntax/compile of every generated .py
+        # and presence of the expected files. No pytest is run (there is no
+        # oracle test), no CRITIC repair against an unrelated test, no LLM judge.
+        if is_freeform:
+            # A stop request must be honored in free-form mode too.
+            if self.stop_requested:
+                self._status = "stopped"
+                self._emit(RUN_STOPPED, run_id=self.config.run_id)
+                return self._finalize(plan, env, files_created, iterations, errors,
+                                      status="stopped", judge_status="NOT_REACHED",
+                                      judge_reason="stopped", det_status="NOT_REACHED",
+                                      agent_trace=agent_trace,
+                                      mode="multi_agent" if use_llm else "deterministic")
+            try:
+                validation = self._validate_freeform(files_created, generated)
+                det_ok = validation.get("deterministic_validation")
+                det_status = "PASS" if det_ok is True else "FAIL"
+            except Exception as _ve:  # validator crashed -> explicit ERROR
+                validation = {"method": "code-lab-v2-freeform", "error": str(_ve)[:200]}
+                det_status = "ERROR"
+            _struct_ok = validation.get("deterministic_validation") is True
+            status = "passed" if _struct_ok else "failed"
+            # Judge disposition follows the existing convention: deterministic
+            # mode has no LLM judge available -> UNAVAILABLE; multi-agent free-form
+            # skips the judge -> NOT_REACHED (pipeline stopped before it).
+            if use_llm:
+                _jstatus, _jreason = "NOT_REACHED", "freeform_structural_no_llm_judge"
+            else:
+                _jstatus, _jreason = "UNAVAILABLE", "llm_backend_unavailable"
+            result = self._finalize(plan, env, files_created, [], errors, status=status,
+                                    agent_trace=agent_trace,
+                                    mode="multi_agent" if use_llm else "deterministic",
+                                    judge_status=_jstatus, judge_reason=_jreason,
+                                    det_status=det_status)
+            result["validation"] = validation
+            result["validator_protocol"] = "code-lab-v2-freeform"
+            result["tests_last_passed"] = _struct_ok
+            return result
 
         # ── bounded VERIFY + repair loop ────────────────────────────────────
         last_tests_passed = False
@@ -536,7 +589,9 @@ class CodeLabEngine:
 
             self._emit(TEST_FAILED, run_id=self.config.run_id, iteration=iteration,
                        failures=ver.get("failures", 0))
-            errors.append({"stage": f"pytest_iter{iteration}", "message": ver.get("output", "")[-500:]})
+            errors.append({"stage": f"pytest_iter{iteration}",
+                               "classification": "TEST_FAILURE",
+                               "message": ver.get("output", "")[-500:]})
 
             if iteration == self.config.max_iterations:
                 break
@@ -558,6 +613,7 @@ class CodeLabEngine:
                         changed = True
                 if not changed:
                     errors.append({"stage": f"repair_iter{iteration}",
+                                   "classification": "VALIDATION_FAILURE",
                                    "message": "critic produced no usable patch"})
                     break
             else:
@@ -565,6 +621,7 @@ class CodeLabEngine:
                 changed = repaired.get("changed", False)
                 if not changed:
                     errors.append({"stage": f"repair_iter{iteration}",
+                                   "classification": "VALIDATION_FAILURE",
                                    "message": "no deterministic fix applied"})
                     break
 
@@ -643,6 +700,7 @@ class CodeLabEngine:
             det_status=det_status,
         )
         result["validation"] = validation
+        result["validator_protocol"] = "code-lab-v2-known"
         result["tests_last_passed"] = last_tests_passed
         result["reviewer"] = review
         # The LLM semantic judge is the CODE LAB component
@@ -754,6 +812,53 @@ class CodeLabEngine:
                 results[f"{f}_compile"] = f"syntax_error: {e}"
         results["source_files"] = source_files
         self._emit(VALIDATION_COMPLETED, run_id=self.config.run_id, results=results)
+        return {"valid": ok, "deterministic_validation": ok, "details": results}
+
+    def _validate_freeform(self, files, generated) -> Dict[str, Any]:
+        """Truthful structural validation for free-form / unknown tasks.
+
+        Establishes ONLY what it actually checks (rule 6 — no invented ground
+        truth): every generated .py parses+compiles, and the expected source
+        files from the plan are present. It does NOT claim task correctness
+        (there is no run()->str oracle). Validation levels are reported so the
+        caller can see exactly what was and was not proven.
+        """
+        results = {
+            "method": "code-lab-v2-freeform",
+            "validator_protocol": "code-lab-v2-freeform",
+            "validator_protocol_version": "2",
+            "files": list(files),
+            "detected_plan": generated.get("plan_id"),
+            "syntax_validation": "PASS",
+            "generated_tests": "NOT_AVAILABLE",
+            "task_semantic_validation": "NOT_AVAILABLE",
+            "expected_files_present": {},
+        }
+        ok = True
+        py_files = [f for f in files if f.endswith(".py")]
+        if not py_files:
+            ok = False
+            results["syntax_validation"] = "FAIL"
+            results["expected_files_present"]["no_python_files"] = False
+        for f in py_files:
+            try:
+                compile(self.ws.read_text(f), f, "exec")
+                results[f"{f}_compile"] = "ok"
+                results["expected_files_present"][f] = True
+            except SyntaxError as e:
+                ok = False
+                results["syntax_validation"] = "FAIL"
+                results[f"{f}_compile"] = f"syntax_error: {e}"
+                results["expected_files_present"][f] = False
+        results["deterministic_validation"] = ok
+        self._emit(VALIDATION_COMPLETED, run_id=self.config.run_id, results={
+            "method": results["method"], "deterministic_validation": ok,
+            "syntax_validation": results["syntax_validation"],
+            "generated_tests": results["generated_tests"],
+            "task_semantic_validation": results["task_semantic_validation"],
+            "expected_files_present": results["expected_files_present"],
+            "files": list(files),
+        })
         return {"valid": ok, "deterministic_validation": ok, "details": results}
 
     def _finalize(self, plan, env, files_created, iterations, errors, status=None,

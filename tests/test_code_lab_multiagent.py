@@ -200,3 +200,69 @@ class TestLiveMultiAgentIntegration:
         # at least one FAIL; the critic may repair or honestly report).
         res = eng.run()
         assert res["execution_mode"] == "multi_agent"
+
+
+# ── S9: Coding Pool — per-role configured models reach each agent ─────────
+class _RecLLM:
+    """Records the model passed to chat; mimics last_model_used."""
+    def __init__(self, default="router-default"):
+        self.calls = []
+        self.last_model_used = default
+    def chat(self, messages, model=None, temperature=0.8, max_tokens=700):
+        self.calls.append(model)
+        self.last_model_used = model or self.last_model_used
+        return "```python\ndef f():\n    return 1\n```\n", "stop"
+
+
+def test_coding_pool_configured_models_reach_each_role():
+    """S9: planner=A..judge=E -> each agent calls chat with ITS configured model,
+    and AGENT_RESPONSE events record configured_model + selection_mode=configured."""
+    stub = _RecLLM()
+    events = []
+    ma = CodingMultiAgent("http://x/v1", "", llm_client=stub, on_event=events.append,
+                          role_models={"planner": "model-A", "developer": "model-B",
+                                       "critic": "model-C", "reviewer": "model-D",
+                                       "judge": "model-E"})
+    expected = ["model-A", "model-B", "model-C", "model-D", "model-E"]
+    # invoke each role once, in order
+    ma.plan("build plan for a thing", "Python")
+    ma.develop("the plan", "Python")
+    ma.critique("source...", {"passed": True}, "Python")
+    ma.review("source...", "tests...", {"passed": True})
+    ma.judge("source...", "tests...", True)
+
+    # the configured model was actually passed to the LLM backend for each role
+    assert stub.calls[:5] == expected, f"got {stub.calls}"
+    for role, exp in [("PLANNER", "model-A"), ("DEVELOPER", "model-B"),
+                      ("CRITIC", "model-C"), ("REVIEWER", "model-D"),
+                      ("JUDGE", "model-E")]:
+        assert ma.agents[role].model_used == exp, f"{role}: {ma.agents[role].model_used}"
+
+    # AGENT_RESPONSE events carry configured vs actual + explicit selection_mode
+    resp = [e for e in events if e.get("type") == "AGENT_RESPONSE"]
+    by_role = {e["role"]: e for e in resp}
+    assert set(by_role) == {"PLANNER", "DEVELOPER", "CRITIC", "REVIEWER", "JUDGE"}
+    for role, exp in [("PLANNER", "model-A"), ("DEVELOPER", "model-B"),
+                      ("CRITIC", "model-C"), ("REVIEWER", "model-D"),
+                      ("JUDGE", "model-E")]:
+        ev = by_role[role]
+        assert ev["configured_model"] == exp
+        assert ev["model"] == exp            # actual == configured
+        assert ev["selection_mode"] == "configured"
+
+
+def test_coding_pool_empty_means_dynamic_explicit():
+    """S7: an empty configured model is recorded as dynamic, never as a
+    specific model selection. configured_model is null."""
+    stub = _RecLLM(default="router-default")
+    events = []
+    ma = CodingMultiAgent("http://x/v1", "", llm_client=stub, on_event=events.append,
+                          role_models={"developer": ""})
+    ma.develop("plan", "Python")
+    resp = [e for e in events if e.get("type") == "AGENT_RESPONSE"][0]
+    assert resp["role"] == "DEVELOPER"
+    assert resp["configured_model"] is None
+    assert resp["selection_mode"] in ("dynamic", "backend_default")
+    # actual model is what the backend/router actually used
+    assert resp["model"] == "router-default"
+    assert ma.agents["DEVELOPER"].model_used == "router-default"

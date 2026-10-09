@@ -257,12 +257,10 @@ def test_reverse_none_raises():
     with pytest.raises(TypeError):
         reverse_string(None)
 ''',
-    "generic": '''from main import run
-
-
-def test_run_returns_string():
-    assert isinstance(run(), str)
-''',
+    # Free-form ("generic") tasks get NO deterministic oracle: the run()->str
+        # test was an invented contract that rejects valid arbitrary projects
+        # (Tetris, GUI, libraries). Structural validation is performed instead.
+        "generic": "",
 }
 
 
