@@ -137,3 +137,27 @@ def test_codelab_run_endpoint_live(server):
     )
     assert status == 200, body
     assert body["status"] == "created"
+
+
+
+def test_experimental_capabilities_endpoint_live(server):
+    """The sandbox capabilities route serves over HTTP and reports the honest
+    executor connectivity (code connected, debate not connected here)."""
+    base, _ = server
+    status, body = _req(base, "/api/experimental/capabilities", method="GET")
+    assert status == 200, body
+    assert "code" in body["connected_executors"]
+    assert "debate" not in body["connected_executors"]
+
+
+def test_experimental_create_draft_never_runs_http(server):
+    """Creating a design over HTTP yields a DRAFT that cannot run yet
+    (400 DESIGN_INVALID) — the human-gated flow holds over the wire."""
+    base, _ = server
+    status, body = _req(base, "/api/experimental/designs", method="POST",
+                        body={"description": "probe sorting algorithm edge cases"})
+    assert status == 200, body
+    assert body["status"] == "DRAFT"
+    design_id = body["design_id"]
+    st2, body2 = _req(base, f"/api/experimental/designs/{design_id}/run", method="POST", body={})
+    assert st2 == 400 and body2.get("code") == "DESIGN_INVALID", body2

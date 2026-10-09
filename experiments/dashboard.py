@@ -27,7 +27,20 @@ except Exception:  # pragma: no cover
 logger = logging.getLogger("ExperimentDashboard")
 
 
-class DashboardHandler(BaseHTTPRequestHandler):
+from experimental.api import ExperimentalApiMixin
+
+
+def _experimental_id_from_path(path: str, suffix: str):
+    """Extract the design_id before a literal '/run' or '/transition' suffix
+    (string slicing — never str.strip, which strips the leading '/' and any
+    matching hex chars)."""
+    if not path.endswith(suffix):
+        return None
+    core = path[: -len(suffix)]
+    return core.split("/")[-1] if core else None
+
+
+class DashboardHandler(ExperimentalApiMixin, BaseHTTPRequestHandler):
     """HTTP request handler for the experiment dashboard."""
 
     ui_controller: ExperimentUIController = None  # Set by server
@@ -53,6 +66,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._code_lab_events(parsed.path)
         elif parsed.path.startswith("/api/code-lab/runs/"):
             self._code_lab_get(parsed.path)
+        elif parsed.path == "/api/experimental/capabilities":
+            self._experimental_capabilities()
+        elif parsed.path == "/api/experimental/designs":
+            self._experimental_designs()
+        elif parsed.path.startswith("/api/experimental/designs/"):
+            _id = ExperimentalApiMixin.match_design_id(parsed.path)
+            if _id:
+                self._experimental_design_get(_id)
+            else:
+                self._send_error(404, "Not found")
         elif parsed.path == "/dashboard":
             self._serve_dashboard()
         else:
@@ -96,6 +119,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
             else:
                 self.ui_controller.stop_experiment(exp_id)
                 self._send_json({"status": "stopped"})
+        elif parsed.path == "/api/experimental/designs":
+            self._experimental_design_create(data)
+        elif parsed.path.startswith("/api/experimental/designs/") and parsed.path.endswith("/transition"):
+            _id = _experimental_id_from_path(parsed.path, "/transition")
+            if _id:
+                self._experimental_design_transition(_id, data)
+            else:
+                self._send_error(404, "Not found")
+        elif parsed.path.startswith("/api/experimental/designs/") and parsed.path.endswith("/run"):
+            _id = _experimental_id_from_path(parsed.path, "/run")
+            if _id:
+                self._experimental_design_run(_id)
+            else:
+                self._send_error(404, "Not found")
         else:
             self._send_error(404, "Not found")
 
