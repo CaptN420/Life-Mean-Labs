@@ -370,7 +370,19 @@
             border-radius: 50%;
             font-size: 1.5rem;
         }
-    </style>
+        /* Compare 3-column browser/inspector/tray */
+        .compare-browser-list { max-height: 60vh; overflow: auto; }
+        .browser-item { margin-bottom: 0.4rem; }
+        .browser-item.in-tray { outline: 1px solid var(--accent); }
+        .subject-list { font-size: 0.85rem; }
+        .subject-row { padding: 0.2rem 0.35rem; cursor: pointer; border-radius: 4px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .subject-row:hover { background: var(--card); }
+        .subject-row.active-subject { background: var(--accent); color: var(--card); font-weight: 600; }
+        .compare-filt.active-filt { background: var(--accent); color: var(--card); border-color: var(--accent); }
+        .tray-list .tray-item { padding: 0.4rem; }
+        .data-table th { text-align: left; font-weight: 600; width: 40%; }
+        .compare-col { min-width: 0; }
+        </style>
 </head>
 <body>
     <div class="container">
@@ -384,6 +396,7 @@
             <button class="tab-btn" data-tab="debate" onclick="switchTab('debate', this)">Debate</button>
             <button class="tab-btn" data-tab="code-lab" onclick="switchTab('code-lab', this)">Code Lab</button>
             <button class="tab-btn" data-tab="settings" onclick="switchTab('settings', this)">Settings</button>
+            <button class="tab-btn" data-tab="compare" onclick="switchTab('compare', this)">Compare</button>
         </nav>
 
         <!-- ── Autopilot tab — the REAL experiment workflow (GOAL 7/8) ── -->
@@ -552,6 +565,73 @@
                 <div id="settings-body"></div>
             </div>
         </div>
+
+        <!-- ── Compare tab — browse / inspect / select / compare ── -->
+        <div id="panel-compare" class="tab-panel">
+            <div class="card">
+                <h2>Compare</h2>
+                <p class="subtitle">Browse experiments, inspect their configuration, then select the runs you want to compare.
+                Life_mean identifies what stayed the same, what changed, and how comparable the runs are.
+                <span title="Compare separates measured observations from hypotheses; it never infers causality from an uncontrolled comparison." style="border-bottom:1px dotted var(--muted-foreground);cursor:help;">ℹ</span></p>
+
+                <div style="display:grid;grid-template-columns:minmax(260px,30%) minmax(320px,45%) minmax(240px,25%);gap:1rem;align-items:start;">
+                    <!-- ── LEFT: EXPERIMENT BROWSER ── -->
+                    <div class="compare-col">
+                        <h3 style="margin:0 0 0.5rem;">Experiments</h3>
+                        <input id="compare-search" type="text" placeholder="🔎 Search subject / id / task…"
+                               oninput="renderBrowser()" style="width:100%;margin-bottom:0.5rem;">
+                        <div class="filter-row" style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+                            <button class="btn-sm compare-filt" data-f="all" onclick="setFilter('all')">All</button>
+                            <button class="btn-sm compare-filt" data-f="recent" onclick="setFilter('recent')">Recent</button>
+                            <button class="btn-sm compare-filt" data-f="successful" onclick="setFilter('successful')">Successful</button>
+                            <button class="btn-sm compare-filt" data-f="failed" onclick="setFilter('failed')">Failed</button>
+                            <button class="btn-sm compare-filt" data-f="inconclusive" onclick="setFilter('inconclusive')">Inconclusive</button>
+                        </div>
+                        <details id="compare-subject-nav" style="margin-bottom:0.5rem;">
+                            <summary style="cursor:pointer;color:var(--accent);">📁 Subjects</summary>
+                            <div id="compare-subject-list" class="empty-state" style="margin-top:0.3rem;max-height:200px;overflow:auto;">Loading…</div>
+                        </details>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin:0.25rem 0;">
+                            <span id="compare-browser-count" style="font-size:0.8rem;color:var(--muted-foreground);"></span>
+                            <span id="compare-index-meta" style="font-size:0.75rem;color:var(--muted-foreground);"></span>
+                        </div>
+                        <div id="compare-browser" class="empty-state">Loading experiments…</div>
+                    </div>
+
+                    <!-- ── CENTER: EXPERIMENT INSPECTOR ── -->
+                    <div class="compare-col">
+                        <h3 style="margin:0 0 0.5rem;">Inspector</h3>
+                        <div id="compare-inspector" class="empty-state">Select an experiment in the browser to inspect it in detail before comparing. Clicking never adds it to the comparison — <strong>Add to Compare</strong> is explicit.</div>
+                        <div id="compare-result" style="margin-top:0.75rem;"></div>
+                    </div>
+
+                    <!-- ── RIGHT: COMPARE TRAY ── -->
+                    <div class="compare-col">
+                        <h3 style="margin:0 0 0.5rem;">Comparison tray</h3>
+                        <div class="experiment-item" style="padding:0.5rem;">
+                            <div id="compare-tray-list" class="empty-state" style="border:none;background:none;padding:0;">Select at least 2 experiments.</div>
+                            <div id="compare-tray-summary" style="margin:0.4rem 0;font-size:0.8rem;color:var(--muted-foreground);"></div>
+                            <button class="btn" onclick="runSelectedCompare()" id="compare-run-btn" disabled style="width:100%;">Compare</button>
+                            <div id="compare-tray-hint" style="margin-top:0.4rem;font-size:0.75rem;color:var(--muted-foreground);">Select at least 2 experiments.</div>
+                        </div>
+
+                        <details style="margin-top:0.75rem;">
+                            <summary style="cursor:pointer;color:var(--muted-foreground);font-size:0.85rem;">▾ Advanced</summary>
+                            <div style="margin-top:0.4rem;font-size:0.85rem;">
+                                <button class="btn-sm" onclick="bootstrapSubjects()">Rebuild subject tree from RAW</button>
+                                <div style="display:flex;gap:0.3rem;margin-top:0.4rem;">
+                                    <input id="compare-register-exp" type="text" placeholder="exp_id" style="flex:1;min-width:0;">
+                                    <input id="compare-register-subject" type="text" placeholder="math/arithmetic" style="flex:1;min-width:0;">
+                                    <button class="btn-sm" onclick="registerSubject()">Register</button>
+                                </div>
+                                <button class="btn-sm" style="margin-top:0.4rem;" onclick="rebuildBrowserIndex()">Rebuild index from RAW</button>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <button class="refresh-btn" onclick="loadExperiments()" title="Refresh">↻</button>
@@ -584,6 +664,478 @@
             if (btn) btn.classList.add('active');
             if (name === 'code-lab') { loadCodeLab(); loadEffectiveTemplate(); }
             if (name === 'settings') loadSettings();
+            if (name === 'compare') { loadCompare(); }
+        }
+
+        // ── Compare ───────────── browse / inspect / select / compare ──
+        const selectedSet = new Set();
+        let compareFilter = 'all';
+        let compareSearch = '';
+        let activeSubject = null;      // null = no subject filter
+        let browserRows = [];
+
+        // Global click listeners for the dynamically-rendered browser (avoids
+        // brittle inline onclick quoting). Everything routes through this one
+        // delegated handler, which also enforces "click != select".
+        document.addEventListener('click', function (ev) {
+            const t = ev.target.closest('[data-compare-action]');
+            if (!t || !ev.target.closest('#panel-compare')) return;
+            const action = t.dataset.compareAction;
+            const id = t.dataset.id || '';
+            if (action === 'inspect') { inspectExperiment(id); }
+            else if (action === 'add') { addToCompare(id); }
+            else if (action === 'remove') { removeFromCompare(id); }
+            else if (action === 'subject') { setSubject(id); }
+            ev.stopPropagation();
+        });
+
+        function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+        function shortId(id) { return id && id.length > 24 ? id.slice(0, 22) + '…' : (id || '—'); }
+
+        function runLabel(r) {
+            // No title exists in RAW for these runs; show best available:
+            // subject/task first, then experiment id. Honest fallback to id.
+            const by = browserRows.find(x => x.experiment_id === (r && r.experiment_id)) || {};
+            const subj = r.subject || by.subject;
+            const head = subj ? String(subj) : 'Experiment';
+            return (head.charAt(0).toUpperCase() + head.slice(1)) + ' · ' + shortId(r.experiment_id);
+        }
+
+        function statusBadge(row) {
+            const st = row.status || 'INCONCLUSIVE';
+            const cls = st === 'COMPLETED' ? 'status-running'
+                : (st === 'COMPLETED_WITH_FAILURES' || st === 'FAILED' ? 'status-stopped' : 'status-pending');
+            const label = st === 'COMPLETED_WITH_FAILURES' ? 'COMPLETED' : st;
+            return '<span class="status-badge ' + cls + '">' + esc(label) + '</span>';
+        }
+
+        async function loadCompare() {
+            compareSearch = ''; compareFilter = 'all'; activeSubject = null;
+            await loadBrowserRows();
+        }
+
+        async function loadBrowserRows() {
+            const bl = document.getElementById('compare-browser');
+            if (bl) bl.innerHTML = '<div class="empty-state">Loading experiments…</div>';
+            try {
+                const resp = await fetch(API_BASE + '/compare/browser');
+                const data = await resp.json();
+                browserRows = data.experiments || [];
+                const meta = document.getElementById('compare-index-meta');
+                if (meta) meta.textContent = data.generated_at ? 'Indexed ' + (data.fresh ? 'just now' : data.generated_at) : '';
+                await loadSubjectList();
+                renderBrowser();
+            } catch (err) {
+                if (bl) bl.innerHTML = '<div class="empty-state">Could not load experiments. <button class="btn-sm" onclick="loadBrowserRows()">Retry</button></div>';
+            }
+        }
+
+        async function loadSubjectList() {
+            const el = document.getElementById('compare-subject-list');
+            if (!el) return;
+            try {
+                const resp = await fetch(API_BASE + '/compare/tree');
+                const data = await resp.json();
+                const topics = (data.topics || []).map(t => t.name ? t.name : t);
+                if (!topics.length) { el.className = 'empty-state'; el.style.maxHeight = ''; el.textContent = 'No subjects yet. Use Advance → Rebuild subject tree.'; return; }
+                const counts = {};
+                browserRows.forEach(r => { if (r.subject) counts[r.subject] = (counts[r.subject] || 0) + 1; });
+                el.className = 'subject-list';
+                el.innerHTML = '<div data-compare-action="subject" data-id="" class="subject-row' + (activeSubject === null ? ' active-subject' : '') + '">All</div>' +
+                    topics.map(function (t) {
+                        const n = counts[t] != null ? counts[t] : '';
+                        return '<div data-compare-action="subject" data-id="' + esc(t) + '" class="subject-row' + (activeSubject === t ? ' active-subject' : '') + '">📂 ' + esc(t) + (n !== '' ? ' <span style="opacity:.6">(' + n + ')</span>' : '') + '</div>';
+                    }).join('');
+            } catch (err) {
+                el.className = 'empty-state'; el.textContent = 'Subjects unavailable.';
+            }
+        }
+
+        function setFilter(f) {
+            compareFilter = f;
+            document.querySelectorAll('.compare-filt').forEach(function (b) {
+                b.classList.toggle('active-filt', b.dataset.f === f);
+            });
+            renderBrowser();
+        }
+
+        function setSubject(id) {
+            activeSubject = id || null;
+            loadSubjectList();
+            renderBrowser();
+        }
+
+        function filteredRows() {
+            const q = (document.getElementById('compare-search') ? document.getElementById('compare-search').value : '').trim().toLowerCase();
+            return browserRows.filter(function (r) {
+                if (compareFilter === 'recent') {
+                    if (r.status === 'INCONCLUSIVE' && r.num_tasks === 0) return false;
+                }
+                if (compareFilter === 'successful' && r.status !== 'COMPLETED') return false;
+                if (compareFilter === 'failed' && r.status !== 'COMPLETED_WITH_FAILURES' && r.status !== 'FAILED') return false;
+                if (compareFilter === 'inconclusive' && r.status !== 'INCONCLUSIVE') return false;
+                if (activeSubject && (r.subject || '') !== activeSubject) return false;
+                if (q) {
+                    const hay = (r.subject || '') + ' ' + r.experiment_id + ' ' + (r.run_id || '') + ' ' + (r.execution_mode || '') + ' ' + (r.workers || []).join(' ') + ' ' + (r.tools || []).join(' ');
+                    if (hay.toLowerCase().indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderBrowser() {
+            const el = document.getElementById('compare-browser');
+            const rows = filteredRows();
+            const cnt = document.getElementById('compare-browser-count');
+            if (cnt) cnt.textContent = browserRows.length ? rows.length + ' / ' + browserRows.length + ' experiments' : '';
+            if (!browserRows.length) {
+                el.className = 'empty-state';
+                el.innerHTML = 'No experiments found. Run an experiment first.<br><button class="btn-sm" onclick="rebuildBrowserIndex()">Refresh index</button>';
+                return;
+            }
+            if (!rows.length) { el.className = 'empty-state'; el.innerHTML = 'No experiments match your filters.'; return; }
+            el.className = 'compare-browser-list';
+            el.innerHTML = rows.slice(0, 120).map(function (r) {
+                const sr = (r.success_rate * 100).toFixed(0) + '%';
+                return '<div class="experiment-item browser-item' + (selectedSet.has(r.experiment_id) ? ' in-tray' : '') + '" data-compare-action="inspect" data-id="' + esc(r.experiment_id) + '" style="cursor:pointer;">'
+                    + '<div class="experiment-header"><span class="experiment-id">' + esc(runLabel(r)) + '</span> ' + statusBadge(r) + '</div>'
+                    + '<div class="experiment-stats">'
+                    + '<span class="experiment-stat">' + r.num_tasks + ' tasks</span>'
+                    + '<span class="experiment-stat">Pass ' + sr + '</span>'
+                    + '<span class="experiment-stat">' + esc(r.created_at || 'no date') + '</span>'
+                    + '<span class="experiment-stat" style="opacity:.7">' + esc(r.subject || 'no subject') + '</span>'
+                    + '</div>'
+                    + '<div class="experiment-actions" style="margin-top:0.25rem;">'
+                    + (selectedSet.has(r.experiment_id)
+                        ? '<span style="font-size:0.75rem;color:var(--accent);">✓ in tray</span>'
+                        : '<button class="btn-sm" data-compare-action="add" data-id="' + esc(r.experiment_id) + '">+ Add to Compare</button>')
+                    + '</div>'
+                    + '</div>';
+            }).join('') + (rows.length > 120 ? '<div class="empty-state">Showing first 120. Narrow your search.</div>' : '');
+        }
+
+        // ── Tray (explicit selection) ──
+        function addToCompare(id) {
+            if (selectedSet.has(id)) return;      // duplicate prevention
+            selectedSet.add(id);
+            renderTray(); renderBrowser(); refreshInspectorAddBtn();
+        }
+        function removeFromCompare(id) {
+            selectedSet.delete(id);
+            renderTray(); renderBrowser(); refreshInspectorAddBtn();
+        }
+        function clearSelection() { selectedSet.clear(); renderTray(); renderBrowser(); refreshInspectorAddBtn(); }
+
+        function renderTray() {
+            const list = document.getElementById('compare-tray-list');
+            const btn = document.getElementById('compare-run-btn');
+            const hint = document.getElementById('compare-tray-hint');
+            const sum = document.getElementById('compare-tray-summary');
+            const arr = Array.from(selectedSet);
+            if (!arr.length) {
+                list.className = 'empty-state'; list.style.border = 'none'; list.style.background = 'none'; list.style.padding = '0';
+                list.textContent = 'Select at least 2 experiments.';
+                sum.textContent = '0 selected';
+                if (btn) { btn.disabled = true; btn.textContent = 'Compare'; }
+                if (hint) hint.textContent = 'Select at least 2 experiments.';
+                return;
+            }
+            list.className = 'tray-list';
+            list.style.border = 'none'; list.style.background = 'none'; list.style.padding = '0';
+            list.innerHTML = arr.map(function (id, i) {
+                const r = browserRows.find(function (x) { return x.experiment_id === id; }) || {};
+                return '<div class="experiment-item tray-item" style="margin-bottom:0.35rem;">'
+                    + '<div class="experiment-header"><span style="color:var(--muted-foreground);font-weight:700;">' + String.fromCharCode(65 + i) + '</span>'
+                    + ' <span class="experiment-id">' + esc(runLabel({ experiment_id: id, subject: r.subject })) + '</span></div>'
+                    + '<div class="experiment-stats">' + statusBadge(r) + (r.execution_mode && r.execution_mode !== 'not_recorded' ? ' <span class="experiment-stat">' + esc(r.execution_mode) + '</span>' : '') + '</div>'
+                    + '<button class="btn-sm" data-compare-action="remove" data-id="' + esc(id) + '" style="margin-top:0.25rem;">Remove</button>'
+                    + '</div>';
+            }).join('');
+            const lbl = arr.length === 1 ? '1 experiment selected' : arr.length + ' experiments selected';
+            sum.textContent = lbl;
+            if (btn) { btn.disabled = arr.length < 2; btn.textContent = arr.length < 2 ? 'Compare' : 'Compare ' + arr.length + ' Experiments'; }
+            if (hint) hint.textContent = arr.length < 2 ? 'Select at least 2 experiments.' : 'Ready to compare.';
+            updateTrayPreview();
+        }
+
+        // Lightweight best-effort "known differences" before Compare (models are
+        // not recorded in RAW -> we show only genuinely differing recorded fields).
+        function updateTrayPreview() {
+            const el = document.getElementById('compare-tray-toolkit');
+            const arr = Array.from(selectedSet);
+            if (el) el.remove();
+            if (arr.length < 2) {
+                const out = document.getElementById('compare-tray-hint');
+                if (out) out.textContent = 'Select at least 2 experiments.';
+                return;
+            }
+            const rows = arr.map(function (id) { return browserRows.find(function (x) { return x.experiment_id === id; }); })
+                .filter(Boolean);
+            if (rows.length < 2) return;
+            const keys = ['subject', 'execution_mode', 'seed', 'generator_strategy'];
+            const diffs = keys.filter(function (k) {
+                const vals = rows.map(function (r) { return r[k] == null || r[k] === '' || (typeof r[k] === 'string' && r[k] === 'not_recorded') ? '?' : r[k]; });
+                return new Set(vals).size > 1;
+            });
+            let inner = '';
+            if (diffs.length) {
+                inner += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted-foreground);">Known differences: '
+                    + diffs.map(function (k) { return esc(k); }).join(', ') + '</div>';
+                inner += '<div style="font-size:0.7rem;color:var(--muted-foreground);">Models/template not recorded in RAW — differences shown are from recorded fields only.</div>';
+            } else {
+                inner += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted-foreground);">No recorded variables differ across these runs.</div>';
+            }
+            inner += '<div style="font-size:0.7rem;color:var(--muted-foreground);">Full comparability is decided by the Compare engine.</div>';
+            const tip = document.createElement('div');
+            tip.id = 'compare-tray-toolkit';
+            tip.innerHTML = inner;
+            document.getElementById('compare-tray-hint').after(tip);
+        }
+
+        // ── Inspector ──
+        function refreshInspectorAddBtn() {
+            const btn = document.getElementById('inspector-add-btn');
+            const cur = document.getElementById('inspector-cur-id');
+            if (btn && cur) {
+                const id = cur.dataset.id;
+                const inTray = id && selectedSet.has(id);
+                btn.textContent = inTray ? '✓ In comparison' : '+ Add to Compare';
+                btn.dataset.id = id;
+                btn.disabled = !id;
+            }
+        }
+
+        async function inspectExperiment(id) {
+            const el = document.getElementById('compare-inspector');
+            const title = document.getElementById('inspector-title');
+            el.innerHTML = '<div class="empty-state" style="border:none;background:none;">Loading…</div>';
+            if (title) title.textContent = shortId(id);
+            const existingRes = document.getElementById('compare-result');
+            try {
+                const r = await fetch(API_BASE + '/compare/run/' + encodeURIComponent(id));
+                const data = await r.json();
+                if (!r.ok) { el.innerHTML = '<div class="empty-state">Error: ' + esc(data.error || r.status) + '</div>'; return; }
+                renderInspector(el, data.experiment, data.subject, id);
+                if (existingRes) existingRes.innerHTML = '';
+            } catch (err) {
+                el.innerHTML = '<div class="empty-state">Failed to load: ' + esc(err.message) + '</div>';
+            }
+        }
+
+        function renderInspector(el, exp, subject, id) {
+            const c = exp.condition || {};
+            let condRows = '';
+            Object.keys(c).forEach(function (k) {
+                let v = c[k], vs;
+                if (Array.isArray(v)) vs = v.join(' – '); else if (typeof v === 'object' && v !== null) vs = JSON.stringify(v); else vs = String(v);
+                condRows += '<tr><th>' + esc(k) + '</th><td>' + esc(vs) + '</td></tr>';
+            });
+            const t = exp.tasks || {};
+            let failS = '';
+            (t.failing_sample || []).forEach(function (r) { failS += '<tr><td class="experiment-id">' + esc(r.task_id) + '</td><td>' + esc(r.failure_reason) + '</td><td>' + esc((r.tools || []).join(', ')) + '</td></tr>'; });
+            let passS = '';
+            (t.passing_sample || []).forEach(function (r) { passS += '<tr><td class="experiment-id">' + esc(r.task_id) + '</td><td>' + esc((r.tools || []).join(', ')) + '</td></tr>'; });
+            let tools = '—', workers = '—', fails = 'none';
+            const tc = exp.tool_counts || {}, wc = exp.worker_counts || {}, fr = exp.failure_reasons || {};
+            tools = Object.keys(tc).map(function (k) { return esc(k) + ' ×' + tc[k]; }).join(', ') || '—';
+            workers = Object.keys(wc).map(function (k) { return esc(k) + ' ×' + wc[k]; }).join(', ') || '—';
+            fails = Object.keys(fr).map(function (k) { return esc(k) + ' ×' + fr[k]; }).join(', ') || 'none';
+
+            let badge = 'status-pending';
+            if (exp.num_failed) badge = 'status-stopped'; else if (exp.num_passed) badge = 'status-running';
+            const stat = exp.num_failed ? 'COMPLETED_WITH_FAILURES' : (exp.num_passed ? 'COMPLETED' : 'INCONCLUSIVE');
+
+            const row = browserRows.find(function (x) { return x.experiment_id === id; }) || {};
+            const seed = row.seed != null ? row.seed : (c.seed != null ? c.seed : 'Not recorded');
+            const execMode = row.execution_mode && row.execution_mode !== 'not_recorded' ? row.execution_mode : 'Not recorded';
+            const created = row.created_at || 'Not recorded';
+            const genStrat = row.generator_strategy && row.generator_strategy !== 'not_recorded' ? row.generator_strategy : 'Not recorded';
+            const inTray = selectedSet.has(id);
+
+            el.className = 'inspector-wrap';
+            el.innerHTML = '<div class="experiment-item" data-inspector-id="' + esc(id) + '">'
+                + '<div class="experiment-header"><span class="experiment-id" id="inspector-cur-id" data-id="' + esc(id) + '">' + esc(runLabel({ experiment_id: id, subject: subject })) + '</span> <span class="status-badge ' + badge + '">' + stat + '</span></div>'
+                + '<div style="font-size:0.85rem;color:var(--muted-foreground);margin-top:0.2rem;">'
+                + esc(id) + ' · ' + esc(subject || 'no subject') + ' · ' + esc(created) + '</div>'
+                + '<button class="btn" id="inspector-add-btn" data-id="' + esc(id) + '" data-compare-action="add" style="margin-top:0.5rem;">' + (inTray ? '✓ In comparison' : '+ Add to Compare') + '</button>'
+                + '<div style="font-size:0.75rem;color:var(--muted-foreground);margin-top:0.2rem;">Clicking the experiment did not add it — this button is the explicit selection.</div>'
+
+                + '<h4 style="margin:0.75rem 0 0.3rem;">Overview</h4>'
+                + '<table class="data-table"><tbody>'
+                + '<tr><th>Subject</th><td>' + esc(subject || 'Not recorded') + '</td></tr>'
+                + '<tr><th>Run</th><td>' + esc(row.run_id || 'Not recorded') + '</td></tr>'
+                + '<tr><th>Created</th><td>' + esc(created) + '</td></tr>'
+                + '<tr><th>Execution mode</th><td>' + esc(execMode) + '</td></tr>'
+                + '<tr><th>Seed</th><td>' + esc(String(seed)) + '</td></tr>'
+                + '<tr><th>Generator strategy</th><td>' + esc(genStrat) + '</td></tr>'
+                + '<tr><th>Tasks</th><td>' + exp.num_tasks + '</td></tr>'
+                + '<tr><th>Passed / Failed / No verdict</th><td>' + exp.num_passed + ' / ' + exp.num_failed + ' / ' + exp.num_no_verdict + '</td></tr>'
+                + '<tr><th>Success rate</th><td>' + (exp.success_rate * 100).toFixed(1) + '%</td></tr>'
+                + '<tr><th>Avg score</th><td>' + Number(exp.avg_score || 0).toFixed(3) + '</td></tr>'
+                + '<tr><th>Template</th><td>Not recorded</td></tr>'
+                + '<tr><th>Models (configured)</th><td>Not recorded</td></tr>'
+                + '<tr><th>Models (actually used)</th><td>Not recorded</td></tr>'
+                + '<tr><th>Validator versions</th><td>Not recorded</td></tr>'
+                + '</tbody></table>'
+
+                + '<h4 style="margin:0.75rem 0 0.3rem;">Configuration</h4>'
+                + (condRows ? '<table class="data-table">' + condRows + '</table>' : '<div style="font-size:0.85rem;color:var(--muted-foreground);">Not recorded.</div>')
+
+                + '<h4 style="margin:0.75rem 0 0.3rem;">Workers (actually used)</h4><div style="font-size:0.9rem;">' + (workers === '—' ? 'Not recorded' : workers) + '</div>'
+                + '<h4 style="margin:0.75rem 0 0.3rem;">Tools used</h4><div style="font-size:0.9rem;">' + (tools === '—' ? 'Not recorded' : tools) + '</div>'
+                + '<h4 style="margin:0.75rem 0 0.3rem;">Failure reasons</h4><div style="font-size:0.9rem;">' + fails + '</div>'
+                + (failS ? '<h4 style="margin:0.75rem 0 0.3rem;">Failing task sample</h4><table class="data-table"><thead><tr><th>Task</th><th>Reason</th><th>Tools</th></tr></thead><tbody>' + failS + '</tbody></table>' : '')
+                + (passS ? '<h4 style="margin:0.75rem 0 0.3rem;">Passing task sample</h4><table class="data-table"><thead><tr><th>Task</th><th>Tools</th></tr></thead><tbody>' + passS + '</tbody></table>' : '')
+                + '</div>';
+        }
+
+        async function runSelectedCompare() {
+            const ids = Array.from(selectedSet);
+            const out = document.getElementById('compare-result');
+            if (ids.length < 2) { out.innerHTML = '<div class="empty-state">Select at least two experiments to compare.</div>'; return; }
+            out.innerHTML = '<div class="empty-state" style="border:none;background:none;">Comparing…</div>';
+            try {
+                const resp = await fetch(API_BASE + '/compare', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ experiment_ids: ids })
+                });
+                const data = await resp.json();
+                if (!resp.ok) { out.innerHTML = '<div class="empty-state">Error: ' + esc(data.error || resp.status) + '</div>'; return; }
+                renderCompare(data.report);
+            } catch (err) {
+                out.innerHTML = '<div class="empty-state">Compare failed: ' + esc(err.message) + '</div>';
+            }
+        }
+
+        function statCard(label, value) {
+            return '<div class="stat-card" style="min-width:100px;"><div class="stat-value" style="font-size:1.15rem;">' + esc(String(value)) + '</div><div class="stat-label">' + esc(label) + '</div></div>';
+        }
+
+        function renderCompare(report) {
+            const out = document.getElementById('compare-result');
+            const runs = report.runs || [];
+            const pairs = report.pairs || [];
+            const findings = report.findings || [];
+            const patterns = report.failure_patterns || [];
+            const sum = report.summary || {};
+            let html = '<h3 style="margin:0 0 0.5rem;">Comparison result</h3>';
+
+            if (sum.num_runs) {
+                html += '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.75rem;">'
+                    + statCard('Runs', sum.num_runs) + statCard('Tasks', sum.total_tasks)
+                    + statCard('Overall pass', (sum.overall_pass_rate * 100).toFixed(1) + '%');
+                if (sum.best_run) html += statCard('Best', runLabel(sum.best_run) + ' ' + (sum.best_run.success_rate * 100).toFixed(0) + '%');
+                if (sum.worst_run) html += statCard('Worst', runLabel(sum.worst_run) + ' ' + (sum.worst_run.success_rate * 100).toFixed(0) + '%');
+                html += '</div>';
+            }
+            if ((sum.top_failure_reasons || []).length) {
+                let rows = '';
+                sum.top_failure_reasons.forEach(function (f) { rows += '<tr><td>' + esc(f.reason) + '</td><td>' + f.count + '</td></tr>'; });
+                html += '<h4 style="margin:0.5rem 0 0.3rem;">Top failure reasons (across compared runs)</h4><table class="data-table"><thead><tr><th>Reason</th><th>Count</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            }
+
+            // ── Comparability + common vs changed variables ──
+            if (pairs.length) {
+                html += '<h3 style="margin:1rem 0 0.5rem;">Comparability</h3>';
+                pairs.forEach(function (p) {
+                    let cls = 'status-pending';
+                    if (p.comparability === 'HIGHLY_CONTROLLED') cls = 'status-running';
+                    else if (p.comparability === 'NOT_DIRECTLY_COMPARABLE') cls = 'status-stopped';
+                    const common = Object.keys(p.common_variables || {}).map(function (k) { return '<tr><th>✓ ' + esc(k) + '</th><td>' + esc(String(p.common_variables[k])) + '</td></tr>'; }).join('');
+                    const changed = Object.keys(p.changed_variables || {}).map(function (k) { return '<tr><th>△ ' + esc(k) + '</th><td>' + esc(String(p.changed_variables[k])) + '</td></tr>'; }).join('');
+                    html += '<div class="experiment-item" style="margin-bottom:0.5rem;">'
+                        + '<div><span class="experiment-id" data-compare-action="inspect" data-id="' + esc(p.left) + '" style="cursor:pointer;text-decoration:underline;">' + esc(runLabel({ experiment_id: p.left })) + '</span> vs '
+                        + '<span class="experiment-id" data-compare-action="inspect" data-id="' + esc(p.right) + '" style="cursor:pointer;text-decoration:underline;">' + esc(runLabel({ experiment_id: p.right })) + '</span> '
+                        + '<span class="status-badge ' + cls + '">' + esc(p.comparability) + '</span></div>'
+                        + '<div style="font-size:0.85rem;color:var(--muted-foreground);margin-top:0.2rem;">' + esc(p.reason) + '</div>'
+                        + (common ? '<table class="data-table" style="margin-top:0.3rem;">' + common + '</table><div style="font-size:0.75rem;color:var(--muted-foreground);">✓ same</div>' : '')
+                        + (changed ? '<table class="data-table" style="margin-top:0.3rem;">' + changed + '</table><div style="font-size:0.75rem;color:var(--muted-foreground);">△ changed</div>' : '')
+                        + '</div>';
+                });
+            }
+
+            // ── Runs matrix ──
+            html += '<h3 style="margin:1rem 0 0.5rem;">Run matrix</h3><table class="data-table"><thead><tr><th>Experiment</th><th>Tasks</th><th>Passed</th><th>Success</th><th>No verdict</th></tr></thead><tbody>';
+            runs.forEach(function (r) {
+                html += '<tr><td class="experiment-id" data-compare-action="inspect" data-id="' + esc(r.experiment_id) + '" style="cursor:pointer;text-decoration:underline;">' + esc(runLabel(r)) + '</td>'
+                    + '<td>' + r.num_tasks + '</td><td>' + r.num_passed + '</td>'
+                    + '<td>' + (r.success_rate * 100).toFixed(1) + '%</td><td>' + r.num_no_verdict + '</td></tr>';
+            });
+            html += '</tbody></table>';
+
+            // ── Findings grouped as narrative: Observations then Hypotheses, Repair ──
+            if (findings.length) {
+                const byKind = { OBSERVATION: [], HYPOTHESIS: [], REPAIR_CANDIDATE: [] };
+                findings.forEach(function (f) { (byKind[f.kind] = byKind[f.kind] || []).push(f); });
+                const groups = [
+                    ['Observations', '🔎', byKind.OBSERVATION, 'var(--accent)'],
+                    ['Hypotheses', '🧪', byKind.HYPOTHESIS, '#e0a63c'],
+                    ['Repair candidates', '🛠️', byKind.REPAIR_CANDIDATE, '#e0555c']
+                ];
+                groups.forEach(function (g) {
+                    const gi = g[0], icon = g[1], items = g[2], color = g[3];
+                    if (!items.length) return;
+                    html += '<h3 style="margin:1rem 0 0.4rem;">' + icon + ' ' + gi + '</h3>';
+                    items.forEach(function (f) {
+                        let runsTxt = '';
+                        if (f.runs && f.runs.length) runsTxt = ' <span style="opacity:.7;font-size:0.8rem;"> · ' + esc(f.runs.join(', ')) + '</span>';
+                        html += '<div class="experiment-item" style="margin-bottom:0.4rem;padding-left:0.75rem;border-left:3px solid ' + color + ';">'
+                            + '<span style="font-size:0.95rem;">' + esc(f.message) + '</span>' + runsTxt + '</div>';
+                    });
+                });
+            }
+
+            if (patterns.length) {
+                html += '<h3 style="margin:1rem 0 0.5rem;">Failure patterns</h3>';
+                patterns.forEach(function (p) {
+                    html += '<div class="experiment-item" style="margin-bottom:0.4rem;">'
+                        + '<span class="status-badge status-stopped">' + esc(p.failure_reason) + '</span>'
+                        + ' <span>' + p.count + '× across ' + esc(p.runs.join(', ')) + '</span></div>';
+                });
+            }
+
+            out.innerHTML = html || '<div class="empty-state">No comparison data.</div>';
+            if (out.scrollIntoView) out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // ── Advanced / admin (off the primary path) ──
+        async function rebuildBrowserIndex() {
+            const el = document.getElementById('compare-browser');
+            if (el) el.innerHTML = '<div class="empty-state">Rebuilding index…</div>';
+            await fetch(API_BASE + '/compare/browser/rebuild');
+            await loadBrowserRows();
+        }
+
+        async function registerSubject() {
+            const eid = (document.getElementById('compare-register-exp') || {}).value || '';
+            const subject = (document.getElementById('compare-register-subject') || {}).value || '';
+            const out = document.getElementById('compare-browser');
+            if (!eid || !subject) { alert('Enter experiment id and a subject (e.g. math/arithmetic).'); return; }
+            try {
+                const resp = await fetch(API_BASE + '/compare/tree/register', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ experiment_id: eid, subject: subject })
+                });
+                const data = await resp.json();
+                if (!resp.ok) { alert('Error: ' + (data.error || resp.status)); return; }
+                alert('Registered ' + eid + ' under ' + data.registered.subject);
+                await loadSubjectList();
+            } catch (err) { alert('Register failed: ' + err.message); }
+        }
+
+        async function bootstrapSubjects() {
+            const out = document.getElementById('compare-browser');
+            if (out) out.innerHTML = '<div class="empty-state">Building subject tree from RAW evidence…</div>';
+            try {
+                const resp = await fetch(API_BASE + '/compare/tree/bootstrap', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+                });
+                const data = await resp.json();
+                if (!resp.ok) { if (out) out.innerHTML = '<div class="empty-state">Error: ' + esc(data.error || resp.status) + '</div>'; return; }
+                await loadBrowserRows();
+            } catch (err) {
+                if (out) out.innerHTML = '<div class="empty-state">Bootstrap failed: ' + esc(err.message) + '</div>';
+            }
         }
 
         // ── Code Lab ────────────────────────────────────────

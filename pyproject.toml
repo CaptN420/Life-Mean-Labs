@@ -34,6 +34,8 @@ include = [
     "core*",
     "analysis*",
     "autopilot*",
+    "experimental*",
+    "compare*",
 ]
 # Exclude generated / namespace runtimes and legacy projects from the wheel.
 # NOTE: `code_lab*` must NOT capture the generated user-workspace `code_lab_runs`

@@ -1,0 +1,111 @@
+{
+  "report": "PROTOCOL_TERMINOLOGY_AUDIT",
+  "date": "2026-10-09",
+  "generated_by": "Life_mean protocol terminology + responsibility audit (spec f224c0)",
+  "scope": "source code, tests, docs, config, UI — excludes .venv, build/, legacy/, hermes-debate, storage/, data/, __pycache__",
+  "executive_summary": "No severe misuse of 'protocol' in live source. No CodingProtocol/TurnProtocol/RetryProtocol/RoutingProtocol/EscalationProtocol runtime component exists. Real occurrences are semantically correct (transport/RAW/window/URL), docstring prose, or correctly-named data fields (validator_protocol, executor_type). No behavioral renames performed (speculative renames prohibited). True ExperimentProtocol model is MISSING (documented, not built).",
+  "renames_performed": [],
+  "confirmed_misnomers": [
+    {
+      "component": "comments/docstrings in role_templates/core.py + registry.py + code_lab/__init__.py",
+      "path": "role_templates/core.py:94,100-104; registry.py:10,41,54; code_lab/__init__.py:8",
+      "responsible_for": "using 'protocol' in prose to mean template/executor_type/workflow",
+      "category": "MISNAMED (prose only)",
+      "rename_required": false,
+      "risk": "none (no data-field impact)",
+      "notes": "Actual data field is already correctly named executor_type; only comments call it 'protocol'."
+    },
+    {
+      "component": "ReflectionProtocol class",
+      "path": "library/protocols/reflection.py:16",
+      "responsible_for": "deterministic mirror-transformation mechanism (a TOOL)",
+      "category": "TOOL named 'protocol'",
+      "rename_required": false,
+      "risk": "high for ~zero gain",
+      "notes": "No productive callers (tests + __init__ only); speculative rename prohibited per S18. Semantically a deterministic capability, not a scientific protocol."
+    }
+  ],
+  "classifications": [
+    {
+      "name": "ReflectionProtocol", "path": "library/protocols/reflection.py:16",
+      "responsibility": "deterministic mirror transformations (hypothesis -> mirrored -> validate -> score)",
+      "category": "TOOL", "rename_required": false, "risk": "high/~zero gain", "notes": "0 productive callers"
+    },
+    {
+      "name": "StagnationDetector", "path": "library/protocols/stagnation.py:15",
+      "responsibility": "stagnation/turn-repetition detection",
+      "category": "POLICY/TOOL", "rename_required": false
+    },
+    {
+      "name": "library/protocols/ package", "path": "library/protocols/",
+      "responsibility": "groups deterministic reflection + stagnation mechanisms",
+      "category": "WORKFLOW/TOOL layer", "rename_required": false, "notes": "only test_phase4_protocols imports it"
+    },
+    {
+      "name": "protocol_stalled", "path": "library/reliability/fallback.py:134",
+      "responsibility": "recovery diagnostic key for debate/reflection mechanism stagnation",
+      "category": "POLICY", "rename_required": false, "notes": "referenced in test_phase5_reliability.py:132"
+    },
+    {
+      "name": "validator_protocol", "path": "code_lab/engine.py:565,703,828",
+      "responsibility": "identifier of validation strategy (freeform vs known oracle)",
+      "category": "SCHEMA/VALIDATION-PROTOCOL", "rename_required": false, "notes": "reproducibility-relevant; fixed in immutable RAW"
+    },
+    {
+      "name": "validator_protocol_version", "path": "code_lab/engine.py:829",
+      "responsibility": "version of the above",
+      "category": "SCHEMA version", "rename_required": false
+    },
+    {
+      "name": "raw_protocol/ package", "path": "philosophical_council/raw_protocol/",
+      "responsibility": "RAW debate recording format (schema_version=1.0.0, EventType, RawDebateRecorder)",
+      "category": "RAW_FORMAT", "rename_required": false, "notes": "legitimate recording protocol; used by debate_engine.py:33 and code_lab engine.py:155; never rename"
+    },
+    {
+      "name": "self.protocol(\"WM_DELETE_WINDOW\")", "path": "philosophical_council/ui/app.py:51",
+      "responsibility": "tkinter window-close handler",
+      "category": "TRANSPORT_PROTOCOL", "rename_required": false, "notes": "standard Tk API"
+    },
+    {
+      "name": "window.location.protocol === 'file:'", "path": "experiments/ui/dashboard.html:646",
+      "responsibility": "browser URL scheme check",
+      "category": "TRANSPORT_PROTOCOL", "rename_required": false, "notes": "standard JS"
+    },
+    {
+      "name": "test_phase4_protocols.py", "path": "tests/",
+      "responsibility": "phase-4 tests of reflection/stagnation mechanisms",
+      "category": "LEGACY_NAME", "rename_required": false, "notes": "historical phase-4 name from design doc"
+    },
+    {
+      "name": "executor_type field", "path": "role_templates/core.py:105",
+      "responsibility": "kind of executor a template may drive (code_lab/philosophical_debate/general_reasoning)",
+      "category": "WORKFLOW/EXECUTOR", "rename_required": false, "notes": "already correctly named; only comments call it 'protocol'"
+    }
+  ],
+  "true_experiment_protocol_model": {
+    "present": false,
+    "status": "MISSING_TRUE_EXPERIMENT_PROTOCOL_MODEL",
+    "closest_existing": "experimental/schema.py::ExperimentDesign (research_question, validators, budgets, stop_conditions)",
+    "missing_fields": ["hypothesis", "controlled_variables", "independent_variables", "dependent_metrics", "seeds", "provenance_requirements", "reproducibility_requirements"],
+    "decision": "Do NOT build during this pass. Documented for future implementation (IDEA PARKING LOT)."
+  },
+  "overloaded_terms_flagged_not_refactored": ["agent", "worker", "template", "executor", "run", "validator", "judge"],
+  "historical_raw_implications": ["validator_protocol fixed in immutable RAW - do not rewrite", "raw_protocol schema_version correct - untouched", "no abusive protocol field in RAW"],
+  "tests_executed": "python -m pytest -q -> 607 passed, 10 skipped (deps model_pool/hermes_debate, separate project), 0 collection errors. No test modified for this terminology audit.",
+  "final_terminology_map": {
+    "experimental_scientific_conditions": "PROTOCOL (MISSING)",
+    "reusable_starting_configuration": "TEMPLATE",
+    "sequence_of_task_stages": "WORKFLOW",
+    "runtime_stage_data_composition": "PIPELINE",
+    "operational_recipe": "PROCEDURE",
+    "reusable_model_instructions": "SKILL",
+    "executable_deterministic_capability": "TOOL",
+    "bounded_specialized_executor": "WORKER",
+    "reasoning_strategy": "THINKER",
+    "runtime_behavior_constraint": "POLICY",
+    "data_shape": "SCHEMA",
+    "actual_occurrence_of_execution": "RUN",
+    "scientific_unit_containing_one_or_more_runs": "EXPERIMENT",
+    "transport_protocol_http_mcp_ws_window": "TRANSPORT_PROTOCOL"
+  }
+}

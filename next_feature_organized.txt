@@ -1,0 +1,1609 @@
+LIFE_MEAN LAB — MASTER FUTURE DESIGN / ROADMAP
+
+STATUS
+------
+This document reorganizes the approved design ideas from "next feature.txt".
+It is a roadmap/design document, not proof that features are already implemented.
+
+IMPORTANT RULE
+--------------
+Agents must NOT implement future items from this document unless the current
+development task explicitly authorizes them.
+
+======================================================================
+0. NORTH STAR
+======================================================================
+
+Life_mean should become a local-first, controlled experimental environment
+for designing, executing, observing, comparing, preserving, and eventually
+sharing AI experiments.
+
+The system is NOT limited to Coding or Philosophical Debate.
+
+Target loop:
+
+QUESTION / PROMPT
+    ↓
+DESIGN EXPERIMENT
+    ↓
+HUMAN REVIEW
+    ↓
+START
+    ↓
+IMMUTABLE EXECUTION SNAPSHOT
+    ↓
+EXECUTE STAGES / LOOPS
+    ↓
+DETERMINISTIC VALIDATION FIRST
+    ↓
+RESULT
+    ↓
+ANALYSIS
+    ↓
+RAW / METRICS / DB / JOURNAL / FAILURE BANK
+    ↓
+COMPARE
+    ↓
+FOLLOW-UP EXPERIMENT / REPAIR CANDIDATE
+
+Main principle:
+
+AI proposes.
+Life_mean controls execution.
+Deterministic evidence has priority.
+Loops are bounded.
+Humans retain authority.
+RAW records what actually happened.
+Everything else is interpretation.
+
+======================================================================
+1. NON-NEGOTIABLE CORE PRINCIPLES
+======================================================================
+
+1. Preserve the Stable Core.
+2. Experimental layers USE the Stable Core; they do not duplicate it.
+3. Deterministic-first; LLM when needed.
+4. MODEL != ROLE != PERSONA != SKILL != TOOL.
+5. MCP != Orchestrator.
+6. Configured/available model != actual model used.
+7. LLMs may request capabilities; they cannot authorize themselves.
+8. Human approval is required for dynamic incorporation or risky runtime changes.
+9. Scientific execution must remain traceable to RAW.
+10. Observation != Hypothesis != Recommendation.
+11. Research packages carry evidence.
+12. Extension packages carry executable capabilities.
+13. Downloaded extension != incorporated extension.
+14. Never encode the research hypothesis as architecture.
+15. Never report fake success, fake executor support, fake routing, or fake UI activity.
+16. Historical runs remain immutable.
+17. Do not expose secrets in logs, packages, or RAW exports.
+
+======================================================================
+2. GLOBAL ARCHITECTURE
+======================================================================
+
+                         LIFE_MEAN LAB
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+      DESIGN                EXECUTION              RESEARCH
+        │                      │                      │
+  AI Copilot            Experimental Sandbox      Questions
+  Templates             Stage Runtime             Hypotheses
+  Roles/Personas        Existing Executors        Results
+  Skills/Tools          Controlled Loops          Claims
+        │                      │                    Notes
+        └───────────────┬──────┴──────┬─────────────┘
+                        │             │
+                   OBSERVABILITY    COMPARE
+                        │             │
+                     EventBus         │
+                        │             │
+                        └────── RAW / METRICS
+                                   │
+                             Research DB/Ledger
+                                   │
+                     ┌─────────────┴─────────────┐
+                     │                           │
+                .lmresearch                .lmextension
+                     │                           │
+                Research Catalog            Extension Bank
+                                             / Catalog
+
+Stable specialized components remain reusable:
+
+- CodeLabEngine
+- DebateEngine
+- SmartRouter
+- EventBus
+- ToolWorker / Workers
+- Validators
+- RAW infrastructure
+- LLM client/configuration
+- Settings
+
+The Experimental Sandbox is a composition layer above them.
+
+======================================================================
+3. DEVELOPMENT ORDER / DEPENDENCY ROADMAP
+======================================================================
+
+M0 — STABILIZE + OBSERVE
+------------------------
+Before adding a large autonomous-looking system, make execution trustworthy.
+
+Goals:
+- finish/freeze the current baseline
+- keep dashboard/API/Core/RAW chain working
+- wheel/installability and resources correct
+- remove machine-specific paths
+- lifecycle race fixes
+- Code Lab dependency injection
+- Settings truly connected
+- Autopilot truly accessible
+- clean tests
+- real semantic execution logs
+- live agent timeline based on EventBus
+
+Observability must answer:
+WHAT is running?
+WHY?
+WHO?
+WHICH model/tool?
+WHAT happened?
+DID it work?
+WHY retry/escalate/stop?
+WHAT was stored?
+
+HTTP 200 is infrastructure feedback.
+Life_mean needs experiment feedback.
+
+M1 — COMPARE V1 + EXECUTOR/ORCHESTRATOR REGISTRY
+--------------------------------------------------
+Build Compare early because later research, routing, model specialization,
+and post-training all depend on measurement.
+
+Compare should:
+- compare multiple experiments/runs
+- identify common and changed variables
+- classify comparability
+- detect failure patterns
+- separate OBSERVATION / HYPOTHESIS / REPAIR_CANDIDATE
+- work deterministically when LLM analysis is unavailable
+- never claim causality from uncontrolled comparisons
+
+Also:
+- audit useful orchestrator logic from the external/legacy orchestrator folder
+- integrate only through adapters/registry, not by duplicating Stable Core
+- expose orchestrator/executor selection in Settings where appropriate
+
+M2 — FRONTEND/API FOUNDATION
+----------------------------
+Migrate the large dashboard progressively toward a modular TypeScript UI
+after the backend/API contract is stable enough.
+
+Suggested pages:
+- Debate
+- Autopilot
+- Code Lab
+- Settings
+- Sandbox
+- Compare
+- Research
+- Extensions
+
+Python remains the engine.
+TypeScript becomes the interchangeable UI.
+
+M3 — EXPERIMENTAL SANDBOX V1
+----------------------------
+This is the main new execution feature.
+
+Implement:
+- ExperimentDesign schema
+- mutable Draft design
+- stage graph
+- stage routing
+- model routing per stage
+- prompt variables
+- pipeline variables
+- bounded loops
+- stop conditions
+- human-controlled Start
+- immutable execution snapshot at Start
+- DebateEngine adapter
+- CodeLab adapter
+- General Reasoning executor
+- Deterministic executor
+- RAW events
+- simple Sandbox UI
+- result analysis
+- DB finalization
+
+Do NOT build a giant replacement engine.
+
+M4 — CAPABILITY LAYER
+---------------------
+Add:
+- Skills
+- MCP capability interface
+- tool permissions
+- structured tool requests for models without reliable native tool calling
+- deterministic-first Capability Resolver
+- capability discovery
+- human-gated capability requests
+
+M5 — SMALL-MODEL CONTROL PLANE
+------------------------------
+Use small local models as specialized infrastructure rather than asking one
+large model to do everything.
+
+Candidate logical roles:
+- micro Narrator / Trace Summarizer (~0.6–0.8B)
+- Intent Router (~0.8B)
+- Experiment Designer (~0.8B)
+- micro specialists: math/bio/coder/etc.
+- Lab Manager (~1.7B or larger), called only on escalation
+
+No model name should be hardcoded.
+These are roles assigned through Settings/model pools.
+
+M6 — RESEARCH LAYER + MEMORY
+----------------------------
+Implement:
+- Question
+- Hypothesis
+- Experiment
+- Result
+- Claim
+- Evidence
+- Researcher Note
+- LLM/Manager Note
+- Failure Bank
+- Research Ledger
+- Carnet de bord / Journey
+- relationships back to RAW
+
+Researcher Note and LLM Note remain separate.
+Neither becomes objective evidence automatically.
+
+M7 — .LMRESEARCH
+----------------
+Portable scientific package:
+- protocol
+- frozen configuration
+- roles/personas/skills
+- models
+- relevant hardware
+- results
+- metrics
+- provenance
+- sanitized Scientific RAW
+- checksums/hashes
+- lineage/relationships
+
+Metrics should be reconstructible from Scientific RAW when possible.
+
+M8 — EXTENSION LAB / .LMEXTENSION
+---------------------------------
+Add:
+- Workers
+- Thinkers
+- Tools
+- Skills
+- Loops
+- Extension Builder through Code Lab
+- manifest/tests/permissions/version/hash
+- Extension Registry
+- Extension Bank
+
+State flow:
+AVAILABLE
+→ DOWNLOADED
+→ VERIFIED
+→ TESTED
+→ INCORPORATED
+→ ENABLED
+
+Plus:
+DISABLED
+INCOMPATIBLE
+QUARANTINED
+FAILED_TESTS
+
+Downloaded never means executable.
+
+M9 — CATALOGS / COLLABORATION
+-----------------------------
+Add:
+- Research Catalog
+- Extension Catalog
+- contribution flow
+- correspondence
+- replication/challenge/extension relationships
+- pseudonymous identity + later signatures
+- Git/package distribution
+- DB as rebuildable index
+
+Do not turn stars/likes into scientific truth.
+
+M10 — TRAINING / SELF-IMPROVEMENT EXPERIMENTS
+----------------------------------------------
+Only after RAW, Compare, DB, and validation are reliable:
+
+- extract training data from verified trajectories
+- build candidate small-model fine-tunes
+- keep base checkpoints
+- evaluate candidates on held-out tasks
+- Compare parent vs candidate
+- promote/reject explicitly
+- allow rollback to base/previous generation
+
+The Lab Manager may learn continuously through DB/memory, while weight updates
+remain checkpointed and experimentally evaluated.
+
+======================================================================
+4. EXPERIMENTAL SANDBOX — DESIGN MODE
+======================================================================
+
+The Sandbox has an AI COPILOT.
+
+The Copilot helps the researcher DESIGN an experiment from natural language.
+
+Example:
+
+"Explore an interesting computer science problem.
+Let several agents research it, debate possible solutions,
+test what can be tested, and stop when we have either a supported
+answer or an inconclusive result."
+
+The Copilot may propose:
+
+INPUT
+ ↓
+Subject Generator
+ ↓
+Research
+ ↓
+Team Generator
+ ↓
+Solve / Debate Loop
+ ↓
+Validation
+ ↓
+Result Analyzer
+ ↓
+Curator / Finalize
+
+This is ONLY a proposal.
+
+Before Start, the experiment is a mutable workspace:
+
+DRAFT
+
+The researcher may:
+- edit the initial prompt
+- chat with the Copilot
+- add/remove/reorder stages
+- add/remove agents
+- generate roles/personas
+- edit system prompts
+- select fixed models or pools
+- change routing
+- change validators
+- change Skills/Tools
+- change permissions
+- change loops/budgets
+- change escalation rules
+- remove useless LLM stages
+- add deterministic stages
+
+The Copilot may suggest structural changes but does not silently apply
+important changes.
+
+Key rule:
+
+DO NOT FREEZE CREATIVITY.
+FREEZE REPRODUCIBILITY.
+
+======================================================================
+5. START IS THE AUTHORITY BOUNDARY
+======================================================================
+
+Nothing should execute simply because:
+- a team was generated
+- roles were generated
+- personas were generated
+- models were selected
+- a pipeline was proposed
+
+When the researcher presses:
+
+[ START EXPERIMENT ]
+
+then:
+
+DRAFT
+ ↓
+VALIDATE DESIGN
+ ↓
+CREATE EXECUTION SNAPSHOT
+ ↓
+FREEZE SNAPSHOT
+ ↓
+RUNNING
+
+Snapshot:
+- complete pipeline
+- stage order/config
+- roles
+- personas
+- Skills
+- system prompts
+- prompt hashes
+- models/pools
+- routing rules
+- variables
+- validators
+- Tools/MCP permissions
+- loop rules
+- budgets
+- stop conditions
+- versions/hashes
+
+The editable draft may continue to exist for a future run.
+The active run never silently changes.
+
+Runtime Copilot suggestions must be explicit and recorded.
+
+======================================================================
+6. EXPERIMENT PIPELINE MODEL
+======================================================================
+
+Experiment
+  ├── stages
+  ├── transitions
+  ├── loops
+  ├── stop conditions
+  ├── agents
+  ├── models/pools
+  ├── roles/personas/skills
+  ├── tools/MCP permissions
+  ├── validators
+  └── finalization
+
+Stages have stable IDs and typed inputs/outputs.
+
+Example stage types:
+- subject_generation
+- classification
+- research
+- evidence_extraction
+- team_generation
+- general_reasoning
+- debate
+- coding
+- tool_execution
+- deterministic_validation
+- benchmark
+- repair
+- review
+- synthesis
+- result_analysis
+- curation
+- finalization
+
+A whole experiment is NOT bound to one executor.
+
+Example:
+
+research
+→ debate
+→ coding
+→ benchmark
+→ debate
+→ repair
+→ validation
+
+Each STAGE selects its compatible executor.
+
+This prevents philosophical/research/general reasoning work from accidentally
+being routed into CodeLabEngine.
+
+======================================================================
+7. EXECUTOR REGISTRY
+======================================================================
+
+Concept:
+
+stage.executor_type
+    ↓
+ExecutorRegistry
+    ├── code_lab       → existing CodeLabEngine
+    ├── debate         → existing DebateEngine
+    ├── deterministic  → validators/tools
+    ├── general_reasoning
+    └── research
+
+Unsupported executor:
+EXECUTOR_NOT_AVAILABLE
+
+Never silently fall back to an unrelated engine.
+
+External/legacy orchestrator logic may be adapted only if it provides useful
+behavior without duplicating core systems.
+
+======================================================================
+8. INITIAL SANDBOX PRESETS / TEMPLATES
+======================================================================
+
+Templates become editable presets, not rigid architectures.
+
+A. CODING_STANDARD
+Prompt
+→ Planner
+→ Developer
+→ workspace
+→ deterministic tests
+→ Critic
+→ repair
+→ Reviewer
+→ semantic Judge
+→ RAW
+
+B. PHILOSOPHICAL_DEBATE
+Question
+→ Moderator
+→ personas
+→ debate
+→ reflection
+→ synthesis
+→ RAW
+
+C. MATH_CHALLENGE
+Problem
+→ multiple Solvers
+→ math/symbolic tools
+→ deterministic validation
+→ Critic
+→ proof review
+→ synthesis
+→ RAW
+
+D. COMPUTER_SCIENCE_CHALLENGE
+Problem
+→ research/planning
+→ competing solutions
+→ algorithms/architecture reasoning
+→ implementation when useful
+→ deterministic validation
+→ adversarial critique
+→ comparison
+→ RAW
+
+E. SUBJECT_EXPLORATION
+Subject
+→ research workers
+→ information gathering
+→ claim extraction
+→ evidence organization
+→ hypothesis generation
+→ synthesis
+→ RAW
+
+F. RESEARCH_DEBATE
+Research question
+→ independent research
+→ evidence extraction
+→ competing interpretations
+→ role/persona debate
+→ Critic
+→ synthesis
+→ unresolved questions
+→ RAW
+
+G. DISCOVERY
+Broad subject
+→ exploration
+→ information gathering
+→ anomaly/pattern detection
+→ hypothesis generation
+→ adversarial challenge
+→ candidate experiments
+→ RAW
+
+H. CHEMISTRY_RESEARCH
+Chemistry question
+→ research
+→ evidence
+→ chemistry/math tools
+→ Chemist
+→ Experimentalist
+→ Skeptic
+→ debate
+→ hypotheses
+→ validation where possible
+→ RAW
+
+I. COMPUTER_SCIENCE_RESEARCH
+Research topic
+→ source/information gathering
+→ architecture/algorithm specialists
+→ tools/benchmarks
+→ debate
+→ hypotheses
+→ proposed experiment/implementation
+→ RAW
+
+J. GENERAL_REASONING
+Problem
+→ Solver
+→ Critic
+→ Verifier
+→ tools where useful
+→ final result
+→ RAW
+
+Custom user-defined presets are also allowed.
+
+======================================================================
+9. AGENT CONFIGURATION
+======================================================================
+
+Each agent can define:
+
+- model or model pool
+- role
+- persona
+- Skills
+- allowed Tools
+- MCP permissions
+- system prompt
+- stage instructions
+- output schema
+
+System prompt composition:
+
+1. ROLE
+2. PERSONA
+3. SKILLS
+4. EXPERIMENT CONTEXT
+5. CURRENT STAGE
+6. AVAILABLE CAPABILITIES
+7. CONSTRAINTS
+8. OUTPUT CONTRACT
+
+The researcher can inspect/edit the final prompt before Start.
+
+======================================================================
+10. MODEL ROUTING
+======================================================================
+
+Every LLM-capable stage may choose:
+
+- Fixed Model
+- Model Pool
+- Smart Router
+- Escalation Chain
+
+Example:
+
+Subject Generator:
+0.8B fixed
+
+Research:
+science-micro-pool
+
+Solver:
+math pool
+
+Escalation:
+0.8B → 1.7B → 4B → multi-agent
+
+Record separately:
+
+CONFIGURED ROUTING
+vs
+ACTUAL ROUTING
+
+For every actual model call record:
+- configured model/pool
+- actual model
+- selection mode
+- routing reason when available
+
+AVAILABLE != USED.
+
+If no router actually selected the model:
+selection_mode = backend_default
+
+Do not falsely claim SmartRouter participation.
+
+======================================================================
+11. SMALL-MODEL CONTROL PLANE
+======================================================================
+
+Use small models only for jobs where they provide value.
+
+MICRO NARRATOR / TRACE SUMMARIZER
+- consumes real EventBus activity
+- produces readable summaries
+- does not define authoritative state
+
+INTENT ROUTER
+- classifies task/stage
+- recommends pool/executor
+- recommendation remains advisory
+
+EXPERIMENT DESIGNER
+- proposes workflow/roles/personas/skills/tools
+- runs in Design Mode
+- never auto-starts
+
+MICRO SPECIALISTS
+Examples:
+- math
+- biology
+- coding
+- domain-specific science
+
+LAB MANAGER
+- larger than micro models
+- called only when needed
+- stalled task
+- conflicting evidence
+- significant agent disagreement
+- package interpretation
+- repeated weakness
+- missing capability
+- researcher asks for deeper analysis
+
+Manager does not replace deterministic validators.
+
+All model choices remain configurable in Settings.
+
+======================================================================
+12. TASK / IDEA STATE
+======================================================================
+
+Tasks are explicit:
+
+CREATED
+READY
+ACTIVE
+WAITING
+BLOCKED
+COMPLETED
+FAILED
+STOPPED
+
+Example:
+
+TASK-041
+├── collect sources
+├── extract claims
+├── validate equations
+└── debate explanations
+
+Unresolved ideas are first-class objects.
+
+IDEA-017
+status=ACTIVE
+
+Do not continuously regenerate/reconsider the same idea until:
+- resolved
+- failed
+- blocked
+- new evidence appears
+- researcher asks for reconsideration
+
+======================================================================
+13. CONTROLLED LOOP ENGINE
+======================================================================
+
+Loops are explicit and always bounded.
+
+Example:
+
+LoopDefinition:
+- stages: solve → validate → analyze_failure
+- continue_when: result_unresolved
+- stop_when:
+  - validator_pass
+  - max_iterations
+  - budget_exceeded
+  - no_progress
+  - human_stop
+- max_iterations: 5
+
+Never implement:
+
+while not solved:
+    call_llm()
+
+Every iteration records:
+- iteration_id
+- input state
+- agents used
+- actual models
+- tools used
+- result
+- validation
+- failure reason
+- progress signal
+- tokens/time/cost when available
+
+Possible loop states:
+
+ACTIVE
+RESOLVED
+STALLED
+BUDGET_EXCEEDED
+FAILED
+
+If no supported answer is found, INCONCLUSIVE is a valid scientific outcome.
+
+======================================================================
+14. STAGNATION + ESCALATION
+======================================================================
+
+Detect:
+- same answer repeated
+- same validation failure
+- no new evidence
+- same patch repeatedly generated
+- semantic repetition
+- unchanged tool result
+- budget pressure
+
+Possible responses:
+- use deterministic Tool
+- change agent
+- request Critic
+- escalate model
+- stop as INCONCLUSIVE
+
+Escalation is policy-controlled.
+
+Example:
+0.8B
+ ↓ fails twice
+1.7B
+ ↓ unresolved
+specialist multi-agent
+ ↓ unresolved
+manager analysis
+ ↓
+INCONCLUSIVE
+
+Models do not grant themselves unrestricted escalation.
+
+======================================================================
+15. DETERMINISTIC-FIRST CAPABILITY RESOLVER
+======================================================================
+
+Preferred resolution order:
+
+1. deterministic active Tool
+2. suitable Skill/instructions
+3. existing Worker
+4. existing Thinker
+5. downloaded deterministic capability requiring human approval
+6. small specialist model
+7. multi-agent reasoning
+8. larger model
+
+Example:
+Need = validate JSON
+
+If JSONSchemaValidator exists:
+use it.
+
+Do not ask five agents whether the JSON "looks correct".
+
+Deterministic validation and semantic judgment remain separate.
+
+======================================================================
+16. SKILLS
+======================================================================
+
+A Skill is not a model and not an executable Tool.
+
+Skill contains:
+- instructions
+- workflow knowledge
+- schemas
+- best practices
+- domain-specific context
+- optional recommended Tools
+- required permissions metadata
+
+Skills should be:
+- versioned
+- hashable
+- portable
+- reusable across models
+- included in experiment provenance
+
+Example:
+pytest-debugging
+- instructions
+- recommended tools: tests.run, workspace.read_file, workspace.write_patch
+- permissions: workspace.read, workspace.write
+
+======================================================================
+17. MCP + TOOL ACCESS
+======================================================================
+
+MCP is a standardized interface for capabilities/resources.
+
+MCP does NOT replace:
+- EventBus
+- SmartRouter
+- DebateEngine
+- Life_mean orchestration
+- agent-to-agent protocol
+
+Concept:
+
+Agent ↔ Agent
+Life_mean protocol
+
+Agent ↔ Tool / Resource
+MCP / capability adapter
+
+A model running in LM Studio does NOT automatically have Tools.
+
+Path A — native tool/function calling:
+Life_mean exposes definitions
+→ model requests
+→ Life_mean validates
+→ Tool/MCP executes
+→ result returned
+
+Path B — structured tool request:
+model emits structured request
+→ Life_mean parses
+→ validates schema/permissions/policy
+→ executes
+→ records to RAW
+→ returns result
+
+The model never receives arbitrary host access.
+
+Permissions may include:
+- workspace.read
+- workspace.write
+- experiment.read
+- memory.read
+- subprocess
+- network
+- git.local
+- package.read
+
+======================================================================
+18. RESEARCH EVIDENCE RULE
+======================================================================
+
+Always preserve:
+
+SOURCE
+ ↓
+EXTRACTED CLAIM
+ ↓
+EVIDENCE
+ ↓
+AGENT INTERPRETATION
+
+Never silently turn generated interpretation into source evidence.
+
+Post-run analysis must keep separate:
+- OBSERVATIONS
+- HYPOTHESES
+- WEAKNESSES
+- USEFUL PATTERNS
+- UNRESOLVED QUESTIONS
+- RECOMMENDED FOLLOW-UPS
+
+======================================================================
+19. RESULT ANALYZER + FOLLOW-UP
+======================================================================
+
+After a result:
+- inspect frozen design
+- RAW summary
+- metrics
+- validators
+- iterations
+- failures
+- related experiments
+
+Return structured analysis.
+
+Optional Follow-up Generator may create:
+PROPOSED_NEXT_EXPERIMENT
+
+Human actions:
+[ Inspect ]
+[ Edit ]
+[ Queue ]
+[ Reject ]
+
+A follow-up never auto-executes.
+
+======================================================================
+20. LAB CURATOR / MANAGER
+======================================================================
+
+At end of experiment:
+
+RAW
+ ↓
+PROCESSED
+ ↓
+METRICS
+ ↓
+RESULT
+ ↓
+LLM ANALYSIS
+ ↓
+RESEARCH JOURNAL
+ ↓
+FAILURE BANK
+ ↓
+RELATIONSHIPS
+ ↓
+FINALIZED
+
+Curator/Manager may:
+- classify useful information
+- identify lessons
+- link related experiments
+- detect repeated failures
+- identify useful protocols
+- identify uncertainties
+- recommend DB relationships
+
+It must never rewrite RAW.
+
+======================================================================
+21. JOURNAL + RESEARCH MEMORY
+======================================================================
+
+Keep separate:
+
+RESEARCHER NOTE
+vs
+LLM / MANAGER NOTE
+
+Example:
+
+Researcher:
+"I expected the small math model to fail."
+
+Manager:
+"The 0.8B model solved 4/5 tasks before escalation."
+
+Neither is RAW evidence.
+
+Long-term DB questions should be answerable with references:
+- which protocols worked?
+- which models repeatedly failed?
+- why was Template V2 abandoned?
+- what package introduced a protocol?
+- which collaboration produced a result?
+
+======================================================================
+22. OBSERVABILITY — REQUIRED FOUNDATION
+======================================================================
+
+Keep two layers:
+
+A. STRUCTURED EVENTS
+Used by:
+- RAW
+- dashboard
+- Compare
+- future Narrator
+- debugging
+
+B. HUMAN-READABLE LOGS
+Example:
+
+[EXP 1042][research][researcher] START model=qwen-4b
+[EXP 1042][validate][pytest] FAIL 2/10
+[EXP 1042][loop] RETRY 2/5 reason=test_failure
+[EXP 1042][router] ESCALATE 0.8B → 1.7B
+
+Use correlation IDs:
+- experiment_id
+- run_id
+- stage_id
+- iteration_id
+- agent_id
+- call_id
+
+======================================================================
+23. CANONICAL EVENT LIFECYCLE
+======================================================================
+
+Experiment events:
+- EXPERIMENT_CREATED
+- EXPERIMENT_STARTED
+- EXPERIMENT_PAUSED
+- EXPERIMENT_RESUMED
+- EXPERIMENT_COMPLETED
+- EXPERIMENT_FAILED
+- EXPERIMENT_STOPPED
+- EXPERIMENT_INCONCLUSIVE
+
+Stage events:
+- STAGE_READY
+- STAGE_STARTED
+- STAGE_COMPLETED
+- STAGE_FAILED
+- STAGE_BLOCKED
+- STAGE_SKIPPED
+
+Agent events:
+- AGENT_SELECTED
+- AGENT_STARTED
+- AGENT_COMPLETED
+- AGENT_FAILED
+
+Important:
+AGENT_STARTED must be emitted BEFORE blocking inference begins.
+
+Tool events:
+- TOOL_REQUESTED
+- TOOL_STARTED
+- TOOL_COMPLETED
+- TOOL_FAILED
+
+Validation:
+PASS / FAIL / ERROR / NOT_REACHED / SKIPPED
+
+Loop:
+- LOOP_STARTED
+- LOOP_ITERATION_STARTED
+- LOOP_ITERATION_COMPLETED
+- LOOP_CONTINUE
+- LOOP_RESOLVED
+- LOOP_STALLED
+- LOOP_BUDGET_EXCEEDED
+
+Escalation:
+- ESCALATION_REQUESTED
+- ESCALATION_APPROVED
+- ESCALATION_REJECTED
+
+Post-run:
+- RESULT_PRODUCED
+- RESULT_ANALYSIS_COMPLETED
+- FOLLOWUP_PROPOSED
+- DB_FINALIZATION_STARTED
+
+No fake frontend state.
+
+======================================================================
+24. LIVE TIMELINE + NARRATOR
+======================================================================
+
+Dashboard timeline comes from real EventBus events.
+
+Example:
+
+15:04:01 Experiment started
+15:04:02 Subject Generator started · qwen3.5-0.8b
+15:04:03 Subject generated
+15:04:03 Research started
+15:04:08 8 sources accepted
+15:04:09 Team Solver started
+15:04:13 Validation failed
+15:04:13 Retry 1/5
+15:04:19 Validation passed
+15:04:20 Result analysis started
+15:04:22 Experiment completed
+
+Authoritative state is deterministic backend state.
+
+Narrator may transform events into prose, but must not invent:
+- pass/fail
+- current stage
+- tool result
+- active task
+- actual model used
+
+======================================================================
+25. FAILURE SEMANTICS
+======================================================================
+
+Useful categories include:
+- EMPTY_RESPONSE
+- TOOL_FAILURE
+- PARSE_FAILURE
+- TEST_FAILURE
+- VALIDATION_FAILURE
+- MODEL_UNAVAILABLE
+- STAGNATION
+- ROUTING_FAILURE
+- BUDGET_EXCEEDED
+- EXECUTOR_NOT_AVAILABLE
+
+RUN_COMPLETED is only real success.
+
+STOPPED != FAILED.
+INCONCLUSIVE != FAILED.
+NOT_REACHED != FAIL.
+
+Repeated failures feed Failure Bank.
+
+======================================================================
+26. COMPARE
+======================================================================
+
+Compare is a top-level research instrument.
+
+Compare should support multiple runs/experiments, not only A/B.
+
+Deterministically extract:
+- configs
+- templates
+- roles/personas/skills
+- pools
+- configured models
+- actual models
+- routing
+- validators
+- pass/fail
+- tests
+- repair iterations
+- latency
+- tokens
+- timeouts
+- fallbacks
+- failures
+
+Classify comparability:
+- HIGHLY_CONTROLLED
+- PARTIALLY_CONTROLLED
+- EXPLORATORY
+- NOT_DIRECTLY_COMPARABLE
+
+Separate:
+OBSERVATION
+HYPOTHESIS
+REPAIR_CANDIDATE
+
+Compare must not modify historical experiments.
+
+Compare can later evaluate:
+- same models, different template
+- same template, different models
+- same template/models, different Skills
+- different Tools
+- Narrator ON/OFF
+- Manager escalation ON/OFF
+
+======================================================================
+27. AUTOPILOT SCIENTIFIC MODES
+======================================================================
+
+Future execution modes:
+- MULTI_AGENT
+- SINGLE_MODEL
+- COMPARISON
+
+Comparison mode should use:
+- same tasks
+- same seeds
+- same validators
+- same protocol
+- explicit budget fairness
+
+Keep separate RAW for each condition.
+
+Compare:
+- correctness
+- deterministic tests
+- failure rate
+- latency
+- tokens
+- VRAM
+- cost/energy when available
+
+Do not claim universal equivalence such as "4×4B = 12B".
+Only claim measured performance under the defined protocol/budget.
+
+======================================================================
+28. .LMRESEARCH
+======================================================================
+
+Scientific package:
+- Question/Hypothesis
+- protocol
+- frozen config
+- roles/personas/skills
+- models
+- relevant hardware
+- experiments
+- trajectories
+- failures
+- metrics
+- notes
+- provenance
+- sanitized Scientific RAW
+- checksums
+
+Packages are immutable.
+
+Relations:
+- REPLICATES
+- EXTENDS
+- CHALLENGES
+- CONTRADICTS
+- SUPPORTS
+- etc.
+
+Import/export across two independent installations is the real portability test.
+
+======================================================================
+29. EXTENSION LAB
+======================================================================
+
+Life_mean can expose:
+
+Workers
+Thinkers
+Tools
+Skills
+Loops
+
+Code Lab may act as Extension Builder.
+
+Capability creation flow:
+
+Experiment
+ ↓
+CAPABILITY_MISSING
+ ↓
+search active capabilities
+ ↓
+search Extension Bank
+ ↓
+none suitable
+ ↓
+propose Tool / Worker / Thinker / Skill
+ ↓
+human approval
+ ↓
+Code Lab creates candidate
+ ↓
+tests / sandbox / validation
+ ↓
+CANDIDATE
+ ↓
+human inspection
+ ↓
+INCORPORATE
+ ↓
+future experiment measures impact
+
+The model that creates an extension never activates it itself.
+
+======================================================================
+30. .LMEXTENSION + EXTENSION BANK
+======================================================================
+
+.lmextension is separate from .lmresearch.
+
+It may contain:
+- manifest
+- README
+- license
+- code/instructions
+- tests
+- permissions
+- compatibility
+- version
+- hashes/signature
+
+.lmresearch references exact extension ID/version/hash.
+It does not silently install executable code.
+
+Downloaded extensions remain non-executable until incorporation.
+
+======================================================================
+31. EXTENSION SECURITY
+======================================================================
+
+Explicit permissions:
+- experiment.read
+- workspace.read/write
+- model.inference
+- network
+- subprocess
+- git.local
+- etc.
+
+Do not expose:
+- secrets
+- full environment
+- unrelated personal files
+- admin privileges
+
+Every request/decision/use is recorded in RAW.
+
+======================================================================
+32. CATALOGS / COMMUNITY
+======================================================================
+
+Research Catalog organization:
+Subject
+→ Question
+→ Hypotheses
+→ Experiments
+→ Results
+→ Claims
+→ Packages/Evidence
+
+Extension Catalog should show:
+- versions
+- provenance
+- permissions
+- experiments using it
+- independent replications
+- known failures
+
+Do not use popularity as scientific truth.
+
+Correspondence is separate from evidence.
+Critique method/result/interpretation, not people.
+
+Git/packages are portable/versioned distribution.
+DB is a rebuildable search/index layer.
+
+======================================================================
+33. SCIENTIFIC VARIABLES
+======================================================================
+
+Support explicit variables:
+
+model
+temperature
+persona
+role template
+skills
+tools
+router
+validator
+context
+budget
+etc.
+
+Future experiment matrix:
+
+2 models
+× 2 temperatures
+× 2 personas
+= 8 traceable conditions
+
+Stage outputs may become typed inputs for later stages.
+
+Example:
+
+SUBJECT_GENERATOR.subject → RESEARCH.query
+RESEARCH.evidence → DEBATE.context
+DEBATE.hypothesis → VALIDATOR.target
+VALIDATOR.result → LOOP.condition
+
+Avoid hidden global prompt state.
+
+======================================================================
+34. SECURITY / PRIVACY / LOCAL-FIRST
+======================================================================
+
+Default:
+LOCAL
+PRIVATE
+
+Publishing/contributing is explicit.
+
+Never log/package:
+- API keys
+- tokens
+- passwords
+- authorization headers
+- full environment variables
+- private credentials
+
+Sanitize:
+- private paths
+- MCP secrets
+- connection strings
+
+Use relative workspace references where possible.
+
+======================================================================
+35. IMPLEMENTATION BOUNDARIES
+======================================================================
+
+DO NOT:
+- rewrite DebateEngine unnecessarily
+- rewrite CodeLabEngine unnecessarily
+- merge DebateEngine into Code Lab
+- create duplicate EventBus
+- create duplicate SmartRouter
+- create duplicate LLM configuration
+- create infinite autonomous loops
+- silently mutate a frozen run
+- let models install/activate packages themselves
+- let LLM text override deterministic evidence
+- claim unsupported executors work
+- auto-promote trained models
+- fake routing
+- fake live activity
+- expose secrets
+
+======================================================================
+36. FIRST SANDBOX ACCEPTANCE SCENARIO
+======================================================================
+
+User enters:
+
+"Generate an interesting computer science research subject and investigate
+it until the team reaches either a supported answer or an inconclusive result."
+
+1. Copilot proposes a workflow.
+2. Nothing executes.
+3. User edits stages/models/roles/personas/prompts/loops.
+4. User presses START.
+5. Life_mean validates and snapshots the exact design.
+6. Subject Generator creates a subject.
+7. Team Generator proposes/creates permitted roles for the active design.
+8. Research/Solver stages execute.
+9. Deterministic Validator evaluates progress.
+10. If unresolved, bounded loop continues.
+11. If stagnated, policy controls escalation or INCONCLUSIVE.
+12. If resolved, Result Analyzer runs.
+13. Curator/Manager organizes useful information.
+14. Finalization writes RAW, metrics, results, observations, hypotheses,
+    failures, notes, follow-ups, and DB relationships.
+15. Compare can later evaluate the run against other conditions.
+
+======================================================================
+37. PRACTICAL "NEXT" SEQUENCE
+======================================================================
+
+Recommended immediate development order:
+
+1. Preserve current working Code Lab / Debate / Settings behavior.
+2. Finish semantic observability + live timeline.
+3. Finish Compare V1.
+4. Create Executor/Orchestrator Registry and safe adapters.
+5. Freeze a stable backend/API baseline.
+6. Start TypeScript migration shell.
+7. Implement Sandbox ExperimentDesign + Draft/Start/Snapshot.
+8. Implement stage dispatch to existing Code Lab / Debate / deterministic /
+   general reasoning paths.
+9. Add bounded loops + routing + explicit stop conditions.
+10. Add AI Copilot design conversation.
+11. Add Research stage.
+12. Add MCP + Skills + permissions.
+13. Add micro-model Router/Narrator/Designer and escalation Manager.
+14. Add Research Layer / Journal / Ledger / Failure Bank.
+15. Add .lmresearch.
+16. Add Extension Lab / .lmextension / Bank.
+17. Add package catalogs and collaboration.
+18. Add controlled post-training/self-improvement experiments.
+
+======================================================================
+38. ONE-SENTENCE IDENTITY
+======================================================================
+
+Life_mean Lab is a local-first experimental operating environment where a
+researcher and an AI Copilot can freely design an experiment, freeze it only
+when ready, execute it through reusable specialized engines and controlled
+capabilities, observe every real action, validate deterministically whenever
+possible, preserve RAW evidence, compare outcomes, and build a traceable
+research memory over time.

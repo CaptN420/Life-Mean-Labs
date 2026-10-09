@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -28,6 +29,7 @@ logger = logging.getLogger("ExperimentDashboard")
 
 
 from experimental.api import ExperimentalApiMixin
+from compare.api import CompareApiMixin
 
 
 def _experimental_id_from_path(path: str, suffix: str):
@@ -40,7 +42,7 @@ def _experimental_id_from_path(path: str, suffix: str):
     return core.split("/")[-1] if core else None
 
 
-class DashboardHandler(ExperimentalApiMixin, BaseHTTPRequestHandler):
+class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHandler):
     """HTTP request handler for the experiment dashboard."""
 
     ui_controller: ExperimentUIController = None  # Set by server
@@ -76,6 +78,16 @@ class DashboardHandler(ExperimentalApiMixin, BaseHTTPRequestHandler):
                 self._experimental_design_get(_id)
             else:
                 self._send_error(404, "Not found")
+        elif parsed.path == "/api/compare/available":
+            self._compare_available()
+        elif parsed.path == "/api/compare/tree":
+            self._compare_tree()
+        elif parsed.path == "/api/compare/browser":
+            self._compare_browser()
+        elif parsed.path == "/api/compare/browser/rebuild":
+            self._compare_browser(refresh=True)
+        elif _id_match := re.match(r"^/api/compare/run/([^/]+)$", parsed.path):
+            self._compare_run(_id_match.group(1))
         elif parsed.path == "/dashboard":
             self._serve_dashboard()
         else:
@@ -121,6 +133,14 @@ class DashboardHandler(ExperimentalApiMixin, BaseHTTPRequestHandler):
                 self._send_json({"status": "stopped"})
         elif parsed.path == "/api/experimental/designs":
             self._experimental_design_create(data)
+        elif parsed.path == "/api/compare":
+            self._compare_report(data)
+        elif parsed.path == "/api/compare/subject":
+            self._compare_subject_report(data)
+        elif parsed.path == "/api/compare/tree/register":
+            self._compare_tree_register(data)
+        elif parsed.path == "/api/compare/tree/bootstrap":
+            self._compare_tree_bootstrap(data)
         elif parsed.path.startswith("/api/experimental/designs/") and parsed.path.endswith("/transition"):
             _id = _experimental_id_from_path(parsed.path, "/transition")
             if _id:

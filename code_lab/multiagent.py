@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import os
 
@@ -301,52 +301,65 @@ class CodingMultiAgent:
             }.get(err_type, f"Agent failed ({err_type}).")
             self.emit("AGENT_FAILED", ok=False, **payload)
 
-    def plan(self, prompt: str, language: str) -> Dict[str, Any]:
-        agent = self._agent("PLANNER")
-        task = self._plan_task(prompt, language)
-        self._emit_agent_started("PLANNER", "plan")
+    def _turn(self, role: str, stage: str, task_fn: Callable, **kw) -> Dict[str, Any]:
+        """Run one agent turn and GUARANTEE a terminal event for every
+        AGENT_STARTED -- no orphaned STARTED on an uncaught exception.
+
+        P0/P1 integrity (spec): the timeline must never show AGENT_STARTED
+        without a matching terminal AGENT_RESPONSE / AGENT_FAILED. If the
+        underlying LLM call raises (backend down, network error), emit an
+        AGENT_FAILED (honest failure) then re-raise so the caller still sees
+        the failure. Returns ``{"agent": role, **turn_result}`` exactly as the
+        pre-refactor plan/develop/critique/review/judge methods did, so the
+        public return contract is unchanged.
+        """
+        self._emit_agent_started(role, stage)
         t0 = time.time()
-        res = agent.turn(task)
-        self._emit_agent_result("PLANNER", "plan", res, t0)
-        return {"agent": "PLANNER", **res}
+        agent = self._agent(role)
+        try:
+            res = task_fn(**kw)
+            self._emit_agent_result(role, stage, res, t0)
+            return {"agent": role, **res}
+        except Exception as exc:  # noqa: BLE001 - must never orphan a STARTED
+            dur_ms = int((time.time() - t0) * 1000)
+            self.emit(
+                "AGENT_FAILED", ok=False,
+                role=role, stage=stage,
+                model=agent.model_used or "auto",
+                configured_model=self.role_model(role) or None,
+                selection_mode=self._selection_mode(role),
+                run_id=self.run_id,
+                duration_ms=dur_ms,
+                response_present=False,
+                response_length=0,
+                error_type="backend_error",
+                message="Agent raised an uncaught exception; no response produced.",
+            )
+            logger.error("Agent %s (%s) raised: %s", role, stage, exc)
+            raise
+
+
+    def plan(self, prompt: str, language: str) -> Dict[str, Any]:
+        return self._turn("PLANNER", "plan",
+                          lambda: self._agent("PLANNER").turn(self._plan_task(prompt, language)))
 
     def develop(self, plan_text: str, language: str) -> Dict[str, Any]:
-        agent = self._agent("DEVELOPER")
-        task = self._develop_task(plan_text, language)
-        self._emit_agent_started("DEVELOPER", "develop")
-        t0 = time.time()
-        res = agent.turn(task, max_tokens=2000)
-        self._emit_agent_result("DEVELOPER", "develop", res, t0)
-        return {"agent": "DEVELOPER", **res}
+        return self._turn("DEVELOPER", "develop",
+                          lambda: self._agent("DEVELOPER").turn(self._develop_task(plan_text, language), max_tokens=2000))
 
     def critique(self, source: str, test_result: Dict[str, Any],
                  language: str) -> Dict[str, Any]:
-        agent = self._agent("CRITIC")
-        task = self._critique_task(source, test_result, language)
-        self._emit_agent_started("CRITIC", "repair")
-        t0 = time.time()
-        res = agent.turn(task, max_tokens=1600)
-        self._emit_agent_result("CRITIC", "repair", res, t0)
-        return {"agent": "CRITIC", **res}
+        return self._turn("CRITIC", "repair",
+                          lambda: self._agent("CRITIC").turn(self._critique_task(source, test_result, language), max_tokens=1600))
 
     def review(self, source: str, tests: str, test_result: Dict[str, Any]) -> Dict[str, Any]:
-        agent = self._agent("REVIEWER")
-        task = self._review_task(source, tests, test_result)
-        self._emit_agent_started("REVIEWER", "review")
-        t0 = time.time()
-        res = agent.turn(task, max_tokens=800, temperature=0.2)
-        self._emit_agent_result("REVIEWER", "review", res, t0)
-        return {"agent": "REVIEWER", **res}
+        return self._turn("REVIEWER", "review",
+                          lambda: self._agent("REVIEWER").turn(self._review_task(source, tests, test_result), max_tokens=800, temperature=0.2))
 
     def judge(self, source: str, tests: str, deterministic_valid: bool) -> Dict[str, Any]:
         """Judge semantic quality. CANNOT override deterministic validity."""
-        agent = self._agent("JUDGE")
-        task = self._judge_task(source, tests, deterministic_valid)
-        self._emit_agent_started("JUDGE", "judge")
-        t0 = time.time()
-        res = agent.turn(task, max_tokens=900, temperature=0.2)
-        self._emit_agent_result("JUDGE", "judge", res, t0)
-        return {"agent": "JUDGE", **res}
+        return self._turn("JUDGE", "judge",
+                          lambda: self._agent("JUDGE").turn(self._judge_task(source, tests, deterministic_valid), max_tokens=900, temperature=0.2))
 
     # ── helpers ───────────────────────────────────────────────────────────
     def _agent(self, role: str) -> CodingAgent:

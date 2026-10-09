@@ -426,7 +426,9 @@ class ExperimentUIController:
                     state.is_running = False
             self._notify_callbacks(experiment_id, "stopped")
 
-    def _persist_results_to_raw(self, experiment_id: str, results: List[Any], mode: str = "deterministic") -> None:
+    def _persist_results_to_raw(self, experiment_id: str, results: List[Any],
+                                mode: str = "deterministic",
+                                raw_root: Optional[Path] = None) -> None:
         """Append-only RAW persistence of experiment results.
 
         Used by BOTH execution modes (deterministic ExperimentRunner and
@@ -435,20 +437,26 @@ class ExperimentUIController:
         Stay inside the workspace; expose strictly the deterministic-provenance
         fields (never secrets). This records evidence without mutating the
         deterministic pipeline.
+
+        On a persistence failure the experiment state is marked FAILED (via
+        ``add_error``) so the UI can never show a COMPLETED experiment that has
+        no RAW evidence -- a P0 integrity rule: an experiment is only COMPLETED
+        when its required finalization actually succeeded. ``raw_root`` is
+        injectable for tests.
         """
         try:
             from pathlib import Path
-            # RAW is written relative to the CURRENT WORKING DIRECTORY so it
-            # is portable across source checkout AND wheel install (in a wheel,
+            # RAW is written relative to the current working directory so it is
+            # portable across source checkout AND wheel install (in a wheel,
             # `__file__` points into site-packages which may be read-only).
             # For the canonical flow the app is started from a writable cwd.
-            base = Path.cwd() / "data" / "raw_debates"
+            base = Path(raw_root) if raw_root else (Path.cwd() / "data" / "raw_debates")
             raw_path = base / f"{experiment_id.replace('/', '_')}.jsonl"
             raw_path.parent.mkdir(parents=True, exist_ok=True)
             import json as _json
             with open(raw_path, "a", encoding="utf-8") as f:
                 # Capture the resolved Settings once per persist call and freeze
-                # it into EVERY record (Settings → experiment → snapshot → RAW).
+                # it into EVERY record (Settings -> experiment -> snapshot -> RAW).
                 settings_snapshot = None
                 try:
                     from experiments.settings import build_settings_snapshot
@@ -457,16 +465,24 @@ class ExperimentUIController:
                     settings_snapshot = None
                 for r in results:
                     rec = r.to_dict()
-                    # Record the runtime execution mode explicitly (GOAL 13) so
-                    # RAW proves which mode actually ran — no silent fallback.
+                    # Record the runtime execution mode explicitly so RAW proves
+                    # which mode actually ran -- no silent fallback.
                     if isinstance(rec, dict):
                         rec.setdefault("metadata", {})
                         rec["metadata"]["execution_mode"] = mode
                         rec["settings_snapshot"] = settings_snapshot
                     f.write(_json.dumps(rec) + "\n")
             logger.info("Persisted %d results to RAW: %s", len(results), raw_path)
-        except Exception as exc:  # best-effort; never breaks the experiment
-            logger.warning("RAW persistence skipped: %s", exc)
+        except Exception as exc:
+            # P0: NEVER swallow a RAW persistence failure while still reporting
+            # the experiment as COMPLETED. Surface it as a visible failure so
+            # the derived lifecycle status becomes FAILED, not COMPLETED-without-evidence.
+            logger.error("RAW persistence FAILED for %s: %s", experiment_id, exc)
+            try:
+                self.add_error(experiment_id,
+                               f"finalization_failure: RAW persistence failed ({exc})")
+            except Exception:  # pragma: no cover - never mask the original
+                pass
 
     def get_dashboard_data(self) -> Dict[str, Any]:
         """Get dashboard data for all experiments.

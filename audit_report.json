@@ -1,0 +1,32 @@
+{
+  "report": "LIFE_MEAN TOTAL INTEGRATION AUDIT + EMERGENCY INTEGRITY REPAIR",
+  "date": "2026-10-09",
+  "feature_freeze": "RESPECTED - no features added",
+  "core_rule": "REAL_FAILURE_OVER_FAKE_SUCCESS",
+  "evidence_table": [
+    {"id": "E1", "type": "CODE", "finding": "_persist_results_to_raw swallowed RAW write failure but experiment marked COMPLETED", "severity": "P0", "status": "CONFIRMED_FIXED", "fix": "add_error -> derived status FAILED; raw_root injectable", "tests": "test_p0_raw_finalization.py (3)"},
+    {"id": "E2", "type": "CODE", "finding": "CodingMultiAgent AGENT_STARTED orphaned if turn() raises (no try/finally)", "severity": "P1", "status": "CONFIRMED_FIXED", "fix": "_turn() guarantees terminal AGENT_RESPONSE/AGENT_FAILED then re-raise; return contract preserved", "tests": "test_p1_agent_terminal_event.py (4) + test_code_lab_multiagent (3)"},
+    {"id": "E3", "type": "CODE", "finding": "ReflectionProtocol/StagnationDetector named 'protocol' = deterministic mechanisms, 0 productive callers", "severity": "P3", "status": "YELLOW_DOCUMENTED", "fix": "none (speculative rename prohibited S18); PROTOCOL_TERMINOLOGY_AUDIT.md"},
+    {"id": "E4", "type": "CODE_RUNTIME", "finding": "CodeLab recorder_experiment_id not exposed in result; RawDebateRecorder stays in-memory (never save_experiment); real provenance = workspace _persist_raw snapshot (written + correct)", "severity": "P3", "status": "YELLOW_VISIBILITY", "fix": "propose exposing raw_path/recorder_experiment_id later (IDEA PARKING) - NOT a phantom"},
+    {"id": "E5", "type": "EXPERIMENT", "finding": "All data/raw_debates failures = 'No answer computed'", "severity": "P2", "status": "GREEN_HONEST_FAILURE", "fix": "real failure surfaced, not masked"},
+    {"id": "E6", "type": "EXPERIMENT", "finding": "domains pass: physics=100%, chemistry=100%, math~60%, coding=0%, logic=0% (10,200 tasks each no_answer)", "severity": "P2", "status": "GREEN_HONEST_FAILURE", "fix": "extraction not extended for coding/logic (feature, outside freeze) -> IDEA PARKING"},
+    {"id": "E7", "type": "CODE", "finding": "EventBus ghost: 3 private instances, CodeLabEngine.event_bus never published, dashboard reads view.events", "severity": "P2", "status": "YELLOW_ARCHITECTURE", "fix": "reconnect later; UI reads real backend callback chain (no fabricated state)"},
+    {"id": "E8", "type": "RUNTIME", "finding": "Debate with LLM backend down -> explicit FAILED via probe gate, never silent deterministic fallback", "severity": "P1", "status": "GREEN_CORRECT"},
+    {"id": "E9", "type": "RUNTIME", "finding": "Code Lab deterministic E2E: det_status PASS, files_created==disk, judge UNAVAILABLE, RAW snapshot persisted (code_lab_runs/<id>/raw)", "severity": "P1", "status": "GREEN_CLEAN", "tests": "verified live this session"}
+  ],
+  "integrity_status": {
+    "CODE_LAB_OUTPUT_INTEGRITY": "GREEN - no phantom: files==disk, judge UNAVAILABLE honest, RAW snapshot persists",
+    "DEBATE_RUNTIME": "GREEN - executes really with backend; backend-down -> explicit FAILED, never fallback",
+    "RAW_PROVENANCE": "GREEN after R1 - RAW failure -> FAILED; historical RAW immutable",
+    "PHANTOM_OUTPUT_BAN": "GREEN after R1+R2 - verified E7/E4 are visibility gaps, not fabrication",
+    "FEATURE_FREEZE": "RESPECTED"
+  },
+  "repairs": [
+    {"id": "R1", "target": "experiments/ui_controller.py", "change": "_persist_results_to_raw(raw_root=..., on failure add_error -> FAILED, never COMPLETED-without-evidence)", "status": "CONFIRMED_FIXED"},
+    {"id": "R2", "target": "code_lab/multiagent.py", "change": "_turn() guarantees terminal event on any exception + re-raise; 5 roles delegate; import Callable; return {'agent':role,**res} preserved", "status": "CONFIRMED_FIXED"}
+  ],
+  "tests": {"full_suite": "608 passed, 10 skipped, 0 errors", "repair_block": "10 dedicated green", "skips_reason": "model_pool/hermes_debate dependency, separate project"},
+  "terminology_audit": "PROTOCOL_TERMINOLOGY_AUDIT.md + protocol_terminology_audit.json - no severe misuse, 0 renames (S18), ExperimentProtocol MISSING documented",
+  "idea_parking_lot": ["expose CodeLab raw_path/recorder_experiment_id in result", "reconnect EventBus code-lab + dashboard subscribe", "extend coding/logic param extraction to lift 'No answer computed'", "implement ExperimentProtocol model", "keep raw_protocol/and ReflectionProtocol intact"],
+  "git": "nothing committed - awaiting user green-light"
+}
