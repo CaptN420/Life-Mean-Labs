@@ -22,6 +22,33 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+import re as _re
+
+# Secret-looking token patterns that must never be persisted to RAW / db even
+# when a backend error body echoes them (e.g. LM Studio 401 replay).
+_SECRET_PATTERNS = (
+    _re.compile(r"sk-[A-Za-z0-9_\-]{10,}"),
+    _re.compile(r"ghp_[A-Za-z0-9]{20,}"),
+    _re.compile(r"gho_[A-Za-z0-9]{20,}"),
+    _re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
+    _re.compile(r"[A-Za-z0-9_\-\.]{20,}@[A-Za-z0-9_\-\.]{6,}"),  # email-like cred
+)
+
+
+def redact_secrets(text) -> str:
+    """Replace known credential patterns with a neutral placeholder.
+
+    Guards the immutable RAW / db write path so an LLM backend that echoes a
+    bearer token inside a 401 body (as LM Studio does) can never leak it into
+    persisted records again. Pure transformation — never raises.
+    """
+    if not isinstance(text, str):
+        return text
+    redacted = text
+    for pat in _SECRET_PATTERNS:
+        redacted = pat.sub("[REDACTED]", redacted)
+    return redacted
+
 
 # Schema version for the RAW protocol
 SCHEMA_VERSION = "1.0.0"
@@ -356,8 +383,8 @@ class RawDebateRecorder:
         call = AgentCall(
             agent_id=agent_id,
             role=role,
-            input_sent=input_sent,
-            output_received=output_received,
+            input_sent=redact_secrets(input_sent),
+            output_received=redact_secrets(output_received),
             status=status,
             tokens_input=tokens_input,
             tokens_output=tokens_output,
@@ -379,7 +406,7 @@ class RawDebateRecorder:
         event = DebateEvent(
             event_type=event_type,
             agent_id=agent_id,
-            content=content,
+            content=redact_secrets(content),
             round_num=round_num,
             parent_event_id=parent_event_id,
         )

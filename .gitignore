@@ -47,6 +47,10 @@ Thumbs.db
 # ── Local data ───────────────────────────────────────────
 autopilot/data/
 data/raw_debates/
+# Debate runtime SQLite DB (regenerated per run; may echo an LM Studio 401
+# token into turns.response — never commit a generated runtime db)
+*.debate.db
+philosophical_council/debate.db
 tmp/
 *.tmp
 
