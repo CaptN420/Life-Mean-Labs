@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life_mean — Synthetic Data Generator</title>
+    <style>
+        :root {
+            --foreground: #1a1a2e;
+            --muted-foreground: #6b7280;
+            --accent: #4f46e5;
+            --accent-hover: #4338ca;
+            --border: #e5e7eb;
+            --card: #ffffff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f3f4f6;
+            color: var(--foreground);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--muted-foreground);
+        }
+
+        /* ── Tabs ─────────────────────────────────────────── */
+        .tabs {
+            display: flex;
+            gap: 0.25rem;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            color: var(--muted-foreground);
+            border: none;
+            border-bottom: 3px solid transparent;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.25rem 0.25rem 0 0;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .tab-btn:hover {
+            color: var(--foreground);
+            background: transparent;
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* ── Code Lab ─────────────────────────────────────── */
+        .clab-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .clab-run {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .clab-log {
+            max-height: 340px;
+            overflow-y: auto;
+            font-family: ui-monospace, 'Cascadia Code', Menlo, monospace;
+            font-size: 0.75rem;
+            background: #111827;
+            color: #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            white-space: pre-wrap;
+        }
+
+        .clab-role-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
+        .clab-role-row label { flex: 0 0 40%; font-size: 0.85em; }
+        .clab-role-row select { flex: 1; min-width: 0; }
+
+        .clab-event {
+            padding: 0.1rem 0;
+        }
+
+        .clab-event .evt {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--foreground);
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--muted-foreground);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            ring: 2px solid var(--accent);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox-group input {
+            width: auto;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+        }
+
+        button:disabled {
+            background: var(--muted-foreground);
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: var(--error);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .experiment-list {
+            margin-top: 1rem;
+        }
+
+        .experiment-item {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .experiment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .experiment-id {
+            font-weight: 600;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-running {
+            background: #d1fae5;
+            color: var(--success);
+        }
+
+        .status-stopped {
+            background: #fee2e2;
+            color: var(--error);
+        }
+
+        .status-ok {
+            background: #d1fae5;
+            color: var(--success);
+        }
+
+        .status-error {
+            background: #fee2e2;
+            color: var(--error);
+        }
+
+        .settings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.5rem 0;
+        }
+        .settings-table td {
+            padding: 0.35rem 0.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .settings-table .settings-key {
+            width: 45%;
+            color: var(--muted-foreground);
+        }
+
+        .experiment-stats {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .experiment-stat {
+            font-size: 0.875rem;
+        }
+
+        .experiment-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .progress-bar {
+            height: 0.5rem;
+            background: var(--border);
+            border-radius: 9999px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+
+        .error-list {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+            color: var(--error);
+        }
+
+        .error-item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--muted-foreground);
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Life_mean Lab</h1>
+            <p class="subtitle">Deterministic Synthetic Data · Code Lab</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="autopilot" onclick="switchTab('autopilot', this)">Autopilot</button>
+            <button class="tab-btn" data-tab="debate" onclick="switchTab('debate', this)">Debate</button>
+            <button class="tab-btn" data-tab="code-lab" onclick="switchTab('code-lab', this)">Code Lab</button>
+            <button class="tab-btn" data-tab="settings" onclick="switchTab('settings', this)">Settings</button>
+        </nav>
+
+        <!-- ── Autopilot tab — the REAL experiment workflow (GOAL 7/8) ── -->
+        <div id="panel-autopilot" class="tab-panel active">
+            <p class="subtitle" style="margin-bottom:1rem;">Define experiment parameters, choose execution mode, and run. Deterministic
+            mode is the default authority; Debate/Multi-Agent mode routes through the existing AutoPilot → DebateEngine path.</p>
+            <div class="grid">
+                <!-- New Experiment Card -->
+                <div class="card">
+                    <h2>Create Experiment</h2>
+                    <form id="experiment-form">
+                        <div class="form-group">
+                            <label for="domain">Domain</label>
+                            <select id="domain" name="domain">
+                                <option value="math">Math</option>
+                                <option value="physics">Physics</option>
+                                <option value="chemistry">Chemistry</option>
+                                <option value="coding">Coding</option>
+                                <option value="logic">Logic</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="difficulty-range">Difficulty Range</label>
+                            <input type="text" id="difficulty-range" name="difficulty_range" value="[1, 5]" placeholder="[1, 5]">
+                        </div>
+                        <div class="form-group">
+                            <label for="num-tasks">Number of Tasks</label>
+                            <input type="number" id="num-tasks" name="num_tasks" value="100" min="1" max="10000">
+                        </div>
+                        <div class="form-group">
+                            <label for="seed">Seed</label>
+                            <input type="number" id="seed" name="seed" value="42">
+                        </div>
+                        <div class="form-group">
+                            <label for="exec-mode">Execution mode</label>
+                            <select id="exec-mode" name="mode">
+                                <option value="deterministic" selected>Deterministic</option>
+                                <option value="debate">Debate / Multi-Agent</option>
+                            </select>
+                            <!-- "No LLM (deterministic only)" checkbox removed: the
+                                 mode selector above is the single source of truth -->
+                        </div>
+                        <button type="submit">Create &amp; Start Experiment</button>
+                    </form>
+                </div>
+                <!-- Stats Card -->
+                <div class="card">
+                    <h2>Pipeline Statistics</h2>
+                    <div class="stat-grid">
+                        <div class="stat">
+                            <div class="stat-value" id="total-experiments">0</div>
+                            <div class="stat-label">Experiments</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="running-count">0</div>
+                            <div class="stat-label">Running</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="total-tasks">0</div>
+                            <div class="stat-label">Tasks Generated</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="pass-rate">0%</div>
+                            <div class="stat-label">Pass Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experiments List -->
+            <div class="card">
+                <h2>Experiments</h2>
+                <div id="experiment-list" class="experiment-list">
+                    <div class="empty-state">No experiments yet. Create one to get started.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Debate tab — real debate path summary (GOAL 14) ── -->
+        <div id="panel-debate" class="tab-panel">
+            <div class="card">
+                <h2>Debate</h2>
+                <p class="subtitle">Multi-agent philosophical debate via the existing DebateEngine. Run experiments in
+                <strong>Debate / Multi-Agent</strong> mode from the <em>Autopilot</em> tab to exercise this path. Debate results
+                are validated deterministically (authority) — the LLM is never an oracle.</p>
+                <div id="debate-summary" class="experiment-list">
+                    <div class="empty-state">Open the Autopilot tab and run an experiment in Debate mode to populate this view.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Code Lab tab ── -->
+        <div id="panel-code-lab" class="tab-panel">
+            <h2 style="margin-bottom:0.5rem;">Code Lab</h2>
+            <p class="subtitle" style="margin-bottom:1rem;">Prompt the multi-agent pipeline to design, write, test,
+            critic &amp; repair code — inside an isolated workspace.</p>
+            <div class="clab-grid">
+                <div class="card">
+                    <h2>New Run</h2>
+                    <form id="code-lab-form">
+                        <div class="form-group">
+                            <label for="cl-prompt">Prompt</label>
+                            <textarea id="cl-prompt" name="prompt" rows="3"
+                                placeholder="Create a Python function fibonacci(n) with unit tests."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="cl-project">Project</label>
+                            <input type="text" id="cl-project" name="project_name" value="my_project">
+                        </div>
+                        <div class="clab-run">
+                            <div style="flex:1;">
+                                <label for="cl-language">Language</label>
+                                <input type="text" id="cl-language" name="language" value="Python">
+                            </div>
+                            <div style="flex:1;">
+                                <label for="cl-iterations">Max iterations</label>
+                                <input type="number" id="cl-iterations" name="max_iterations" value="10" min="1" max="50">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="checkbox-group"><input type="checkbox" id="cl-multi" name="multi_agent" checked>
+                                <label for="cl-multi">Multi-agent</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="cl-tests" name="run_tests" checked>
+                                <label for="cl-tests">Run tests (pytest)</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="cl-detval" name="deterministic_validation" checked>
+                                <label for="cl-detval">Deterministic validation</label></div>
+                            <div class="checkbox-group"><input type="checkbox" id="cl-reflection" name="reflection" checked>
+                                <label for="cl-reflection">Reflection</label></div>
+                        </div>
+                        <div class="form-group" style="border-top:1px solid var(--border);margin-top:0.75rem;padding-top:0.75rem;">
+                            <label>Role Template (effective)</label>
+                            <div id="cl-effective-template" style="font-size:0.9em;">Loading…</div>
+                            <div style="font-size:0.8em;opacity:0.85;">Configured in Settings ·
+                                <a href="#" onclick="(function(){const b=[...document.querySelectorAll('.tab-btn')].find(x=>x.textContent.includes('Settings'));if(b)b.click();return false;})();return false;">Manage in Settings</a>
+                                <input type="hidden" name="template_id" id="cl-template-id" value="coding-standard">
+                            </div>
+                            <div id="cl-template-roles" class="clab-role-list" style="margin-top:0.5rem;"></div>
+                            <div class="checkbox-group" style="margin-top:0.5rem;">
+                                <input type="checkbox" id="cl-use-rolemodels" checked>
+                                <label for="cl-use-rolemodels">Set model per role (leave blank = dynamic routing)</label>
+                            </div>
+                        </div>
+                        <button type="submit" id="cl-build-btn">BUILD</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Runs</h2>
+                    <div id="code-lab-list">
+                        <div class="empty-state">No code lab runs yet.</div>
+                    </div>
+                    <h2 style="margin-top:1rem;">Live Log</h2>
+                    <div id="code-lab-log" class="clab-log">— no run selected —</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Settings tab (GOAL 9/10: real UI over existing config) ── -->
+        <div id="panel-settings" class="tab-panel">
+            <div class="card">
+                <h2>Settings</h2>
+                <p class="subtitle">Read-only view of the existing <code>philosophical_council/config.py</code> configuration.
+                Secrets (API keys/tokens) are never shown — only <code>configured: true/false</code>. A few safe values below are
+                runtime-editable and persisted server-side.</p>
+                <div id="settings-status" class="empty-state" style="margin-bottom:1rem;">Loading settings…</div>
+                <div id="settings-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" onclick="loadExperiments()" title="Refresh">↻</button>
+
+    <script>
+        // Canonical entrypoint guard (GOAL 1/3): the dashboard is served at
+        // http://127.0.0.1:8080/dashboard. Opening dashboard.html directly via
+        // file:// cannot reach the API (fetch('/api/...') resolves to the file
+        // scheme) and silently half-breaks. Detect and redirect the user.
+        const API_BASE = '/api';
+        (function guardFileScheme() {
+            if (window.location.protocol === 'file:') {
+                const notice = document.createElement('div');
+                notice.style.cssText = 'padding:16px 20px;background:#fff3cd;border-bottom:2px solid #f0ad4e;'
+                    + 'font:14px/1.5 inherit;color:#664d03;';
+                notice.innerHTML = '<strong>Not connected.</strong> Open the dashboard over HTTP instead of the '
+                    + 'file:// scheme: <code>http://127.0.0.1:8080/dashboard</code> '
+                    + '(serve with <code>python -m experiments.dashboard</code>). '
+                    + 'The file:// view cannot reach <code>/api/...</code> and create/run will fail.';
+                document.body.insertBefore(notice, document.body.firstChild);
+            }
+        })();
+
+        // ── Tab navigation ─────────────────────────────────
+        function switchTab(name, btn) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            const panel = document.getElementById(`panel-${name}`);
+            if (panel) panel.classList.add('active');
+            if (btn) btn.classList.add('active');
+            if (name === 'code-lab') { loadCodeLab(); loadEffectiveTemplate(); }
+            if (name === 'settings') loadSettings();
+        }
+
+        // ── Code Lab ────────────────────────────────────────
+        let selectedRun = null;
+
+        async function loadCodeLab() {
+            try {
+                const resp = await fetch(`${API_BASE}/code-lab/runs`);
+                const data = await resp.json();
+                renderCodeLabRuns(data.runs || []);
+            } catch (err) {
+                console.error('Failed to load code lab runs:', err);
+            }
+        }
+
+        function renderCodeLabRuns(runs) {
+            const list = document.getElementById('code-lab-list');
+            if (!runs.length) {
+                list.innerHTML = '<div class="empty-state">No code lab runs yet.</div>';
+                if (selectedRun) clearLog();
+                return;
+            }
+            list.innerHTML = runs.map(r => `
+                <div class="experiment-item" data-run="${r.run_id}" style="cursor:pointer" onclick="selectRun('${r.run_id}')">
+                    <div class="experiment-header">
+                        <span class="experiment-id">${r.run_id}</span>
+                        <span class="status-badge ${r.status === 'passed' ? 'status-running' : (r.status === 'failed' || r.status === 'stopped' ? 'status-stopped' : 'status-running')}">
+                            ${r.status}
+                        </span>
+                    </div>
+                    <div class="experiment-stats">
+                        <span class="experiment-stat">${escapeHtml(r.config.prompt || '').slice(0, 60)}</span>
+                    </div>
+                </div>
+            `).join('');
+            if (selectedRun && runs.some(r => r.run_id === selectedRun)) {
+                selectRun(selectedRun, true);
+            }
+        }
+
+        async function selectRun(runId, silent) {
+            selectedRun = runId;
+            const resp = await fetch(`${API_BASE}/code-lab/runs/${runId}`);
+            const data = await resp.json();
+            renderLog(data);
+            highlightRun(runId);
+        }
+
+        function highlightRun(runId) {
+            document.querySelectorAll('#code-lab-list .experiment-item').forEach(el => {
+                el.style.outline = el.dataset.run === runId ? '2px solid var(--accent)' : '';
+            });
+        }
+
+        function clearLog() {
+            document.getElementById('code-lab-log').textContent = '— no run selected —';
+        }
+
+        function renderLog(run) {
+            const log = document.getElementById('code-lab-log');
+            if (!log) return;
+            const lines = [];
+            const evLine = (ev) => {
+                // GOAL 2/3/7: discover + render structured agent metadata.
+                if (ev.type === 'AGENT_STARTED') {
+                    return `[AGENT_STARTED] ${ev.role || '?'} ▸ ${ev.stage || ''} · model=${ev.model || 'auto'}`;
+                }
+                if (ev.type === 'AGENT_RESPONSE') {
+                    const ms = ev.duration_ms != null ? `${(ev.duration_ms/1000).toFixed(1)}s` : '?';
+                    const reason = ev.finish_reason ? ` · finish=${ev.finish_reason}` : '';
+                    return `[AGENT_RESPONSE] ${ev.role || '?'} (${ev.stage||''}) · ok · ${ms} · len=${ev.response_length ?? '?'}${reason}`;
+                }
+                if (ev.type === 'AGENT_FAILED') {
+                    return `[AGENT_FAILED] ${ev.role || '?'} (${ev.stage||''}) · ${ev.error_type || 'unknown'} — ${ev.message || ''}`;
+                }
+                if (ev.type === 'FILE_CREATED' || ev.type === 'FILE_MODIFIED') {
+                    return `[${ev.type}] ${ev.file || (ev.files||[]).join(',')} · ${ev.operation || ''}${ev.by_agent ? ' · by='+ev.by_agent : ''}`;
+                }
+                if (ev.type === 'TEST_STARTED') return '[TEST_STARTED] pytest';
+                if (ev.type === 'TEST_PASSED') return `[TEST_PASSED] iter=${ev.iteration} · ${ev.passed} passed / ${ev.total}`;
+                if (ev.type === 'TEST_FAILED') return `[TEST_FAILED] iter=${ev.iteration} · ${ev.failures} failed`;
+                if (ev.type === 'CRITIQUE_STARTED') return `[CRITIQUE_STARTED] iter=${ev.iteration}`;
+                if (ev.type === 'REPAIR_STARTED') return `[REPAIR_STARTED] iter=${ev.iteration}`;
+                if (ev.type === 'VALIDATION_COMPLETED') {
+                    const det = ev.results && ev.results.deterministic_validation;
+                    return `[VALIDATION_COMPLETED] det=${det === true ? 'PASS' : 'FAIL'}`;
+                }
+                if (ev.type === 'RUN_COMPLETED') return `[RUN_COMPLETED] status=${ev.status} · files=${(ev.files_created||[]).join(',') || 'none'} · iter=${ev.iterations} · det=${ev.deterministic_validation} · judge=${ev.semantic_judge_status}`;
+                if (ev.type === 'RUN_FAILED') return `[RUN_FAILED] error_count=${ev.error_count} · stage=${ev.stage_reached} · files=${(ev.files_created||[]).join(',')||'none'} · det=${ev.deterministic_validation} · judge=${ev.semantic_judge_status}`;
+                if (ev.type === 'RUN_STOPPED') return '[RUN_STOPPED] cancelled';
+                if (ev.type === 'JUDGE_COMPLETED') return `[JUDGE_COMPLETED] ${ev.verdict || ''}`;
+                if (ev.type === 'AGENT_SELECTED') return `[AGENT_SELECTED] roles=${(ev.roles||[]).join(',')}`;
+                if (ev.type !== 'RUN_STARTED') {
+                    let extra = '';
+                    if (ev.error) extra += ` error=${ev.error}`;
+                    if (ev.status) extra += ` status=${ev.status}`;
+                    return `[${ev.type}]${extra}`;
+                }
+                return `[RUN_STARTED] llm=${ev.llm_available ? 'available' : 'unavailable'}`;
+            };
+            (run.events || []).forEach(ev => lines.push(evLine(ev)));
+            if (run.result) {
+                const r = run.result;
+                const sj = r.semantic_judge || {};
+                const det = r.validation && r.validation.deterministic_validation;
+                lines.push(`── RESULT: ${r.status} · plan=${(r.plan||{}).plan_id} (template) · iterations=${r.iterations}`);
+                lines.push(`   ` + ((r.execution_mode==='multi_agent') ? 'mode=multi-agent' : 'mode=deterministic'));
+                lines.push(`   files: ${(r.files_created||[]).join(', ') || 'none'}`);
+                lines.push(`   deterministic_validation: ${det === true ? 'PASS' : (det === false ? 'FAIL' : 'NOT_REACHED')}`);
+                lines.push(`   semantic_judge: ${sj.status || 'NOT_REACHED'}${sj.reason ? ' (' + sj.reason + ')' : ''}`);
+                if (r.errors && r.errors.length) lines.push(`   errors(${r.errors.length}): ${r.errors.map(e=>e.message||e).slice(0,3).join(' | ')}`);
+            }
+            log.textContent = lines.length ? lines.join('\n') : '— running —';
+        }
+
+        async function createCodeLabRun(config) {
+            document.getElementById('cl-build-btn').disabled = true;
+            try {
+                const resp = await fetch(`${API_BASE}/code-lab/runs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config),
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert(data.error || 'Failed to build code lab run');
+                    return;
+                }
+                selectedRun = data.run_id;
+                await loadCodeLab();
+            } catch (err) {
+                console.error('Failed to create code lab run:', err);
+                alert('Failed to create code lab run');
+            } finally {
+                document.getElementById('cl-build-btn').disabled = false;
+            }
+        }
+
+        function escapeHtml(s) {
+            return s.replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        document.getElementById('code-lab-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const fd = new FormData(form);
+            const config = {
+                prompt: (fd.get('prompt') || '').trim() || 'Create a Python function fibonacci(n) with unit tests.',
+                project_name: fd.get('project_name') || 'my_project',
+                language: fd.get('language') || 'Python',
+                max_iterations: parseInt(fd.get('max_iterations') || '10', 10),
+                multi_agent: fd.get('multi_agent') === 'on',
+                run_tests: fd.get('run_tests') === 'on',
+                deterministic_validation: fd.get('deterministic_validation') === 'on',
+                reflection: fd.get('reflection') === 'on',
+                seed: 42,
+                template_id: fd.get('template_id') || 'coding-standard',
+            };
+            // Per-role CONFIGURED model mapping (blank = dynamic routing).
+            // Kept SEPARATE from the template: the template never hardcodes a model.
+            if (document.getElementById('cl-use-rolemodels') && document.getElementById('cl-use-rolemodels').checked) {
+                const rmodels = {};
+                document.querySelectorAll('#cl-template-roles select[data-role]').forEach(sel => {
+                    if (sel.value) rmodels[sel.dataset.role] = sel.value;
+                });
+                config.role_models = rmodels;
+            }
+            await createCodeLabRun(config);
+        });
+
+        // ── Role Template (effective, Settings-owned; S12) ─────────────────
+        let _clModels = [];
+        async function loadEffectiveTemplate() {
+            let templates = [], settings = {};
+            try { settings = await (await fetch(`${API_BASE}/settings`)).json(); } catch (e) {}
+            try { const t = await (await fetch(`${API_BASE}/role-templates`)).json(); templates = t.templates || []; } catch (e) {}
+            _clModels = settings.available_models || [];
+            const eff = (settings.role_templates && settings.role_templates.code_lab &&
+                         settings.role_templates.code_lab.default_id) || 'coding-standard';
+            const hid = document.getElementById('cl-template-id');
+            if (hid) hid.value = eff;
+            const el = document.getElementById('cl-effective-template');
+            const rolesEl = document.getElementById('cl-template-roles');
+            const t = templates.find(x => x.id === eff);
+            if (!t) {
+                if (el) el.innerHTML = `<strong>${escapeHtml(eff)}</strong> <span style="color:#b00;">(not found)</span>`;
+                if (rolesEl) rolesEl.innerHTML = '';
+                return;
+            }
+            if (el) el.innerHTML = `<strong>${escapeHtml(t.name)}</strong> v${escapeHtml(t.version)}` +
+                (t.executor_type ? ` · <span style="opacity:.8">${escapeHtml(t.executor_type)}</span>` : '') +
+                (t.hash ? ` · <span style="opacity:.6">hash ${escapeHtml(t.hash.slice(0,12))}…</span>` : '');
+            if (rolesEl) rolesEl.innerHTML = (t.roles || []).map(r =>
+                `<div class="clab-role-row">
+                    <label for="rm-${escapeHtml(r.role_id)}">${escapeHtml(r.name)}${r.default_persona ? ` · persona ${escapeHtml(r.default_persona)}` : ''}</label>
+                    <select id="rm-${escapeHtml(r.role_id)}" data-role="${escapeHtml(r.role_id)}">
+                        <option value="">(dynamic)</option>
+                        ${_clModels.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}
+                    </select>
+                </div>`).join('');
+        }
+
+        async function loadExperiments() {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments`);
+                const data = await resp.json();
+                renderDashboard(data);
+            } catch (err) {
+                console.error('Failed to load experiments:', err);
+            }
+        }
+
+        function renderDashboard(data) {
+            // Update stats
+            document.getElementById('total-experiments').textContent = data.total_experiments;
+            document.getElementById('running-count').textContent = data.running_count;
+
+            let totalTasks = 0;
+            let validTasks = 0;
+            Object.values(data.experiments).forEach(exp => {
+                totalTasks += exp.tasks_generated || 0;
+                validTasks += exp.tasks_valid || 0;
+            });
+            document.getElementById('total-tasks').textContent = totalTasks;
+            document.getElementById('pass-rate').textContent = totalTasks > 0 ? `${((validTasks / totalTasks) * 100).toFixed(1)}%` : '0%';
+
+            // Render experiment list (Autopilot tab) — lifecycle-aware (GOAL 5/8).
+            const vals = Object.entries(data.experiments);
+            const listEl = document.getElementById('experiment-list');
+            if (vals.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">No experiments yet. Create one to get started.</div>';
+            } else {
+                listEl.innerHTML = vals.map(([id, exp]) => {
+                    const badgeCls = exp.is_running ? 'status-running'
+                        : exp.status === 'FAILED' ? 'status-error'
+                        : exp.status === 'COMPLETED' ? 'status-ok'
+                        : 'status-stopped';
+                    const statusLabel = exp.status || (exp.is_running ? 'RUNNING' : 'STOPPED');
+                    return `
+                    <div class="experiment-item">
+                        <div class="experiment-header">
+                            <span class="experiment-id">${id}</span>
+                            <span class="status-badge ${badgeCls}">${statusLabel}</span>
+                            <span class="experiment-stat" style="margin-left:8px;">Mode: ${exp.mode || 'deterministic'}</span>
+                        </div>
+                        <div class="experiment-stats">
+                            <span class="experiment-stat">Generated: ${exp.tasks_generated}</span>
+                            <span class="experiment-stat">Completed: ${exp.tasks_completed}</span>
+                            <span class="experiment-stat">Valid: ${exp.tasks_valid}</span>
+                            <span class="experiment-stat">Pass Rate: ${((exp.pass_rate||0) * 100).toFixed(1)}%</span>
+                        </div>
+                        ${exp.errors && exp.errors.length > 0 ? `
+                            <div class="error-list">
+                                ${exp.errors.map(e => `<div class="error-item">${escapeHtml(e)}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                        <div class="experiment-actions">
+                            ${exp.is_running
+                                ? `<button class="btn-sm btn-danger" onclick="stopExperiment('${id}')">Stop</button>`
+                                : `<button class="btn-sm" onclick="startExperiment('${id}')">Start</button>`
+                            }
+                            <button class="btn-sm" onclick="deleteExperiment('${id}')">Delete</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            // Debate tab summary (GOAL 14): only genuinely debate-mode experiments.
+            const debateEl = document.getElementById('debate-summary');
+            if (!debateEl) return;
+            const debateOnes = vals.filter(([, e]) => e.mode === 'debate');
+            if (debateOnes.length === 0) {
+                debateEl.innerHTML = '<div class="empty-state">No debate-mode experiments yet. Run one from Autopilot to populate this view.</div>';
+            } else {
+                debateEl.innerHTML = debateOnes.map(([id, exp]) => `
+                    <div class="experiment-item">
+                        <div class="experiment-header">
+                            <span class="experiment-id">${id}</span>
+                            <span class="status-badge ${exp.is_running ? 'status-running' : 'status-stopped'}">${exp.status}</span>
+                        </div>
+                        <div class="experiment-stats">
+                            <span class="experiment-stat">Valid: ${exp.tasks_valid}</span>
+                            <span class="experiment-stat">Pass Rate: ${((exp.pass_rate||0) * 100).toFixed(1)}%</span>
+                        </div>
+                    </div>`).join('');
+            }
+        }
+
+        // ── Settings (GOAL 9-13) ────────────────────────────────────────
+        async function loadSettings() {
+            const statusEl = document.getElementById('settings-status');
+            const bodyEl = document.getElementById('settings-body');
+            if (statusEl) statusEl.textContent = 'Loading settings…';
+            try {
+                const resp = await fetch(`${API_BASE}/settings`);
+                if (!resp.ok) throw new Error('settings endpoint failed');
+                const s = await resp.json();
+                renderSettings(s);
+            } catch (err) {
+                if (bodyEl) bodyEl.innerHTML = '';
+                if (statusEl) { statusEl.style.color = '#b00';
+                    statusEl.textContent = 'Failed to load settings — is the server running?'; }
+                console.error('loadSettings:', err);
+            }
+        }
+
+        // Globals for persona edit/delete (called from onclick handlers in the
+        // injected Settings HTML).
+        async function savePersona(idx, role) {
+            const nameEl = document.getElementById(`persona-name-${idx}`);
+            const promptEl = document.getElementById(`persona-prompt-${idx}`);
+            if (!nameEl || !promptEl) return;
+            const name = nameEl.value.trim();
+            const prompt = promptEl.value.trim();
+            if (!name || !prompt) { alert('Name and system prompt are required.'); return; }
+            try {
+                const resp = await fetch(`${API_BASE}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ personas: { [role]: { name, system_prompt: prompt } } }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                renderSettings(data);
+            } catch (err) { console.error('savePersona:', err); alert('Failed to save persona — ' + err.message); }
+        }
+        async function deletePersona(role) {
+            if (!confirm(`Delete persona "${role}"?`)) return;
+            try {
+                const resp = await fetch(`${API_BASE}/settings/personas/${encodeURIComponent(role)}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                renderSettings(data.settings || data);
+            } catch (err) { console.error('deletePersona:', err); alert('Failed to delete persona — ' + err.message); }
+        }
+
+        function renderSettings(s) {
+            const bodyEl = document.getElementById('settings-body');
+            const statusEl = document.getElementById('settings-status');
+            if (statusEl) statusEl.textContent = '';
+            if (!bodyEl) return;
+            const fmt = (v) => v === null || v === undefined || v === '' ? '<em>—</em>' : escapeHtml(String(v));
+            const bools = (v) => v ? 'yes' : 'no';
+            const cat = (title, rows) => `
+                <h3 style="margin-top:1rem;">${title}</h3>
+                <table class="settings-table">
+                    ${rows.map(([k, v]) =>
+                        `<tr><td class="settings-key">${escapeHtml(k)}</td><td>${fmt(v)}</td></tr>`).join('')}
+                </table>`;
+
+            // Inference: show availability honestly, NEVER the key.
+            const inf = s.inference || {};
+            const infStatus = inf.llm_error
+                ? `listing blocked — ${escapeHtml(inf.llm_error)}`
+                : (inf.models_available ? `${(s.available_models||[]).length} models reachable`
+                                        : 'no models listed');
+            const authStatus = (inf.authenticated === true) ? 'authenticated'
+                : (inf.backend_reachable === false ? 'backend unreachable'
+                    : (inf.credentials_configured ? 'reachable but NOT authenticated' : 'no credentials configured'));
+            const inferenceRows = [
+                ['Backend', inf.base_url || 'http://localhost:1234/v1'],
+                ['API key configured', typeof inf.api_key_configured === 'boolean' ? bools(inf.api_key_configured) : '—'],
+                ['Backend reachable', inf.backend_reachable === true ? 'yes' : 'no'],
+                ['Authenticated', authStatus],
+                ['Models', infStatus],
+            ];
+
+            const d = s.debate || {};
+            const models = s.models || {};
+            const r = s.router || {};
+            const editable = new Set(s.editable || []);
+
+            const modelsRows = Object.keys(models).map(m => [m, models[m]]);
+            const debateRows = [
+                ['temperature (editable)', d.temperature],
+                ['max_tokens (editable)', d.max_tokens],
+                ['moderator_max_tokens (editable)', d.moderator_max_tokens],
+                ['philosopher_max_tokens (editable)', d.philosopher_max_tokens],
+                ['short_term_turns (editable)', d.short_term_turns],
+                ['mid_term_interval (editable)', d.mid_term_interval],
+                ['long_term_interval (editable)', d.long_term_interval],
+            ];
+            const routerRows = [
+                ['method (editable)', r.method],
+                ['prevent_repetition (editable)', bools(r.prevent_repetition)],
+                ['max_consecutive_same_speaker (editable)', r.max_consecutive_same_speaker],
+            ];
+
+            bodyEl.innerHTML = cat('Inference', inferenceRows)
+                + `<div class="card" style="margin-top:1rem;">
+                    <h2>LLM Backend (LM Studio) — configure API credentials</h2>
+                    <p class="subtitle">Set the LM Studio <code>base_url</code> and API key. The key is stored server-side in a
+                    git-ignored file and is <strong>never read back</strong> — only its "configured" state is shown.</p>
+                    ${inf.llm_error ? `<p style="margin-top:0.5rem;padding:0.5rem 0.75rem;border-left:3px solid #e06c3a;background:rgba(224,108,58,.12);color:#e06c3a;font-size:.85em;">
+                        <strong>Models cannot be listed:</strong> ${escapeHtml(inf.llm_error)}.
+                        Set a <em>valid</em> LM Studio API token above and Save (LM Studio "Require Authentication" is on).</p>` : ''}
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                        <div class="form-group"><label>base_url</label>
+                            <input id="cred-base_url" type="text" placeholder="http://localhost:1234/v1" value="${escapeHtml(inf.base_url || '')}"></div>
+                        <div class="form-group"><label>API key</label>
+                            <input id="cred-api_key" type="password" autocomplete="off" placeholder="${inf.api_key_configured ? '(key set — leave blank to keep)' : 'lm-studio API key'}"></div>
+                    </div>
+                    <button class="btn-sm" id="cred-save" style="margin-top:1rem;">Save credentials</button>
+                    <span id="cred-msg" style="margin-left:0.75rem;"></span>
+                </div>`
+                + cat('Models (configured)', modelsRows)
+                + cat('Debate', debateRows)
+                + cat('Router', routerRows)
+                + (s.restart_required
+                    ? '<p style="margin-top:1rem;color:#b8860b;"><strong>Restart required</strong> for some applied settings.</p>'
+                    : '');
+
+            // Credentials save — POST to a dedicated route so the key never
+            // round-trips through GET.
+            document.getElementById('cred-save').addEventListener('click', async () => {
+                const msg = document.getElementById('cred-msg');
+                const payload = {};
+                const bu = document.getElementById('cred-base_url').value.trim();
+                const key = document.getElementById('cred-api_key').value.trim();
+                if (bu) payload.base_url = bu;
+                if (key) payload.api_key = key;
+                if (Object.keys(payload).length === 0) {
+                    if (msg) { msg.style.color = '#b00'; msg.textContent = 'Nothing to save.'; }
+                    return;
+                }
+                try {
+                    const resp = await fetch(`${API_BASE}/settings/credentials`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                    document.getElementById('cred-api_key').value = '';
+                    if (msg) { msg.style.color = '#0a0'; msg.textContent = 'Saved.'; }
+                    loadSettings();
+                } catch (err) {
+                    if (msg) { msg.style.color = '#b00'; msg.textContent = 'Save failed — ' + err.message; }
+                    console.error('cred save:', err);
+                }
+            });
+
+            // ── Model-per-role selection (GOAL: choose models for each role) ──
+            const modelsEl = document.createElement('div');
+            modelsEl.className = 'card';
+            modelsEl.style.marginTop = '1rem';
+            const modRoles = [
+                ['existentialist','Existentialist'], ['stoic','Stoic'], ['nihilist','Nihilist'],
+                ['spiritual','Spiritual'], ['skeptic','Skeptic'], ['pragmatist','Pragmatist'],
+                ['moderator','Moderator'],
+            ];
+            const avail = (s.available_models && s.available_models.length) ? s.available_models : null;
+            modelsEl.innerHTML = `
+                <h2>Models per role</h2>
+                <p class="subtitle">${avail
+                    ? `Choose a model for each agent from the ${avail.length} available on the backend. Empty = dynamic routing.`
+                    : (inf.llm_error
+                        ? `Backend reached but listing failed (${escapeHtml(inf.llm_error)}). `
+                        : 'Backend not reachable — no models listed. ')
+                        + 'Set a valid LM Studio API key above, Save, then reload Settings.'}</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem 1.2rem;">
+                    ${modRoles.map(([role,label]) => `
+                        <div class="form-group">
+                            <label>${label}</label>
+                            <select id="model-${role}">
+                                <option value="">dynamic</option>
+                                ${avail ? avail.map(m => `<option ${s.models[role]===m?'selected':''}>${escapeHtml(m)}</option>`).join('') : ''}
+                            </select>
+                        </div>`).join('')}
+                </div>
+                <button class="btn-sm" id="models-save" style="margin-top:0.75rem;">Save model selection</button>
+                <span id="models-msg" style="margin-left:0.75rem;"></span>`;
+            bodyEl.appendChild(modelsEl);
+            document.getElementById('models-save').addEventListener('click', async () => {
+                const patch = {};
+                modRoles.forEach(([role]) => {
+                    const sel = document.getElementById(`model-${role}`).value;
+                    patch[role] = sel || '';
+                });
+                const msg = document.getElementById('models-msg');
+                try {
+                    const resp = await fetch(`${API_BASE}/settings`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ models: patch }),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                    if (msg) { msg.style.color = '#0a0'; msg.textContent = 'Saved.'; }
+                    renderSettings(data);
+                } catch (err) {
+                    if (msg) { msg.style.color = '#b00'; msg.textContent = 'Save failed — ' + err.message; }
+                    console.error('models save:', err);
+                }
+            });
+
+            // ── Role Templates (Settings-owned lab defaults, S10-11) ──
+            const rtCard = document.createElement('div');
+            rtCard.className = 'card';
+            rtCard.style.marginTop = '1rem';
+            rtCard.innerHTML = `\n                <h2>Role Templates</h2>\n                <p class="subtitle">Default template per subsystem — configured here, inherited by Code Lab. A template marks its executor; the UI never offers a non-executable template for the wrong subsystem.</p>`;
+            const rtWrap = document.createElement('div');
+            rtWrap.innerHTML = '<p style="color:#777;font-size:.85em;">Loading templates…</p>';
+            rtCard.appendChild(rtWrap);
+            bodyEl.appendChild(rtCard);
+            (async () => {
+                let templates = [];
+                try {
+                    const resp = await fetch(`${API_BASE}/role-templates`);
+                    const data = await resp.json();
+                    templates = Array.isArray(data) ? data : ((data && data.templates) || []);
+                } catch (e) { /* keep empty */ }
+                const rt = s.role_templates || {};
+                const subsystems = [
+                    ['code_lab', 'Code Lab Default', 'EXECUTABLE', 'coding-standard'],
+                    ['philosophical_debate', 'Philosophical Debate Default', 'NOT_CONNECTED', 'philosophical-debate'],
+                ];
+                rtWrap.innerHTML = subsystems.map(([subsys, label, want, fallback]) => {
+                    const info = rt[subsys] || { default_id: fallback, status: '' };
+                    const opts = templates.map(t => {
+                        const sel = (t.id === info.default_id) ? ' selected' : '';
+                        const xs = t.executor_type ? ` · ${t.executor_type}` : '';
+                        return `<option value="${escapeHtml(t.id)}"${sel}>${escapeHtml(t.name || t.id)} v${escapeHtml(t.version||'')}${xs}</option>`;
+                    }).join('');
+                    const statusTag = `<span style="margin-left:.5rem;font-size:.75em;font-weight:600;${info.status==='EXECUTABLE'?'color:#0a0':'color:#b07020'}">${escapeHtml(info.status||'')}</span>`;
+                    return `
+                        <div class="form-group" style="margin:0.5rem 0;">
+                            <div><label>${label}</label>${statusTag}</div>
+                            <div style="display:flex;gap:0.5rem;align-items:center;">
+                                <select id="rt-${subsys}" style="min-width:20rem;">
+                                    <option value="">— none —</option>
+                                    ${opts}
+                                </select>
+                                ${info.status==='NOT_CONNECTED'
+                                  ? '<span style="font-size:.75em;color:#b07020;">no executor wired yet (disabled from running)</span>' : ''}
+                                ${info.status==='EXECUTABLE'
+                                  ? '<span style="font-size:.75em;color:#0a0;">runs through Code Lab</span>' : ''}
+                            </div>
+                        </div>`;
+                }).join('') + `
+                    <button class="btn-sm" id="rt-save">Save template defaults</button>
+                    <span id="rt-msg" style="margin-left:0.75rem;"></span>`;
+                document.getElementById('rt-save').addEventListener('click', async () => {
+                    const patch = {};
+                    subsystems.forEach(([subsys]) => {
+                        const v = document.getElementById(`rt-${subsys}`).value;
+                        if (v) patch[subsys] = v;
+                    });
+                    const msg = document.getElementById('rt-msg');
+                    try {
+                        const resp = await fetch(`${API_BASE}/settings`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ role_templates: patch }),
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                        if (msg) { msg.style.color = '#0a0'; msg.textContent = 'Saved.'; }
+                        renderSettings(data);
+                    } catch (err) {
+                        if (msg) { msg.style.color = '#b00'; msg.textContent = 'Save failed — ' + err.message; }
+                        console.error('role template save:', err);
+                    }
+                });
+            })();
+
+            // ── Personas management (create / edit / delete) ──
+            const persEl = document.createElement('div');
+            persEl.className = 'card';
+            persEl.style.marginTop = '1rem';
+            const personas = s.personas || [];
+            persEl.innerHTML = `
+                <h2>Personas</h2>
+                <p class="subtitle">Create, edit, or delete debate personas (their name and role/system prompt).</p>
+                <div id="persona-list">
+                ${personas.map((p, idx) => `
+                    <div class="persona-row" data-idx="${idx}" data-role="${escapeHtml(p.role)}">
+                        <div class="form-group" style="margin-bottom:0.25rem;">
+                            <strong>${escapeHtml(p.name)}</strong> <span class="settings-key">(${escapeHtml(p.role)})</span>
+                            <textarea id="persona-prompt-${idx}" rows="2" style="width:100%;margin-top:0.25rem;">${escapeHtml(p.system_prompt || '')}</textarea>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;">
+                            <input id="persona-name-${idx}" type="text" value="${escapeHtml(p.name)}" style="flex:1;">
+                            <button class="btn-sm" onclick="savePersona(${idx},'${escapeHtml(p.role)}')">Save edit</button>
+                            <button class="btn-sm btn-danger" onclick="deletePersona('${escapeHtml(p.role)}')">Delete</button>
+                        </div>
+                    </div>`).join('') || '<div class="empty-state">No personas yet.</div>'}
+                </div>
+                ${personas.length > 0 ? `
+                <div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem;">
+                    <a href="#" id="add-persona-link">+ Add new persona</a>
+                    <div id="add-persona-form" style="display:none;margin-top:0.5rem;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                            <div class="form-group"><label>Name</label><input id="np-name" type="text" placeholder="e.g. Simone de Beauvoir"></div>
+                            <div class="form-group"><label>Role id</label><input id="np-role" type="text" placeholder="e.g. existentialist2"></div>
+                        </div>
+                        <div class="form-group"><label>System prompt / role</label><textarea id="np-prompt" rows="3" style="width:100%;"></textarea></div>
+                        <button class="btn-sm" id="np-save">Add persona</button>
+                    </div>
+                </div>` : ''}`;
+            bodyEl.appendChild(persEl);
+            if (document.getElementById('add-persona-link')) {
+                document.getElementById('add-persona-link').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const f = document.getElementById('add-persona-form');
+                    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+                });
+                document.getElementById('np-save').addEventListener('click', async () => {
+                    const name = document.getElementById('np-name').value.trim();
+                    const role = document.getElementById('np-role').value.trim() || `persona_${Date.now().toString(36)}`;
+                    const prompt = document.getElementById('np-prompt').value.trim();
+                    if (!name || !prompt) { alert('Name and system prompt are required.'); return; }
+                    try {
+                        const resp = await fetch(`${API_BASE}/settings`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ personas: { [role]: { name, system_prompt: prompt } } }),
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                        renderSettings(data);
+                    } catch (err) { console.error('add persona:', err); alert('Failed to add persona — ' + err.message); }
+                });
+            }
+
+            // Editable block (only genuinely runtime-editable settings).
+            const editEl = document.createElement('div');
+            editEl.className = 'card';
+            editEl.style.marginTop = '1rem';
+            editEl.innerHTML = `
+                <h2>Edit (runtime-editable)</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                    ${editable.has('temperature') ? `
+                        <div class="form-group"><label>temperature</label>
+                        <input id="set-temperature" type="number" step="0.05" value="${d.temperature}"></div>` : ''}
+                    ${editable.has('max_tokens') ? `
+                        <div class="form-group"><label>max_tokens</label>
+                        <input id="set-max_tokens" type="number" value="${d.max_tokens}"></div>` : ''}
+                    ${editable.has('method') ? `
+                        <div class="form-group"><label>router.method</label>
+                        <select id="set-method">
+                            ${['llm','round_robin','weighted','context_aware'].map(mo =>
+                                `<option ${r.method===mo?'selected':''}>${mo}</option>`).join('')}
+                        </select></div>` : ''}
+                </div>
+                <button class="btn-sm" id="settings-save" style="margin-top:1rem;">Save selected</button>
+                <div id="settings-save-msg"></div>`;
+            bodyEl.appendChild(editEl);
+
+            document.getElementById('settings-save').addEventListener('click', async () => {
+                const patch = {};
+                const msg = document.getElementById('settings-save-msg');
+                if (editable.has('temperature')) {
+                    const t = parseFloat(document.getElementById('set-temperature').value);
+                    if (!isNaN(t)) patch.temperature = t;
+                }
+                if (editable.has('max_tokens')) {
+                    const n = parseInt(document.getElementById('set-max_tokens').value, 10);
+                    if (!isNaN(n)) patch.max_tokens = n;
+                }
+                if (editable.has('method')) patch.method = document.getElementById('set-method').value;
+                try {
+                    const resp = await fetch(`${API_BASE}/settings`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patch),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) {
+                        throw new Error(data.error || `HTTP ${resp.status}`);
+                    }
+                    if (msg) { msg.style.color = '#0a0'; msg.textContent = 'Saved.'; }
+                    renderSettings(data);
+                } catch (err) {
+                    if (msg) { msg.style.color = '#b00'; msg.textContent = 'Save failed — ' + err.message; }
+                    console.error('saveSettings:', err);
+                }
+            });
+        }
+
+        // Load settings when the tab is opened.
+        function switchToSettings() { loadSettings(); }
+
+        async function createExperiment(config) {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config),
+                });
+                let data = {};
+                try { data = await resp.json(); } catch (_) {}
+                if (!resp.ok) {
+                    const msg = (data && data.error) ? data.error
+                        : `Request failed (HTTP ${resp.status})`;
+                    console.error('Create experiment failed:', resp.status, data);
+                    alert(`Failed to create experiment — ${msg}`);
+                    return;
+                }
+                if (data.status === 'created') {
+                    startExperiment(data.experiment_id);
+                } else {
+                    alert('Failed to create experiment — unexpected response.');
+                }
+            } catch (err) {
+                console.error('Failed to create experiment:', err);
+                alert('Failed to create experiment — network error. Is the server running?');
+            }
+        }
+
+        async function startExperiment(id) {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${id}/start`, { method: 'POST' });
+                let data = {};
+                try { data = await resp.json(); } catch (_) {}
+                if (!resp.ok) {
+                    console.error('Start experiment failed:', resp.status, data);
+                    alert(`Failed to start experiment — ${(data && data.error) || ('HTTP ' + resp.status)}`);
+                    return;
+                }
+                loadExperiments();
+            } catch (err) {
+                console.error('Failed to start experiment:', err);
+                alert('Failed to start experiment — network error.');
+            }
+        }
+
+        async function stopExperiment(id) {
+            try {
+                await fetch(`${API_BASE}/experiments/${id}/stop`, { method: 'POST' });
+                loadExperiments();
+            } catch (err) {
+                console.error('Failed to stop experiment:', err);
+            }
+        }
+
+        async function deleteExperiment(id) {
+            if (!confirm(`Delete experiment ${id}?`)) return;
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${id}`, { method: 'DELETE' });
+                if (!resp.ok) {
+                    console.error('Delete failed:', resp.status);
+                    alert('Failed to delete experiment');
+                }
+                loadExperiments();
+            } catch (err) {
+                console.error('Failed to delete experiment:', err);
+                alert('Failed to delete experiment');
+            }
+        }
+
+        document.getElementById('experiment-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const mode = (formData.get('mode') || 'deterministic');
+            const config = {
+                domain: formData.get('domain'),
+                difficulty_range: JSON.parse(formData.get('difficulty_range') || '[1, 5]'),
+                num_tasks: parseInt(formData.get('num_tasks') || '100'),
+                seed: parseInt(formData.get('seed') || '42'),
+                // Execution mode from the explicit selector (GOAL 13: no silent
+                // fallback — the backend records the real mode in RAW). The mode
+                // selector is the SINGLE source of truth for deterministic/debate.
+                mode: mode,
+                deterministic: mode === 'deterministic',
+                debate: mode === 'debate',
+            };
+            await createExperiment(config);
+        });
+
+        // Auto-refresh every 5 seconds
+        loadExperiments();
+        setInterval(loadExperiments, 5000);
+        setInterval(() => { if (document.getElementById('panel-code-lab').classList.contains('active')) loadCodeLab(); }, 3000);
+    </script>
+</body>
+</html>

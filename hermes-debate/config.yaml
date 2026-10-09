@@ -1,0 +1,57 @@
+# Hermes Multi-Agent Debate Orchestrator Configuration
+
+runtime:
+  mode: strict  # "strict" or "performance"
+  max_turns: 8
+  request_timeout_seconds: 600
+  
+  clef_load_timeout_ms: 30000
+  clef_inference_timeout_ms: 10000
+  model_load_timeout_ms: 120000
+  model_inference_timeout_ms: 120000
+  
+  max_vram_gb: 24.0
+  vram_reserve_mb: 1024
+
+routing:
+  min_confidence: 0.70
+  loop_threshold: 3
+  consensus_threshold: 0.85
+
+generation:
+  temperature: 0.7
+  max_tokens: 2048
+  top_p: 1.0
+
+models:
+  cloudflare_clef-flash:
+    role: decision_model
+    vram_class: decision
+    unload_after_call: true
+    
+  model_a:
+    role: philosopher
+    vram_class: reasoning
+    
+  model_b:
+    role: critic
+    vram_class: reasoning
+
+# Decision Models (separate from generative models)
+decision_models:
+  strands_decider_2b:
+    type: decision_model
+    provider: lm_studio
+    base_url: http://localhost:1234/v1
+    model_id: strands-decider-2b
+    temperature: 0.0
+    max_tokens: 1024
+    timeout_seconds: 60
+    capabilities:
+      - routing
+      - classification
+      - tool_selection
+      - agent_selection
+    metadata:
+      description: "Strands Decider 2B - Specialized decision model"
+      version: "2.0"

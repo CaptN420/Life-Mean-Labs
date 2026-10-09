@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "life_mean_lab"
+version = "1.0.0"
+description = "Life_mean — multi-agent system & synthetic data lab (stable core: philosophical_council, experiments, code_lab)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.0.0",      # OpenAI-compatible client (LM Studio / OpenRouter / OpenAI)
+    "pydantic>=2.0.0",
+    "ttkbootstrap",       # legacy UI helper (philosophical_council)
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# No extras required for a deterministic run/tests; the LLM client is an
+# optional runtime capability (see code_lab.multiagent.probe_llm).
+hermes_debate = [
+    # `hermes-debate/` is a SEPARATE project (installed from its own layout).
+    "pyyaml>=6.0",
+    "aiohttp>=3.8.0",
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "philosophical_council*",
+    "experiments*",
+    "code_lab*",
+    "role_templates*",
+    "library*",
+    "core*",
+    "analysis*",
+    "autopilot*",
+]
+# Exclude generated / namespace runtimes and legacy projects from the wheel.
+# NOTE: `code_lab*` must NOT capture the generated user-workspace `code_lab_runs`
+# namespace; it is excluded explicitly here.
+exclude = [
+    "code_lab_runs*",
+    "code_lab.runs*",
+    "node_modules*",
+    "hermes-debate*",
+    "hermes-orchestrator*",
+]
+# NOTE: `hermes-debate` is a SEPARATE project (distinct package `hermes_debate`,
+# its own setup.py). It is intentionally NOT included here.
+
+# Non-Python runtime resources that MUST ship inside the wheel (GOAL 2/3):
+#   * experiments/ui/dashboard.html  — served dashboard (canonical URL /dashboard)
+#   * library/personas/data/*.txt     — deterministic corpus (persona thinkers)
+# Also collect the source README so the wheel metadata is complete.
+[tool.setuptools.package-data]
+"experiments.ui" = ["dashboard.html"]
+"library.personas.data" = ["*.txt"]
+
+[tool.setuptools]
+include-package-data = true
+
+# Generated Code Lab runtime workspaces (git-ignored) must NEVER ship in a
+# wheel. `code_lab/runs/` is not a Python package (no __init__.py), so the
+# packages.find exclude cannot catch it — exclude it as package data instead.
+# Depth-enumerated so fnmatch matches every nested level reliably.
+[tool.setuptools.exclude-package-data]
+code_lab = [
+    "runs",
+    "runs/*",
+    "runs/*/*",
+    "runs/*/*/*",
+    "runs/*/*/*/*",
+    "runs/*/*/*/*/*",
+    "runs/*/*/*/*/*/*",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+pythonpath = ["."]
+testpaths = ["tests", "philosophical_council/tests"]
+# Deterministic default: never auto-add the known package-shadows like
+# code_lab/runs. Kept explicit so a fresh env collects identically.
+norecursedirs = ["code_lab/runs", "node_modules", "hermes-debate", ".git", "experiments/*_*"]

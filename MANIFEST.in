@@ -1,0 +1,3 @@
+# Durable guard: generated Code Lab runtimes never enter sdist/wheel
+recursive-exclude code_lab/runs *
+recursive-exclude code_lab_runs *

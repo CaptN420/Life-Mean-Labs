@@ -1,0 +1,1 @@
+"""Curriculum package for adaptive synthetic data generation."""

@@ -1,0 +1,66 @@
+# Code Lab run workspaces (generated state — not source)
+code_lab/runs/
+code_lab_runs/
+
+# ── Secrets ──────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/.env.example
+
+# ── Local LLM config (may carry tokens) ──────────────────
+.lmstudio/
+http-server*.json
+
+# ── Runtime overrides (settings + LLM credentials, written by the
+#    Settings UI — never commit these; llm.env holds the API key) ──
+overrides/
+
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.log
+
+# ── Node (hermes-orchestrator) ───────────────────────────
+node_modules/
+build/
+dist/
+*.whl
+
+# ── IDE / OS ─────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Local data ───────────────────────────────────────────
+autopilot/data/
+data/raw_debates/
+tmp/
+*.tmp
+
+# ── Generated test artefacts (DebateEngine integration) ──
+experiments/integ_*/
+experiments/exp_*/
+
+# ── Heavy / vendor / legacy trees with REAL secrets — never push ──
+legacy/
+External/
+storage/
+data/
+benchmarks/
+dogfood-output/
+nul
+*.zip
+*.tar.gz
