@@ -221,3 +221,28 @@ def test_runner_loop_sets_valid_counts():
             sys.modules["experiments.runner"] = orig
         else:
             sys.modules.pop("experiments.runner", None)
+
+
+def test_code_lab_create_dispatches_wrong_executor_template_not_to_code_lab():
+    """A selected template dispatches by executor_type: a philosophical-debate
+    template must NOT reach CodeLabEngine — the dashboard refuses it (400
+    wrong_executor) before any CodeLabConfig/CodeLabEngine is constructed."""
+    h = _FakeHandler()
+    h.ui_controller = _make_controller()
+    h.code_lab_controller = object()  # dispatch must reject BEFORE this is used
+    h._code_lab_create({
+        "prompt": "make a debate about free will",
+        "template_id": "philosophical-debate",
+        "multi_agent": True,
+    })
+    assert h._code == 400
+    assert "philosophical_debate" in h._err  # names the intended executor
+    assert "cannot run it" in h._err
+    # Code Lab happy path still dispatches to the code_lab executor
+    h2 = _FakeHandler()
+    h2.ui_controller = _make_controller()
+    h2.code_lab_controller = object()
+    from code_lab.generator import detect_plan
+    # exercise require_code_lab directly (controller path is covered by smoke test)
+    from role_templates.executor import require_code_lab
+    assert require_code_lab("coding-standard")["executor_type"] == "code_lab"

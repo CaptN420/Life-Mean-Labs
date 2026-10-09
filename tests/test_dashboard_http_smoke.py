@@ -132,7 +132,8 @@ def test_codelab_run_endpoint_live(server):
     status, body = _req(
         base, "/api/code-lab/runs", method="POST",
         body={"prompt": "Create a Python function is_prime(n) with unit tests.",
-              "run_tests": True, "multi_agent": False},
+                      "run_tests": True, "multi_agent": False,
+                      "template_id": "coding-standard"},
     )
     assert status == 200, body
     assert body["status"] == "created"

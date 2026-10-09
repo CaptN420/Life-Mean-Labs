@@ -13,6 +13,7 @@ Core invariant exported through the public API:
 from .core import RoleSpec, RoleTemplate, RoleModelMapping
 from .registry import RoleTemplateRegistry, get_registry
 from .builtins import coding_standard, philosophical_debate, general_reasoning
+from .executor import EXECUTOR_CAPABILITIES, dispatch_template, require_code_lab
 
 __all__ = [
     "RoleSpec",
@@ -23,4 +24,7 @@ __all__ = [
     "coding_standard",
     "philosophical_debate",
     "general_reasoning",
+    "EXECUTOR_CAPABILITIES",
+    "dispatch_template",
+    "require_code_lab",
 ]

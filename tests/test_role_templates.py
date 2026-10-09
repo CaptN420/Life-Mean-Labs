@@ -421,3 +421,55 @@ def test_m_registry_immutable_identity_and_version(registry):
     registry.register(hi)
     registry.register(low)
     assert registry.get_template("order-test").version == "1.10.0"
+
+
+
+# ── N. Template selection dispatches by executor_type (never all into Code Lab) ─
+def test_n_template_dispatches_to_compatible_executor(registry):
+    """A selected template must dispatch to the executor matching its
+    executor_type — CodeLabEngine only ever receives code_lab templates."""
+    from role_templates.executor import (
+        EXECUTOR_CAPABILITIES, dispatch_template, require_code_lab)
+
+    # built-ins are registered by the registry fixture; classify each
+    assert dispatch_template("coding-standard")["executor_type"] == "code_lab"
+    assert dispatch_template("coding-standard")["connected"] is True
+    assert dispatch_template("coding-standard")["engine"] == "CodeLabEngine"
+
+    d = dispatch_template("philosophical-debate")
+    assert d["executor_type"] == "philosophical_debate"
+    assert d["executor_kind"] == "philosophical_debate"
+    assert d["engine"] == "DebateEngine"
+    assert d["connected"] is False  # not wired right now -> honest refusal
+
+    assert dispatch_template("general-reasoning")["executor_type"] == "general_reasoning"
+
+    # capability catalog is consistent with the executor kinds the template
+    # system can actually declare
+    for t in registry._latest.values():
+        assert t.executor_type in EXECUTOR_CAPABILITIES, t.executor_type
+
+    # unknown template cannot dispatch (no silent default executor)
+    with pytest.raises(ValueError):
+        dispatch_template("no-such-template")
+
+
+def test_n_require_code_lab_refuses_other_executors(registry):
+    """require_code_lab is the dispatch guard for Code Lab: passes only for
+    code_lab templates, refuses others naming their correct executor."""
+    from role_templates.executor import require_code_lab
+
+    d = require_code_lab("coding-standard")
+    assert d["executor_type"] == "code_lab"
+
+    for bad, target in (("philosophical-debate", "philosophical_debate"),
+                        ("general-reasoning", "general_reasoning")):
+        with pytest.raises(ValueError) as ei:
+            require_code_lab(bad)
+        msg = str(ei.value)
+        # names the target executor, never a silent fallback / Code Lab run
+        assert target in msg
+        assert "cannot run it" in msg
+
+    with pytest.raises(ValueError):
+        require_code_lab("no-such-template")
