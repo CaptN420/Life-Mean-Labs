@@ -552,6 +552,19 @@
                     <div id="code-lab-log" class="clab-log">— no run selected —</div>
                 </div>
             </div>
+
+            <!-- Lab-wide live timeline (roadmap M0 §22): backend-real events
+                 aggregated across every Code Lab run, never synthesized. -->
+            <div class="card" style="margin-top:1.5rem;">
+                <h2 style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>Lab Timeline</span>
+                    <button type="button" class="btn" style="padding:0.1rem 0.6rem;font-size:0.8em"
+                        onclick="loadLabTimeline()">Refresh</button>
+                </h2>
+                <p class="subtitle" style="margin-top:0.25rem;">Live events across all runs
+                    (WHO echoed / WHICH model or tool / DID it work).</p>
+                <div id="lab-timeline" class="clab-log" style="max-height:280px;">— no events yet —</div>
+            </div>
         </div>
 
         <!-- ── Settings tab (GOAL 9/10: real UI over existing config) ── -->
@@ -1142,14 +1155,42 @@
         let selectedRun = null;
 
         async function loadCodeLab() {
-            try {
-                const resp = await fetch(`${API_BASE}/code-lab/runs`);
-                const data = await resp.json();
-                renderCodeLabRuns(data.runs || []);
-            } catch (err) {
-                console.error('Failed to load code lab runs:', err);
-            }
-        }
+                    try {
+                        const resp = await fetch(`${API_BASE}/code-lab/runs`);
+                        const data = await resp.json();
+                        renderCodeLabRuns(data.runs || []);
+                    } catch (err) {
+                        console.error('Failed to load code lab runs:', err);
+                    }
+                }
+
+                async function loadLabTimeline() {
+                    const el = document.getElementById('lab-timeline');
+                    if (!el) return;
+                    try {
+                        const resp = await fetch(`${API_BASE}/code-lab/timeline`);
+                        const data = await resp.json();
+                        const evts = data.events || [];
+                        if (!evts.length) {
+                            el.textContent = '— no events yet —';
+                            return;
+                        }
+                        const time = (t) => (typeof t === 'number'
+                            ? new Date(t * 1000).toLocaleTimeString()
+                            : String(t || ''));
+                        const model = (e) => e.model && e.model !== 'auto' ? ` · ${e.model}` : '';
+                        const tool = (e) => e.tool_name ? ` · ${e.tool_name}` : '';
+                        el.innerHTML = evts.map(e =>
+                            `<div class="clab-event"><span class="evt">${time(e.time)}</span> ` +
+                            `<span class="experiment-id">${escapeHtml(e.type || '')}</span>` +
+                            `${model(e)}${tool(e)}` +
+                            ` <span class="experiment-stat">${escapeHtml(String(e.run_id || '')).slice(0, 24)}</span></div>`
+                        ).join('');
+                        el.scrollTop = el.scrollHeight;
+                    } catch (err) {
+                        el.textContent = '— timeline unavailable —';
+                    }
+                }
 
         function renderCodeLabRuns(runs) {
             const list = document.getElementById('code-lab-list');
@@ -1910,8 +1951,9 @@
 
         // Auto-refresh every 5 seconds
         loadExperiments();
-        setInterval(loadExperiments, 5000);
-        setInterval(() => { if (document.getElementById('panel-code-lab').classList.contains('active')) loadCodeLab(); }, 3000);
+                setInterval(loadExperiments, 5000);
+                loadLabTimeline();
+                setInterval(() => { if (document.getElementById('panel-code-lab').classList.contains('active')) { loadCodeLab(); loadLabTimeline(); } }, 3000);
     </script>
 </body>
 </html>

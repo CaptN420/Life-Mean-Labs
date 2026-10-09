@@ -44,12 +44,18 @@ class CodeLabRunView:
 class CodeLabController:
     """Owns all Code Lab runs in a session; thread-safe."""
 
+    # Bounded size of the lab-wide event log (oldest entries are evicted).
+    TIMELINE_LIMIT = 500
+
     def __init__(self, base_dir: Optional[Path] = None) -> None:
         self._runs: Dict[str, CodeLabRunView] = {}
         self._engines: Dict[str, CodeLabEngine] = {}
         self._stop_flags: Dict[str, threading.Event] = {}
         self._lock = threading.Lock()
         self._base_dir = base_dir
+        # Lab-wide consolidated event log: every real run event across all runs.
+        # Each entry carries `run_id` + `time`; backend-real, never synthesized.
+        self._timeline: List[Dict[str, Any]] = []
 
     # ── run management ─────────────────────────────────────────────────────
     def create_run(self, config: CodeLabConfig) -> CodeLabRunView:
@@ -81,6 +87,10 @@ class CodeLabController:
                     view.status = "failed"
                 elif ev["type"] == "RUN_STOPPED":
                     view.status = "stopped"
+                # Also record on the lab-wide timeline (backend-real event).
+                self._timeline.append(ev)
+                if len(self._timeline) > self.TIMELINE_LIMIT:
+                    self._timeline = self._timeline[-self.TIMELINE_LIMIT:]
             if on_event is not None:
                 try:
                     on_event(ev)
@@ -178,6 +188,25 @@ class CodeLabController:
             self._runs.pop(run_id, None)
             self._engines.pop(run_id, None)
         return True
+
+    def get_timeline(self, limit: int = 200) -> Dict[str, Any]:
+        """Return the lab-wide consolidated event log, newest-last.
+
+        Each event is a backend-real dict carried over from the per-run callback
+        chain (type, time, run_id, role/tool/model metadata where applicable).
+        Large payload fields (source, tests, plan, response) are stripped so the
+        timeline stays a diagnostic surface, not a data dump. ``count`` is the
+        total number of events recorded this session (may exceed ``limit``).
+        """
+        with self._lock:
+            total = len(self._timeline)
+            trimmed = []
+            for ev in self._timeline[-limit:]:
+                trimmed.append(
+                    {k: v for k, v in ev.items()
+                     if k not in ("source", "tests", "plan", "result", "response", "code")}
+                )
+        return {"events": trimmed, "count": total}
 
     def get_dashboard_data(self) -> Dict[str, Any]:
         runs = self.list_runs()

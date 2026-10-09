@@ -66,6 +66,8 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._code_lab_files(parsed.path)
         elif parsed.path.startswith("/api/code-lab/runs/") and parsed.path.endswith("/events"):
             self._code_lab_events(parsed.path)
+        elif parsed.path == "/api/code-lab/timeline":
+            self._code_lab_timeline()
         elif parsed.path.startswith("/api/code-lab/runs/"):
             self._code_lab_get(parsed.path)
         elif parsed.path == "/api/experimental/capabilities":
@@ -237,6 +239,18 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._send_error(404, f"Run {run_id} not found")
         else:
             self._send_json({"run_id": run_id, "events": data.get("events", [])})
+
+    def _code_lab_timeline(self, limit: int = 200) -> None:
+        """GET /api/code-lab/timeline — lab-wide consolidated event timeline.
+
+        Backend-real events aggregated across every Code Lab run (roadmap M0 /
+        §22 live timeline). Returns {events:[...], count} with large payload
+        fields stripped by the controller; the UI polls this for a live feed.
+        """
+        if self.code_lab_controller is None:
+            self._send_json({"events": [], "count": 0})
+            return
+        self._send_json(self.code_lab_controller.get_timeline(limit=limit))
 
     def _code_lab_create(self, data: Dict[str, Any]) -> None:
         if self.code_lab_controller is None:
