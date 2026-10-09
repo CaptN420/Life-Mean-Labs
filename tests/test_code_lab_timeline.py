@@ -76,6 +76,8 @@ class TestLabTimeline:
 
         tl = ctl.get_timeline()
         assert tl["count"] == 4
+        assert tl["total_events"] == 4
+        assert tl["runs_count"] == 2
         ids = [e["run_id"] for e in tl["events"]]
         assert ids == ["a", "a", "b", "b"]
         # big payload fields stripped from timeline surface

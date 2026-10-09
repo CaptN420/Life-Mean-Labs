@@ -206,7 +206,8 @@ class CodeLabController:
                     {k: v for k, v in ev.items()
                      if k not in ("source", "tests", "plan", "result", "response", "code")}
                 )
-        return {"events": trimmed, "count": total}
+            runs_count = len({ev["run_id"] for ev in self._timeline if "run_id" in ev})
+        return {"events": trimmed, "count": total, "total_events": total, "runs_count": runs_count}
 
     def get_dashboard_data(self) -> Dict[str, Any]:
         runs = self.list_runs()
