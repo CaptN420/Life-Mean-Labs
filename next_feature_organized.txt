@@ -3844,3 +3844,2617 @@ RESEARCH MEMORY / NOTEBOOK / RESEARCH HOME
 = HIGH VALUE
 = POST-FOUNDATION
 = DO NOT IMPLEMENT YET
+
+
+
+
+LIFE_MEAN LABS
+CLEF / HARNESS / STATE-TRANSITION / BONSAI READINESS AUDIT
+
+MISSION
+
+Audit the CURRENT Life_mean repository and the preserved historical
+Hermes/CLEF code to determine whether Life_mean already contains the
+primitives required for a state-driven agentic reasoning loop.
+
+DO NOT IMPLEMENT CLEF.
+
+DO NOT IMPLEMENT BONSAI.
+
+DO NOT TRAIN ANY MODEL.
+
+DO NOT CREATE A LORA.
+
+DO NOT BUILD A NEW ORCHESTRATOR.
+
+DO NOT REWRITE THE CURRENT PIPELINE.
+
+THIS IS AN ARCHITECTURE + DATA-CONTRACT AUDIT ONLY.
+
+Primary questions:
+
+1. What did historical CLEF/Hermes actually do?
+2. Which of those concepts already exist in current Life_mean?
+3. What is genuinely missing?
+4. What canonical STATE / ACTION / OBSERVATION / VALIDATION format
+   would allow the current system to become trainable and benchmarkable?
+5. Can existing Workers/EventBus/RAW/DB already produce this format
+   deterministically?
+6. Could Bonsai consume this state format in SHADOW MODE before any LoRA?
+7. What configuration must be frozen so comparisons are scientifically valid?
+
+======================================================================
+0. PRINCIPLE
+======================================================================
+
+DO NOT START FROM:
+
+"We need to recreate the old system."
+
+START FROM:
+
+"What useful concepts did the old system contain,
+and which current Life_mean primitives already supersede them?"
+
+Preferred outcome:
+
+MIGRATE CONCEPTS
+NOT OLD ARCHITECTURAL DEBT.
+
+======================================================================
+1. AUDIT HISTORICAL CLEF / HERMES
+======================================================================
+
+Locate all historical implementations related to:
+
+CLEF
+
+ClefDecisionEngine
+
+Hermes orchestrator
+
+decision engine
+
+allowed_actions
+
+next_action
+
+expected result / expected output
+
+confidence
+
+consensus
+
+needs_fact_check
+
+loop_detected
+
+debate_progress
+
+state
+
+judge/evaluator
+
+model A / model B orchestration
+
+fallback
+
+termination
+
+Do not assume a directory is legacy merely because it is old.
+
+Trace:
+
+imports
+callers
+tests
+entrypoints
+README/design docs
+runtime usage
+
+For every historical primitive report:
+
+NAME
+
+PURPOSE
+
+INPUT
+
+OUTPUT
+
+STATE OWNERSHIP
+
+REAL IMPLEMENTATION / STUB / SIMULATION
+
+CURRENTLY USED?
+
+CURRENT LIFE_MEAN EQUIVALENT?
+
+VALUE WORTH PRESERVING?
+
+Do not claim historical behavior that the code does not support.
+
+======================================================================
+2. RECONSTRUCT THE OLD LOOP
+======================================================================
+
+From actual code and docs, reconstruct the historical control loop.
+
+Determine whether it was approximately:
+
+STATE
+→ CLEF DECISION
+→ ACTION
+→ MODEL / EXECUTOR
+→ RESULT
+→ EVALUATION
+→ STATE UPDATE
+→ NEXT ACTION
+
+But do not assume this structure.
+
+Prove it from the repository.
+
+Especially determine whether CLEF produced only:
+
+NEXT_ACTION
+
+or also produced concepts equivalent to:
+
+OBJECTIVE
+
+EXPECTED_RESULT
+
+SUCCESS_CRITERIA
+
+FALLBACK
+
+CONFIDENCE
+
+NEEDS_FACT_CHECK
+
+STOP / CONTINUE
+
+This distinction is important.
+
+======================================================================
+3. CURRENT LIFE_MEAN PRIMITIVE MAP
+======================================================================
+
+Audit current Life_mean for equivalents to:
+
+CONTROL
+
+STATE
+
+GOAL
+
+ACTION
+
+CAPABILITY
+
+WORKER
+
+TOOL
+
+THINKER
+
+MODEL ROUTING
+
+EXECUTOR
+
+OBSERVATION
+
+VALIDATOR
+
+FAILURE TYPE
+
+FALLBACK
+
+RECOVERY
+
+MEMORY
+
+EVENT
+
+RAW
+
+EXPERIMENT
+
+RUN
+
+COMPARE
+
+For each one classify:
+
+EXISTS_AND_CONNECTED
+
+EXISTS_PARTIAL
+
+EXISTS_BUT_DIFFERENT_SEMANTICS
+
+MISSING
+
+LEGACY_ONLY
+
+UNKNOWN
+
+======================================================================
+4. PRODUCE OLD → CURRENT MAPPING
+======================================================================
+
+Create a concrete mapping such as:
+
+Historical ClefDecisionEngine
+→ current candidate equivalent
+
+Historical allowed_actions
+→ current Capability Registry / Worker Registry / Tool Registry / Executor Registry
+
+Historical needs_fact_check
+→ current/future tool request or research capability
+
+Historical loop_detected
+→ current stagnation/repetition signal
+
+Historical debate_progress
+→ current feedback/progression metric
+
+Historical model A/model B
+→ current ModelPool / SmartRouter
+
+Historical next_action
+→ candidate ExecutionRequest
+
+Historical expected_result
+→ candidate ExecutionContract
+
+Historical Judge
+→ current validator / semantic evaluator / JudgeAgent
+
+Historical state
+→ current Experiment/Run/Event-derived state
+
+BUT:
+
+do not force mappings where semantics differ.
+
+Mark uncertain mappings explicitly.
+
+======================================================================
+5. HARNESS AUDIT
+======================================================================
+
+Determine whether current Life_mean already contains an effective
+AGENT HARNESS.
+
+A Harness means the controlled layer that sits between model decisions
+and actual execution.
+
+Audit whether current code already provides:
+
+request validation
+
+capability lookup
+
+permissions
+
+input schema validation
+
+budget enforcement
+
+runtime lifecycle checks
+
+execution
+
+actual result capture
+
+EventBus publication
+
+RAW persistence
+
+error capture
+
+timeouts
+
+stop/cancel propagation
+
+structured return to calling model/agent
+
+If these responsibilities are distributed across multiple modules,
+map them.
+
+Do NOT build a new Harness in this task.
+
+Answer:
+
+DO WE ALREADY HAVE THE HARNESS IN PIECES?
+
+======================================================================
+6. PIPELINE AUDIT
+======================================================================
+
+Trace whether the current system already supports some form of:
+
+STATE
+→ DECISION
+→ EXECUTION
+→ OBSERVATION
+→ VALIDATION
+→ RECOVERY
+→ UPDATED STATE
+
+Identify concrete runtime examples from:
+
+Debate
+
+Code Lab
+
+AutoPilot
+
+Workers
+
+Tools
+
+Validators
+
+Failure Bank
+
+Experimental
+
+For example:
+
+Code Lab may already contain:
+
+task
+→ developer action
+→ filesystem result
+→ pytest
+→ failure
+→ repair
+→ pytest
+→ success
+
+Determine whether this can already be represented as canonical state
+transitions without modifying runtime behavior.
+
+======================================================================
+7. CANONICAL STATE TRANSITION CONTRACT
+======================================================================
+
+Design, but DO NOT implement, a canonical representation for one
+Life_mean reasoning/execution transition.
+
+The contract should be:
+
+stable
+
+machine-readable
+
+versioned
+
+minimal enough for many executors
+
+rich enough for training/evaluation
+
+reconstructible from canonical events where possible
+
+provenance-preserving
+
+Do not make it dependent on philosophical debate terminology.
+
+Recommended conceptual shape:
+
+STATE
+
+- state_id
+- experiment_id
+- run_id
+- stage_id if applicable
+- turn / step
+- current_goal
+- current_subgoal
+- known_evidence_refs
+- unresolved_questions
+- previous_action
+- previous_result
+- failure_state
+- available_capabilities
+- configured_models
+- budget_remaining
+- memory_refs
+- config_snapshot_hash
+
+DECISION
+
+- decision_id
+- actor
+- actual_model
+- action_type
+- target
+- objective
+- expected_result
+- success_criteria
+- fallback
+- confidence
+- reason_summary if explicitly produced
+
+EXECUTION
+
+- executor_type
+- capability_id
+- configured_target
+- actual_target
+- started_at
+- completed_at
+- parameters
+- artifact_refs
+
+OBSERVATION
+
+- actual_result
+- structured_output
+- evidence_refs
+- tool_results
+- artifacts
+- errors
+
+VALIDATION
+
+- validator_id
+- status
+- objective_result
+- expected_vs_actual
+- failure_type
+- confidence if semantic
+- evidence_refs
+
+NEXT_STATE
+
+- next_state_id
+- progress_status
+- resolved_items
+- newly_open_items
+- updated_failure_state
+- candidate_next_action
+- terminal_status
+
+These are suggestions.
+
+Audit the repository and adjust the contract to CURRENT REALITY.
+
+Do not invent fields that cannot be populated or reconstructed.
+
+======================================================================
+8. EXPECTED RESULT IS CRITICAL
+======================================================================
+
+Investigate specifically whether current Life_mean has any equivalent of:
+
+EXPECTED_RESULT
+
+SUCCESS_CRITERIA
+
+This may be one of the most important concepts from historical CLEF.
+
+Distinguish:
+
+ACTION:
+"Call Worker X"
+
+from:
+
+OBJECTIVE:
+"Determine why test Y fails"
+
+from:
+
+EXPECTED_RESULT:
+"Concrete failure cause + candidate repair"
+
+from:
+
+SUCCESS_CRITERIA:
+"Cause is supported by compiler/test evidence"
+
+This structure would allow the system to evaluate whether an action
+actually progressed the task.
+
+Identify where current Life_mean already has similar concepts:
+
+validator expectations
+
+task specifications
+
+moderator challenges
+
+agent objectives
+
+role expected_output
+
+Code Lab acceptance criteria
+
+experiment success criteria
+
+Do not prematurely unify incompatible concepts.
+
+======================================================================
+9. REPRESENTATIVE RUN RECONSTRUCTION
+======================================================================
+
+Use at least one EXISTING representative run/checkpoint if available.
+
+Prefer a run with approximately:
+
+10–20 turns/steps
+
+multi-agent interaction
+
+actual events
+
+actual model responses
+
+some state changes
+
+possibly failure/recovery if available
+
+Do NOT run a new 100-turn experiment just for this audit.
+
+From the existing run, reconstruct as many transitions as possible:
+
+STATE_0
+→ ACTION_0
+→ RESULT_0
+→ VALIDATION_0
+→ STATE_1
+
+STATE_1
+→ ACTION_1
+→ ...
+
+Report:
+
+what can be reconstructed deterministically
+
+what requires LLM interpretation
+
+what information is currently missing
+
+what fields are ambiguous
+
+what provenance is available
+
+This is the practical proof that the proposed contract is viable.
+
+======================================================================
+10. 20 TURNS VS 100 TURNS
+======================================================================
+
+Do not assume longer is better.
+
+Analyze conceptually what a longer run would add.
+
+Distinguish:
+
+TURN COUNT
+
+from:
+
+USEFUL STATE TRANSITIONS
+
+A 20-turn run with:
+
+failure
+critique
+tool result
+repair
+validation
+
+may contain more training value than a repetitive 100-turn run.
+
+Recommend future metrics such as:
+
+useful transitions
+
+unique failure/recovery events
+
+state changes
+
+hypothesis revisions
+
+objective validator interactions
+
+stagnation ratio
+
+rounds_to_verified_success
+
+Do not run the 100-turn benchmark now.
+
+======================================================================
+11. TRAINING TRACE COMPILER FEASIBILITY
+======================================================================
+
+Determine whether a deterministic Worker could transform current
+EventBus/RAW/DB data into canonical training traces.
+
+Potential future component:
+
+TrainingTraceCompiler
+
+or:
+
+TrajectoryCompilerWorker
+
+Its job would be ONLY:
+
+read canonical evidence
+
+resolve linked events
+
+construct state_before
+
+copy actual action
+
+copy actual result
+
+copy validator evidence
+
+construct state_after
+
+validate schema
+
+preserve provenance
+
+export candidate trace
+
+It must NOT:
+
+invent missing reasoning
+
+rewrite failed outcomes
+
+summarize evidence using an LLM as truth
+
+silently guess missing fields
+
+Determine what percentage of the proposed format could be produced
+deterministically TODAY.
+
+Report approximately:
+
+FULLY_DERIVABLE
+
+PARTIALLY_DERIVABLE
+
+NOT_CURRENTLY_AVAILABLE
+
+for each field group.
+
+======================================================================
+12. DATASET LEVELS
+======================================================================
+
+Determine whether the same runtime data could eventually generate:
+
+LOCAL TRANSITIONS
+
+state
+→ next action
+
+SHORT TRAJECTORIES
+
+5–10 transitions
+
+LONG TRAJECTORIES
+
+20+ transitions
+
+FULL RUNS
+
+entire experiment/run
+
+Do not create datasets now.
+
+Only assess feasibility.
+
+======================================================================
+13. BONSAI SHADOW OBSERVER READINESS
+======================================================================
+
+Evaluate whether the available Bonsai checkpoint could later be used
+WITHOUT TRAINING as a SHADOW OBSERVER.
+
+Shadow mode means:
+
+REAL POLICY
+→ runs Life_mean normally
+
+BONSAI
+→ receives a canonical state
+→ predicts what it would do
+
+Life_mean does NOT obey Bonsai.
+
+Later we compare:
+
+Bonsai prediction
+
+vs
+
+actual chosen action
+
+vs
+
+actual outcome
+
+Potential Bonsai prediction contract:
+
+failure_classification
+
+next_action
+
+target_capability
+
+objective
+
+expected_result
+
+success_criteria
+
+confidence
+
+recommended_fallback
+
+Determine:
+
+what context would be required
+
+what retrieval would be required
+
+what existing DB interfaces could provide it
+
+what should NOT be included
+
+Do not connect Bonsai in this task.
+
+======================================================================
+14. BONSAI MEMORY / RETRIEVAL BENCHMARK DESIGN
+======================================================================
+
+Design a future quick benchmark BEFORE LoRA.
+
+Conditions:
+
+A — BASE
+
+Bonsai
+without Life_mean memory
+
+B — RETRIEVAL
+
+Bonsai
++ relevant prior Life_mean states/results
+
+C — VERIFIED RETRIEVAL
+
+Bonsai
++ prior examples with deterministic/validator-confirmed outcomes
+
+D — FUTURE LORA
+
+trained candidate
++ same retrieval
+
+Do not run D.
+
+Potential metrics:
+
+failure classification accuracy
+
+next capability accuracy
+
+tool selection accuracy
+
+expected-result usefulness
+
+fallback quality
+
+confidence calibration
+
+unnecessary escalation
+
+rounds_to_verified_success
+
+Do not assume accuracy can always be defined exactly;
+identify where semantic evaluation would be needed.
+
+======================================================================
+15. CONFIGURATION FREEZE REQUIREMENTS
+======================================================================
+
+Determine which configuration must be frozen to make these benchmarks valid.
+
+At minimum inspect whether we need to record:
+
+model IDs
+
+actual model IDs
+
+model versions/hashes if available
+
+temperature
+
+sampling parameters
+
+seed if actually supported
+
+model pool
+
+routing method
+
+available capabilities
+
+tool versions
+
+worker versions
+
+thinker versions
+
+template ID/version/hash
+
+prompts/hashes
+
+memory retrieval configuration
+
+retrieved memory IDs
+
+budget
+
+max steps
+
+max tool calls
+
+timeouts
+
+validator versions
+
+success criteria
+
+fallback policy
+
+runtime/backend version
+
+Life_mean commit hash
+
+Do not expose config fields that are not actually honored.
+
+======================================================================
+16. MEMORY MUST NOT LEAK FUTURE INFORMATION
+======================================================================
+
+For future training/benchmarking, identify risks of:
+
+future-state leakage
+
+test-set contamination
+
+using later conclusions in earlier states
+
+retrieving notes generated after the target transition
+
+using final run outcomes when predicting earlier next actions
+
+The canonical state must contain ONLY information available at that time.
+
+This is mandatory.
+
+Otherwise the benchmark/training data is invalid.
+
+======================================================================
+17. FAILURE / FALLBACK DATA VALUE
+======================================================================
+
+Audit whether current Life_mean can already preserve:
+
+failure type
+
+failed action
+
+objective evidence
+
+fallback selected
+
+fallback executor
+
+actual recovery result
+
+validator outcome
+
+This is especially valuable for future datasets.
+
+Desired future trace:
+
+STATE
+
+→ ACTION_A
+
+→ FAIL
+
+→ FAILURE_TYPE
+
+→ FALLBACK_B
+
+→ RESULT
+
+→ VALIDATOR PASS
+
+Do not collapse this into only the final successful answer.
+
+======================================================================
+18. ROUTING AS TRAINING DATA
+======================================================================
+
+Assess whether current events contain enough provenance to generate
+future routing examples:
+
+state/context
+→ chosen capability
+→ actual model/tool/worker
+→ outcome
+
+Potential targets include:
+
+MODEL ROUTING
+
+TOOL ROUTING
+
+WORKER ROUTING
+
+THINKER ROUTING
+
+EXECUTOR ROUTING
+
+RECOVERY ROUTING
+
+Do not assume every routing decision is currently observable.
+
+Report gaps.
+
+======================================================================
+19. MULTI-AGENT STATE
+======================================================================
+
+Determine how multi-agent Debate state should be represented without
+dumping the full transcript into every training example.
+
+Potential compact state may contain:
+
+goal
+
+active question
+
+speaker history summary
+
+current hypotheses
+
+open objections
+
+evidence refs
+
+recent relevant turns
+
+current moderator objective
+
+available roles
+
+But only recommend fields that can be derived reliably.
+
+Preserve references to full RAW transcript.
+
+======================================================================
+20. CODE LAB STATE
+======================================================================
+
+Determine whether Code Lab already provides especially strong
+state-transition data.
+
+Potential examples:
+
+TASK
+
+→ PLAN
+
+→ CODE ACTION
+
+→ FILESYSTEM OBSERVATION
+
+→ PYTEST FAIL
+
+→ CRITIC
+
+→ REPAIR
+
+→ PYTEST PASS
+
+This may be one of the best initial sources for deterministic training traces.
+
+Assess that hypothesis.
+
+Do not create training data yet.
+
+======================================================================
+21. TOOL / WORKER DETERMINISM
+======================================================================
+
+Identify where Workers can make state construction more reliable.
+
+Example:
+
+Instead of LLM saying:
+
+"The file exists"
+
+Worker checks:
+
+filesystem.exists(path)
+
+Instead of:
+
+"The test passed"
+
+Worker reads:
+
+pytest exit code
+
+Instead of:
+
+"This run used Model X"
+
+Worker reads:
+
+actual runtime provenance
+
+List current deterministic sources suitable for canonical state building.
+
+======================================================================
+22. STATE VERSIONING
+======================================================================
+
+Recommend a versioned schema strategy.
+
+Example concept:
+
+life_mean_state_transition/v1
+
+Future schema changes must not silently reinterpret historical data.
+
+Historical traces should preserve:
+
+schema_version
+
+source_version
+
+compiler_version
+
+Do not implement migrations now.
+
+======================================================================
+23. SCIENTIFIC QUESTIONS ENABLED BY THIS CONTRACT
+======================================================================
+
+Identify what Life_mean could experimentally test once this state
+contract exists.
+
+Examples:
+
+Does deterministic feedback reduce rounds-to-success?
+
+Does evidence-driven fallback outperform blind retry?
+
+Does retrieval improve next-action selection without training?
+
+Does Bonsai shadow prediction improve with verified exemplars?
+
+Does a LoRA improve decision quality beyond retrieval alone?
+
+Does Tool routing reduce unsupported claims?
+
+Does longer trajectory context improve or degrade control decisions?
+
+Does a small controller outperform using the main reasoning model
+for orchestration?
+
+These are experiments.
+
+Do not state outcomes.
+
+======================================================================
+24. DO NOT CONFUSE THREE DIFFERENT THINGS
+======================================================================
+
+Keep these separate:
+
+RUNTIME STATE
+
+what Life_mean knows now
+
+TRAINING TRACE
+
+selected historical transition used as data
+
+MODEL INTERNAL REASONING
+
+private internal computation of the model
+
+The canonical contract should capture explicit observable state,
+actions, results and justifications.
+
+Do not attempt to extract hidden chain-of-thought.
+
+======================================================================
+25. SECURITY / CONTROL
+======================================================================
+
+Any future controller must remain behind the Harness.
+
+CLEF/Bonsai should never directly:
+
+execute arbitrary shell
+
+write outside workspace
+
+install dependencies
+
+modify Life_mean core
+
+enable extensions
+
+publish
+
+train/promote models
+
+access secrets
+
+Actions remain subject to:
+
+capability registry
+
+permissions
+
+budgets
+
+validation
+
+human authority where required
+
+======================================================================
+26. EXPECTED AUDIT OUTPUT
+======================================================================
+
+Produce:
+
+CLEF_STATE_READINESS_AUDIT.md
+
+and optionally, if existing audit conventions support it:
+
+clef_state_readiness_audit.json
+
+The report must contain:
+
+A. HISTORICAL CLEF/HERMES REALITY
+
+B. CURRENT LIFE_MEAN PRIMITIVES
+
+C. OLD → CURRENT MAPPING
+
+D. HARNESS READINESS
+
+E. PIPELINE READINESS
+
+F. CANONICAL STATE TRANSITION CONTRACT PROPOSAL
+
+G. REPRESENTATIVE RUN RECONSTRUCTION
+
+H. DETERMINISTICALLY DERIVABLE FIELDS
+
+I. MISSING FIELDS
+
+J. TRAINING TRACE COMPILER FEASIBILITY
+
+K. BONSAI SHADOW READINESS
+
+L. REQUIRED BENCHMARK CONFIG SNAPSHOT
+
+M. DATA LEAKAGE RISKS
+
+N. FAILURE/FALLBACK TRACE QUALITY
+
+O. ROUTING DATA READINESS
+
+P. WHAT IS ACTUALLY MISSING
+
+Q. MINIMUM NEXT IMPLEMENTATION
+
+======================================================================
+27. MINIMUM NEXT IMPLEMENTATION
+======================================================================
+
+The final report should recommend the smallest possible next step.
+
+Do NOT automatically implement it.
+
+Possible outcome might be:
+
+1. canonical state schema
+
+2. deterministic state builder
+
+3. trajectory compiler
+
+4. shadow benchmark adapter
+
+But this must come from the audit.
+
+If current Life_mean already provides most of this,
+say so explicitly.
+
+Do not propose a new framework when an adapter is sufficient.
+
+======================================================================
+28. SUCCESS CRITERIA
+======================================================================
+
+This audit succeeds if we can answer:
+
+Can current Life_mean represent:
+
+STATE_t
+→ DECISION
+→ EXPECTED_RESULT
+→ ACTUAL_EXECUTION
+→ OBSERVATION
+→ VALIDATION
+→ STATE_t+1
+
+using mostly existing canonical runtime evidence?
+
+Can an existing Worker deterministically compile that transition?
+
+Can a model such as Bonsai consume STATE_t and predict the next useful action
+without controlling the real run?
+
+Can we compare its prediction to actual outcomes?
+
+Can the same trace later become training data without rewriting reality?
+
+If YES:
+
+identify exactly what adapters are missing.
+
+If NO:
+
+identify exactly which primitives are missing.
+
+Do not hide gaps.
+
+======================================================================
+29. FINAL PRINCIPLE
+======================================================================
+
+DO NOT BUILD THE TRAINING LOOP YET.
+
+FIRST PROVE THAT LIFE_MEAN ALREADY PRODUCES
+A CLEAN, REPRODUCIBLE STATE TRANSITION.
+
+The valuable primitive is:
+
+STATE
+→ ACTION
+→ EXPECTATION
+→ REALITY
+→ VALIDATION
+→ NEXT STATE
+
+If that primitive already exists implicitly in current Life_mean,
+extract it.
+
+Do not reinvent it.
+
+FINAL STATUS:
+
+AUDIT ONLY
+
+NO CLEF RESTORATION
+
+NO BONSAI INTEGRATION
+
+NO LORA
+
+NO TRAINING
+
+NO NEW ORCHESTRATOR
+
+
+LIFE_MEAN LABS
+FEATURE ROADMAP REVIEW — PRE-STABILIZATION
+NO IMPLEMENTATION
+
+MISSION
+
+Review the provided Life_mean feature/roadmap file against the CURRENT
+understanding of the project architecture.
+
+THIS IS A DOCUMENT / ARCHITECTURE REVIEW ONLY.
+
+DO NOT IMPLEMENT ANY FEATURE.
+
+DO NOT MODIFY RUNTIME CODE.
+
+DO NOT MODIFY DATABASE SCHEMAS.
+
+DO NOT MODIFY APIS.
+
+DO NOT MODIFY DASHBOARD/UI.
+
+DO NOT MODIFY:
+
+DebateEngine
+CodeLabEngine
+ExperimentalEngine
+SmartRouter
+EventBus
+Workers
+Tools
+Validators
+Memory runtime
+Training runtime
+
+Do not restore CLEF.
+
+Do not connect Bonsai.
+
+Do not build Dataset Compiler.
+
+Do not create training loops.
+
+Do not create Research Home.
+
+Do not create Notebook memory.
+
+The project will be STABILIZED FIRST.
+
+The purpose of this task is only to make the future roadmap coherent with
+what we now understand.
+
+
+======================================================================
+1. REVIEW PHILOSOPHY
+======================================================================
+
+Do not treat the roadmap as implementation instructions.
+
+Treat it as a collection of:
+
+- ideas
+- hypotheses
+- future architecture
+- possible features
+- experiments
+- unresolved design questions
+
+Some old ideas may still be excellent.
+
+Some may now belong to another layer.
+
+Some may have been superseded by simpler architecture.
+
+Do not delete history casually.
+
+
+======================================================================
+2. CLASSIFY EVERY MAJOR FEATURE
+======================================================================
+
+For every major roadmap item, classify it as:
+
+KEEP
+
+The idea remains valid essentially as written.
+
+
+REFRAME
+
+The goal remains valid but its architectural interpretation has changed.
+
+
+MERGE
+
+The idea is now better represented as part of another system.
+
+
+DEPENDENCY_CHANGED
+
+The feature remains useful but should only happen after newer foundations.
+
+
+OBSOLETE
+
+A better architecture now replaces the old concept.
+
+
+PARKED
+
+Good idea, but not part of the current stabilization/build phase.
+
+
+PROMOTE
+
+The feature has become more foundational or valuable than originally understood.
+
+
+NEEDS_RESEARCH
+
+Interesting idea, but not understood well enough to design safely yet.
+
+
+Do not use these labels mechanically.
+
+Explain WHY.
+
+
+======================================================================
+3. CURRENT ARCHITECTURAL MODEL
+======================================================================
+
+Evaluate the roadmap against this current conceptual direction:
+
+
+STABLE CORE
+
+- LLM configuration
+- model pools
+- SmartRouter
+- EventBus
+- canonical events
+- RAW / provenance
+- validators
+- Workers / Tools
+- lifecycle management
+- executor registry
+
+
+FIRST-CLASS INSTRUMENTS
+
+- Debate Lab
+- Code Lab
+- General Reasoning / future simple reasoning executor
+
+
+COMMON EXECUTION CONCEPT
+
+STATE
+→ DECISION
+→ ACTION
+→ ACTUAL RESULT
+→ VALIDATION
+→ STATE UPDATE
+
+
+FUTURE CONTROL LAYER
+
+CLEF-like controller may eventually decide:
+
+- what capability is needed next
+- objective
+- expected result
+- success criteria
+- fallback
+- stop/continue
+
+
+FUTURE BOUNDED REASONING
+
+Bonsai or similar model may later operate as:
+
+- observer
+- shadow decision model
+- bounded investigator
+- research analyst
+
+but not yet.
+
+
+EXPERIMENTAL / SANDBOX
+
+Experimental should eventually compose existing executors.
+
+It must not reimplement them.
+
+
+RESEARCH MEMORY
+
+Future separation:
+
+RAW
+= what actually happened
+
+LEDGER
+= structured evidence/results/claims
+
+NOTEBOOK
+= interpretation, questions, understanding
+
+
+TRAINING
+
+Future:
+
+runtime evidence
+→ trace compiler
+→ candidate dataset
+→ quality validation
+→ training
+→ held-out evaluation
+→ Compare
+→ human promotion/rejection
+
+
+======================================================================
+4. ONE IMPORTANT NEW PRINCIPLE
+======================================================================
+
+Preserve this principle in the future roadmap:
+
+LLM decides / interprets / adapts.
+
+Deterministic systems measure / execute / verify.
+
+Failure evidence should guide recovery.
+
+A fallback should ideally become:
+
+FAILURE
+→ classify problem
+→ identify missing evidence/capability
+→ use appropriate Tool/Worker/Validator
+→ observe reality
+→ continue
+
+rather than:
+
+FAILURE
+→ blind retry
+
+
+======================================================================
+5. CANONICAL STATE TRANSITION — FUTURE CONCEPT
+======================================================================
+
+Add or preserve as PARKED / HIGH VALUE:
+
+CANONICAL STATE TRANSITION CONTRACT
+
+Future conceptual shape:
+
+STATE_t
+
+- current goal
+- known evidence
+- unresolved questions
+- previous action/result
+- failure state
+- available capabilities
+- relevant memory
+- remaining budget
+
+DECISION
+
+- next action
+- target capability
+- objective
+- expected result
+- success criteria
+- fallback
+- confidence
+
+EXECUTION
+
+- actual model/tool/worker/executor
+- parameters
+- artifacts
+
+OBSERVATION
+
+- actual result
+- evidence
+- errors
+
+VALIDATION
+
+- PASS / FAIL / ERROR / INCONCLUSIVE / NOT_REACHED
+- failure type
+- evidence
+
+STATE_t+1
+
+This is FUTURE DESIGN ONLY.
+
+Do not implement it.
+
+
+======================================================================
+6. CLEF / HERMES — PRESERVE FOR FUTURE AUDIT
+======================================================================
+
+The historical CLEF/Hermes system may contain useful concepts.
+
+Do NOT restore it now.
+
+Add/preserve a future task:
+
+CLEF / HERMES RESTORATION AUDIT
+
+Questions for later:
+
+- What did historical CLEF actually control?
+- Did it output only next_action?
+- Did it also define expected_result?
+- Did it maintain state?
+- Did it use allowed_actions?
+- How did judge/evaluation work?
+- Which concepts are already superseded by current Life_mean?
+- Which should be migrated rather than copied?
+
+Desired principle:
+
+MIGRATE CONCEPTS
+NOT OLD ARCHITECTURAL DEBT.
+
+
+======================================================================
+7. BONSAI — FUTURE SHADOW OBSERVER FIRST
+======================================================================
+
+Preserve this future sequence:
+
+Bonsai should NOT immediately control Life_mean.
+
+First potential experiment:
+
+SHADOW MODE
+
+REAL LIFE_MEAN POLICY
+→ continues normally
+
+BONSAI
+→ receives current canonical state
+→ predicts what it would do
+
+Record:
+
+- failure classification
+- next action
+- target capability
+- objective
+- expected result
+- fallback
+- confidence
+
+Then compare with:
+
+- actual action
+- actual result
+- validator outcome
+
+Possible progression later:
+
+SHADOW
+→ ADVISORY
+→ CONTROLLED A/B TEST
+→ only then possible control role
+
+
+======================================================================
+8. MEMORY / NOTEBOOK — ADD CONTAMINATION RULES
+======================================================================
+
+Review all Notebook / Research Memory ideas with this critical rule:
+
+GENERATED KNOWLEDGE MUST NOT BECOME CANONICAL TRUTH AUTOMATICALLY.
+
+
+Future knowledge states may include:
+
+GENERATED
+
+CLASSIFIED
+
+LLM_REVIEWED
+
+SUPPORTED_BY_SOURCE
+
+DETERMINISTICALLY_VERIFIED
+
+REPLICATED
+
+TRAINING_ELIGIBLE
+
+
+Important:
+
+LLM_REVIEWED != VERIFIED.
+
+
+A second LLM agreeing with the first LLM is not objective verification.
+
+
+======================================================================
+9. RAW MUST REMAIN RAW
+======================================================================
+
+If the roadmap contains ideas such as:
+
+raw_classified
+
+reframe them.
+
+Do NOT modify or reorganize immutable RAW as if classification were truth.
+
+Preferred future model:
+
+RAW
+= immutable original evidence
+
+DERIVED / CLASSIFIED
+= indexes/views built from RAW
+
+
+Example:
+
+DERIVED
+├── Chemistry
+│   ├── Organic
+│   └── Inorganic
+├── Coding
+├── Agentic AI
+└── ...
+
+with classifications such as:
+
+SUCCESS
+FAILURE
+REPAIR
+OBSERVATION
+HYPOTHESIS
+VERIFIED_RESULT
+
+
+Every derived item preserves:
+
+source_run_id
+source_event_id
+source_turn_id
+source_model
+classification_method
+classification_version
+timestamp
+
+
+The classification may be wrong.
+
+RAW remains unaffected.
+
+
+======================================================================
+10. CORPUS DESIGN
+======================================================================
+
+Preserve as future architecture:
+
+GLOBAL EVIDENCE STORE
++
+derived domain views
++
+tags
++
+relations
++
+provenance
+
+
+Do NOT assume one physical database per specialist.
+
+A future specialist corpus may be:
+
+GLOBAL STORE
+→ domain index
+→ relevance retrieval
+→ specialist view
+
+
+Example:
+
+Chemistry
++ Organic
++ Failure
++ Tool-Assisted
++ Repair
+
+The same event may belong to multiple classifications.
+
+
+======================================================================
+11. TRAINING DATA MUST NOT COME DIRECTLY FROM NOTEBOOK
+======================================================================
+
+Add this future rule:
+
+NOTEBOOK
+MAY IDENTIFY INTERESTING DATA
+
+BUT
+
+TRAINING DATASET COMPILER
+MUST RETURN TO SOURCE EVENTS / RAW / VALIDATORS
+
+
+Never:
+
+AI summary
+→ summary of summary
+→ training sample
+
+Prefer:
+
+Notebook suggestion
+→ locate source transitions
+→ deterministic extraction
+→ verification
+→ training candidate
+
+
+======================================================================
+12. FUTURE DATA QUALITY PIPELINE
+======================================================================
+
+Preserve as PARKED:
+
+RAW / EVENTS
+      ↓
+DERIVED CLASSIFICATION
+      ↓
+DATASET CANDIDATE
+      ↓
+verification
+      ↓
+deduplication
+      ↓
+contamination checks
+      ↓
+quality scoring
+      ↓
+TRAINING_ELIGIBLE
+
+
+Nothing becomes training data merely because an AI says it is correct.
+
+
+======================================================================
+13. FAILURE DATA IS VALUABLE
+======================================================================
+
+Preserve failures.
+
+Future useful trace:
+
+STATE
+
+→ ACTION_A
+
+→ FAILURE
+
+→ FAILURE_TYPE
+
+→ FALLBACK_B
+
+→ ACTUAL RESULT
+
+→ VALIDATOR
+
+→ PASS / FAIL
+
+
+Do NOT reduce training corpus to final successful answers only.
+
+Potential future datasets:
+
+- failure classification
+- repair
+- tool routing
+- recovery routing
+- preference
+- critique
+- successful trajectory
+- failed trajectory
+- expected-vs-actual result
+
+
+======================================================================
+14. CONTEXT COMPRESSION
+======================================================================
+
+Preserve the existing idea of context compression as a future runtime
+recovery mechanism.
+
+Potential flow:
+
+CONTEXT PRESSURE
+→ ContextCompressionWorker
+→ preserve critical state
+→ retry with compressed context
+
+
+Compression should preserve:
+
+- current goal
+- hard evidence
+- unresolved questions
+- relevant recent turns
+- researcher instructions
+- tool results
+- important failure state
+
+
+Compression output must NEVER replace original history.
+
+It is a derived view.
+
+Future provenance should preserve:
+
+source_context_refs
+compression_model
+compression_method
+preserved_evidence_refs
+output_hash
+
+
+Potential failure mode to document:
+
+SUMMARY DRIFT
+
+Repeated compression may progressively distort historical meaning.
+
+
+======================================================================
+15. RESEARCH CYCLES
+======================================================================
+
+Reframe long-running Debate/Research work.
+
+Do not assume:
+
+1000 continuous turns
+= deeper research
+
+Consider future:
+
+RESEARCH CYCLE 1
+20 turns
+
+→ review
+→ unresolved questions
+→ hypotheses
+→ contradictions
+→ evidence gaps
+
+RESEARCH CYCLE 2
+20 turns
+focused on selected unresolved questions
+
+→ review
+
+etc.
+
+
+This may allow:
+
+20-turn cycles
+× N
+
+rather than one unstructured 500–1000-turn conversation.
+
+
+Important future research question:
+
+Does cyclical checkpoint/reframing improve depth
+compared with one continuous long debate?
+
+
+Do not implement this now.
+
+
+======================================================================
+16. REOPENING OLD QUESTIONS
+======================================================================
+
+Preserve as future capability:
+
+An unresolved question may become relevant again when new evidence appears.
+
+Example:
+
+Q17
+status = UNRESOLVED
+
+new result appears:
+RESULT-88
+
+system proposes:
+
+REOPEN Q17
+
+
+This must remain a suggestion.
+
+Do not automatically treat the new evidence as resolving the question.
+
+
+======================================================================
+17. NOTEBOOK CURATOR / LAB ANALYST
+======================================================================
+
+Keep these roles distinct conceptually.
+
+
+NOTEBOOK CURATOR
+
+- organizes
+- summarizes
+- indexes
+- preserves questions
+- creates derived memory
+
+
+LAB ANALYST / NARRATOR
+
+- compares experiments
+- identifies patterns
+- detects contradictions
+- suggests research gaps
+- proposes conclusions/questions
+
+
+Neither is a scientific authority.
+
+Neither may overwrite RAW.
+
+
+======================================================================
+18. RESEARCH HOME
+======================================================================
+
+Keep Research Home PARKED.
+
+Future home may show:
+
+- investigations worth continuing
+- unresolved questions
+- unresolved contradictions
+- hypotheses never tested
+- results needing replication
+- cross-domain connections
+- capability gaps
+- candidate experiments
+
+
+Future chat:
+
+ASK YOUR LAB
+
+
+Example:
+
+"What angles have I not explored in multimodal agentic systems?"
+
+
+Potential pipeline:
+
+question
+→ search local research memory
+→ search experiments/results
+→ compare coverage
+→ optional web research
+→ answer with provenance
+
+
+Do not implement now.
+
+
+======================================================================
+19. TOOL AGENTIC DIRECTION
+======================================================================
+
+Review future Tool Agentic ideas with this principle:
+
+Agents should not need all knowledge in their prompt.
+
+They should be able to request information/capabilities when needed.
+
+
+Future tool families:
+
+LAB TOOLS
+
+- search experiments
+- search runs
+- search failures
+- search RAW
+- search Notebook
+- search Ledger
+- inspect current state
+
+
+RESEARCH TOOLS
+
+- web research
+- paper search
+- source retrieval
+
+
+DETERMINISTIC TOOLS
+
+- calculator
+- Python
+- filesystem
+- pytest
+- compiler
+- schema validator
+- statistics
+- domain-specific tools
+
+
+One Tool Registry.
+
+Do NOT create separate incompatible tool systems for Debate, Code Lab,
+Experimental, Notebook, etc.
+
+
+======================================================================
+20. CAPABILITY GAP LOOP
+======================================================================
+
+Preserve as HIGH-VALUE / PARKED:
+
+Observed failure pattern
+→ capability gap
+→ propose capability
+
+Possible proposal:
+
+Tool
+Worker
+Thinker
+Skill
+Loop
+
+
+Example:
+
+Repeated visual disputes
+→ missing deterministic visual comparison
+→ propose VisualRegionComparator Tool
+
+
+But:
+
+PROPOSAL
+→ HUMAN APPROVAL
+→ Code Lab candidate
+→ deterministic tests
+→ security
+→ benchmark
+→ Compare
+→ human promote/reject
+
+
+LLM WRITES TOOL
+!=
+TOOL ACTIVATED
+
+
+======================================================================
+21. EVIDENCE-DRIVEN ROUTING
+======================================================================
+
+Preserve future research direction:
+
+Routing may eventually operate over:
+
+MODEL
+
+TOOL
+
+WORKER
+
+THINKER
+
+EXECUTOR
+
+RECOVERY STRATEGY
+
+
+Instead of:
+
+"try again"
+
+future system may learn:
+
+For failure family X:
+Tool A historically performs best.
+
+For ambiguous research state Y:
+Debate helps more than direct reasoning.
+
+For compiler failure:
+Code Worker + pytest performs best.
+
+
+This remains an experimental hypothesis.
+
+
+======================================================================
+22. RESEARCH MEMORY CONTAMINATION
+======================================================================
+
+Explicitly add future safety rules against self-reinforcing false knowledge.
+
+Danger:
+
+Model A invents claim X
+
+Model B says X seems plausible
+
+Notebook records X
+
+next experiment receives X as history
+
+Model C builds on X
+
+Narrator observes repeated X
+
+system mistakes repetition for evidence
+
+
+Prevent this.
+
+Every memory object must distinguish:
+
+SOURCE
+
+CLAIM TYPE
+
+VERIFICATION TYPE
+
+EVIDENCE
+
+CONFIDENCE
+
+STATUS
+
+
+Possible verification types:
+
+DETERMINISTIC
+
+EXTERNAL_SOURCE
+
+REPLICATION
+
+HUMAN_REVIEW
+
+CROSS_MODEL_REVIEW
+
+SEMANTIC_EVALUATION
+
+UNVERIFIED
+
+
+Cross-model review must not be considered equivalent to deterministic
+verification or replication.
+
+
+======================================================================
+23. FUTURE PACKAGE / COMMUNITY IMPLICATION
+======================================================================
+
+Review package-related roadmap ideas under:
+
+SHARE BROADLY.
+IMPORT CAUTIOUSLY.
+TRUST PROVENANCE.
+REPLICATE LOCALLY.
+
+
+External research should enter as:
+
+EXTERNAL EVIDENCE
+
+not:
+
+LOCAL FACT
+
+
+Possible progression:
+
+DOWNLOADED
+→ HASH VERIFIED
+→ SCHEMA VALID
+→ IMPORTED EXTERNAL
+→ INSPECTED
+→ LOCALLY REPLICATED
+→ stronger evidence
+
+
+Keep separate:
+
+SECURITY TRUST
+
+PROVENANCE TRUST
+
+SCIENTIFIC EVIDENCE
+
+
+Trusted publisher does not mean scientifically correct.
+
+
+======================================================================
+24. ROADMAP DEPENDENCY ORDER
+======================================================================
+
+Reevaluate feature dependencies using approximately this order:
+
+
+PHASE A — STABILIZE CURRENT SYSTEM
+
+- Debate
+- Code Lab
+- lifecycle
+- EventBus
+- RAW
+- Settings
+- routing
+- tests
+- provenance
+
+
+PHASE B — COMMON FOUNDATIONS
+
+- canonical events
+- executor contract
+- tool/capability registry
+- canonical state-transition contract
+
+
+PHASE C — CONTROL / OBSERVATION
+
+- CLEF restoration audit
+- state builder
+- Bonsai shadow observer
+- quick benchmark
+
+
+PHASE D — EXPERIMENTAL COMPOSITION
+
+- Experimental stages
+- handoffs
+- global trajectory view
+
+
+PHASE E — RESEARCH MEMORY
+
+- Notebook
+- Ledger integration
+- classified derived corpus
+- checkpoints
+- Research Home
+- retrieval
+
+
+PHASE F — DATA PIPELINE
+
+- TrainingTraceCompiler
+- Dataset Compiler
+- verification pipeline
+- deduplication
+- leakage checks
+- train/val/test splitting
+
+
+PHASE G — TRAINING
+
+- QLoRA / SFT
+- candidate model
+- held-out benchmark
+- Compare
+- promotion/rejection
+
+
+Do not treat this as final implementation order if repository reality later
+contradicts it.
+
+It is the current roadmap hypothesis.
+
+
+======================================================================
+25. STABILIZATION HAS PRIORITY
+======================================================================
+
+After this document review:
+
+STOP.
+
+Do not immediately implement the newly clarified ideas.
+
+Next active task remains:
+
+STABILIZE CURRENT LIFE_MEAN.
+
+
+The roadmap may become clearer.
+
+Runtime does not change yet.
+
+
+======================================================================
+26. OUTPUT FILE
+======================================================================
+
+Do not overwrite the original roadmap blindly.
+
+Preferred:
+
+preserve original file
+
+and produce either:
+
+FEATURE_REVIEW_PRE_STABILIZATION.md
+
+or a clearly separated review/addendum section.
+
+
+The review should contain:
+
+A. EXECUTIVE SUMMARY
+
+B. FEATURES TO KEEP
+
+C. FEATURES TO REFRAME
+
+D. FEATURES TO MERGE
+
+E. DEPENDENCY CHANGES
+
+F. OBSOLETE / SUPERSEDED IDEAS
+
+G. PARKED HIGH-VALUE IDEAS
+
+H. PROMOTED FOUNDATIONAL IDEAS
+
+I. NEEDS-RESEARCH ITEMS
+
+J. CONTAMINATION / DATA-QUALITY RISKS
+
+K. CURRENT RECOMMENDED DEPENDENCY GRAPH
+
+L. ITEMS THAT MUST NOT BE IMPLEMENTED BEFORE STABILIZATION
+
+
+Do not produce hundreds of cosmetic edits if a review document is clearer.
+
+
+======================================================================
+27. DO NOT LOSE PROJECT HISTORY
+======================================================================
+
+The roadmap represents how Life_mean evolved.
+
+Do not rewrite history to make old ideas appear foolish.
+
+Where an idea changed, document:
+
+OLD INTERPRETATION
+
+NEW INTERPRETATION
+
+WHY IT CHANGED
+
+
+Example:
+
+OLD:
+Deterministic-first
+
+NEW:
+Hybrid execution
+
+LLM understands/plans/interprets/adapts.
+
+Deterministic capabilities measure/execute/verify.
+
+
+This evolution is useful project history.
+
+
+======================================================================
+28. FINAL PRINCIPLES
+======================================================================
+
+Preserve prominently:
+
+
+ONE LAB.
+ONE CONNECTED RESEARCH MEMORY.
+MANY BOUNDED EXPERIMENTS.
+
+
+RAW REMEMBERS REALITY.
+
+LEDGER REMEMBERS EVIDENCE.
+
+NOTEBOOK REMEMBERS UNDERSTANDING.
+
+
+GLOBAL MEMORY IS NOT ACTIVE MODEL CONTEXT.
+
+
+GENERATED KNOWLEDGE ENTERS QUARANTINE.
+
+EVIDENCE EARNS PROMOTION.
+
+
+LLM_REVIEWED IS NOT VERIFIED.
+
+
+NOTHING BECOMES TRAINING DATA
+MERELY BECAUSE AN AI SAID IT WAS CORRECT.
+
+
+IF IT CAN BE MEASURED,
+MEASURE IT.
+
+IF IT CAN BE VALIDATED,
+PRESERVE THE VALIDATION.
+
+IF IT CAN BE REUSED WITH PROVENANCE,
+IT MAY BECOME TRAINING DATA.
+
+
+STABILITY BEFORE SPECTACLE.
+
+
+======================================================================
+29. FINAL STATUS
+======================================================================
+
+At the end report:
+
+ROADMAP REVIEW COMPLETED
+
+RUNTIME MODIFICATIONS:
+NONE
+
+FEATURE IMPLEMENTATION:
+NONE
+
+DATABASE MODIFICATIONS:
+NONE
+
+ACTIVE NEXT STEP:
+STABILIZATION
+
+FUTURE ARCHITECTURAL CHANGES:
+DOCUMENTED / PARKED
+
+Do not commit automatically.
+Do not push.
+Do not tag.
