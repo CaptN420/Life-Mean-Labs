@@ -86,8 +86,9 @@ def dispatch_stage(executor_type: str) -> Dict[str, Any]:
             executor_type)
     if not cap.get("connected"):
         raise ExecutorNotAvailable(
-            f"executor_type '{executor_type}' targets {cap.get('engine') or 'a '
-             'not-yet-wired executor'} which is NOT connected now",
+            f"executor_type '{executor_type}' targets "
+            f"{cap.get('engine') or 'a not-yet-wired executor'} "
+            "which is NOT connected now",
             executor_type, engine=cap.get("engine"))
     return dict(cap, executor_type=executor_type)
 

@@ -770,7 +770,7 @@ class CodeLabEngine:
         # Run pytest in the workspace directory only.
         import re
         proc = subprocess.run(
-            ["python", "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider"],
+            [sys.executable, "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider"],
             cwd=str(self.ws.workspace),
             capture_output=True,
             text=True,
