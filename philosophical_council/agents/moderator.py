@@ -13,53 +13,74 @@ logger = logging.getLogger(__name__)
 
 
 class ModeratorAgent(BaseAgent):
-    """Agent that manages the debate flow."""
+    """Agent that manages the debate flow.
 
-    def __init__(self, model: str = "") -> None:
-        config = AgentConfig(
-            role="moderator",
-            name="Moderator",
-            system_prompt="""You are the Moderator of a philosophical council debate.
+    The set of selectable speakers is CONFIGURABLE per session
+    (``allowed_speakers``) so the same ModeratorAgent serves both the
+    historical philosophical template (six schools) and generic RoleTemplate
+    debates (Moderator + Scientist + Skeptic, ...). The prompt never hardcodes
+    a six-philosopher list; the session's actual participants are enumerated.
+    """
 
-Your role is to ensure intellectual quality, not to participate as a philosopher.
+    def __init__(self, model: str = "", allowed_speakers=None,
+                 shared_context: str = "") -> None:
+        allowed = list(allowed_speakers) if allowed_speakers else [
+            "Existentialist", "Stoic", "Nihilist", "Spiritual", "Skeptic", "Pragmatist"]
+        speakers_text = ", ".join(allowed)
+        system_prompt = f"""You are the Moderator of a council debate.
+
+Your role is to ensure intellectual quality, not to participate as a debater.
 
 Your responsibilities:
 1. Read the recent debate context and memory
 2. Identify unresolved questions and contradictions
 3. Detect repetition and prevent circular arguments
 4. Select the next speaker strategically (do NOT simply rotate)
-5. Give that speaker a specific philosophical challenge
+5. Give that speaker a specific challenge that advances the discussion
 6. Explain your reasoning
 7. Occasionally introduce a deeper sub-question
 8. Push the discussion to a deeper level when appropriate
 9. Recognize when topics have been sufficiently explored and pivot
-10. Advance the debate through phases: exploration → destruction → saturation → construction
+10. Keep the debate moving through meaningful stages
 
 Selection criteria:
 - Choose the speaker best positioned to advance the discussion
 - Break deadlocks by having someone address the strongest counterargument
-- When agreement emerges, ask the Skeptic to challenge it
+- When agreement emerges, ask another participant to challenge it
 - When arguments repeat, ask someone to reframe the question
 - Push toward deeper questions naturally
-- NEVER let one agent dominate (max 2 consecutive turns)
-- PREFER speakers who haven't spoken recently
-- Consider which agent can best respond to the strongest objection
+- NEVER let one participant dominate (max 2 consecutive turns)
+- PREFER participants who haven't spoken recently
+- Consider which participant can best respond to the strongest objection
+
+Registered participants for THIS session:
+- {speakers_text}
 
 IMPORTANT: Return ONLY a valid JSON object. No other text, no explanations, no markdown.
 
 Required fields:
-- selected_speaker: One of: Existentialist, Stoic, Nihilist, Spiritual, Skeptic, Pragmatist
-- challenge: A specific philosophical challenge (at least 50 characters) that directly addresses the last argument
+- selected_speaker: One of: {speakers_text}
+- challenge: A specific challenge (at least 50 characters) that directly addresses the last argument
 - reason: Why this choice was made, mentioning who should respond and why
 - question: Optional deeper question to explore (can be null)
 - detected_issues: Any contradictions, repetitions, or logical gaps detected
 
 Example response showing direct engagement with previous arguments:
-{"selected_speaker": "Skeptic", "challenge": "The Pragmatist just claimed that meaning comes from practical consequences. But how do we test which consequences are 'practical' without already assuming a theory of value? Your criterion seems circular.", "reason": "The Skeptic should challenge the Pragmatist's circular reasoning about practical consequences.", "question": "What standard do we use to judge whether consequences are valuable?", "detected_issues": "Circular reasoning in pragmatist's argument about practical consequences"}""",
+{{"selected_speaker": "{allowed[0]}", "challenge": "The previous speaker claimed a strong position, but an unexamined assumption remains that undercuts it. Address that assumption directly and show why it does or does not hold.", "reason": "The selected participant is best positioned to advance the discussion by addressing the unresolved objection.", "question": "What standard do we use to judge whether this claim holds?", "detected_issues": "Unaddressed assumption in the previous argument"}}"""
+        if shared_context and shared_context.strip():
+            system_prompt += "\n\n=== TEMPLATE SHARED CONTEXT ===\n" + shared_context.strip()
+
+        config = AgentConfig(
+            role="moderator",
+            name="Moderator",
+            system_prompt=system_prompt,
             model=model,
             color="#FFD700",
         )
         super().__init__(config)
+        # Spec §6.G / §11: the session's admissible speakers (runtime authority
+        # checks them; the engine validates against them too).
+        self.allowed_speakers: list[str] = allowed
         # Spec §16: how the LAST decision was parsed. DEFAULTS to DIRECT_JSON;
         # set on every successful/failed branch so consumers can label the parse.
         self.last_parse_mode: str = "DIRECT_JSON"
@@ -133,11 +154,15 @@ Example response showing direct engagement with previous arguments:
                     logger.warning("MODERATOR PARSE: pattern extraction failed: %s", e)
 
         # Fallback - use a deterministic response based on actual debate context
-        # NEVER use generic fallback phrases
+        # NEVER use generic fallback phrases, and NEVER inject a specific
+        # philosopher (e.g. "Pragmatist") just because parsing failed: an empty
+        # selected_speaker is an INVALID/unknown speaker that the DebateEngine
+        # rejects, forcing its explicit deterministic fallback over the
+        # session's ACTUAL registered participants (spec §6.G).
         logger.error("MODERATOR PARSE: ALL ATTEMPTS FAILED. Using deterministic fallback.")
         self.last_parse_mode = "DETERMINISTIC_FALLBACK"
         return {
-            "selected_speaker": "Pragmatist",  # Default for balance
+            "selected_speaker": "",  # invalid — engine applies session fallback
             "challenge": "Please address the specific objection raised in the previous turn with a novel argument.",
             "reason": "Moderator recovery fallback - could not parse response.",
             "question": None,
@@ -146,9 +171,12 @@ Example response showing direct engagement with previous arguments:
 
     def _validate_moderator_decision(self, data: dict[str, object]) -> dict[str, str]:
         """Ensure the decision has required fields."""
-        # Check for required fields and add defaults if missing
+        # Check for required fields and add defaults if missing. A missing
+        # selected_speaker is left EMPTY (invalid) so the ENGINE decides who is
+        # admissible from the session's actual participants — never a hardcoded
+        # philosopher injected by the parser.
         if "selected_speaker" not in data or not data["selected_speaker"]:
-            data["selected_speaker"] = "Pragmatist"
+            data["selected_speaker"] = ""
 
         if "challenge" not in data or not data["challenge"]:
             data["challenge"] = "Please address the current debate topic with a fresh perspective."

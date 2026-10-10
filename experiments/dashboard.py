@@ -25,6 +25,13 @@ except Exception:  # pragma: no cover
     CodeLabController = None
     _CODE_LAB_AVAILABLE = False
 
+try:
+    from debate_lab.controller import DebateLabController
+    _DEBATE_LAB_AVAILABLE = True
+except Exception:  # pragma: no cover
+    DebateLabController = None
+    _DEBATE_LAB_AVAILABLE = False
+
 logger = logging.getLogger("ExperimentDashboard")
 
 
@@ -47,6 +54,7 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
 
     ui_controller: ExperimentUIController = None  # Set by server
     code_lab_controller: Any = None  # Set by server (from code_lab)
+    debate_lab_controller: Any = None  # Set by server (from debate_lab)
 
     def do_GET(self) -> None:
         """Handle GET requests."""
@@ -62,6 +70,10 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._role_templates_get()
         elif parsed.path == "/api/code-lab/runs":
             self._code_lab_list()
+        elif parsed.path.startswith("/api/code-lab/runs/") and parsed.path.endswith("/raw"):
+            self._code_lab_raw(parsed.path)
+        elif _clfile := re.match(r"^/api/code-lab/runs/([^/]+)/file/(.+)$", parsed.path):
+            self._code_lab_read_file(_clfile.group(1), _clfile.group(2))
         elif parsed.path.startswith("/api/code-lab/runs/") and parsed.path.endswith("/files"):
             self._code_lab_files(parsed.path)
         elif parsed.path.startswith("/api/code-lab/runs/") and parsed.path.endswith("/events"):
@@ -70,6 +82,16 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._code_lab_timeline()
         elif parsed.path.startswith("/api/code-lab/runs/"):
             self._code_lab_get(parsed.path)
+        elif parsed.path == "/api/debate/runs":
+            self._debate_lab_list()
+        elif parsed.path == "/api/debate/timeline":
+            self._debate_lab_timeline()
+        elif parsed.path == "/api/debate/templates":
+            self._debate_lab_templates()
+        elif parsed.path.startswith("/api/debate/runs/") and parsed.path.endswith("/events"):
+            self._debate_lab_events(parsed.path)
+        elif parsed.path.startswith("/api/debate/runs/"):
+            self._debate_lab_get(parsed.path)
         elif parsed.path == "/api/experimental/capabilities":
             self._experimental_capabilities()
         elif parsed.path == "/api/experimental/designs":
@@ -119,6 +141,14 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._code_lab_start(parsed.path)
         elif parsed.path.startswith("/api/code-lab/runs/") and parsed.path.endswith("/stop"):
             self._code_lab_stop(parsed.path)
+        elif parsed.path == "/api/debate/runs":
+            self._debate_lab_create(data)
+        elif parsed.path.startswith("/api/debate/runs/") and parsed.path.endswith("/start"):
+            self._debate_lab_start(parsed.path)
+        elif parsed.path.startswith("/api/debate/runs/") and parsed.path.endswith("/stop"):
+            self._debate_lab_stop(parsed.path)
+        elif parsed.path.startswith("/api/debate/runs/") and parsed.path.endswith("/message"):
+            self._debate_lab_message(parsed.path, data)
         elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/start"):
             exp_id = parsed.path.split("/")[-2]
             if self.ui_controller.get_experiment(exp_id) is None:
@@ -168,6 +198,15 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
                 self._send_json({"status": "deleted", "run_id": run_id})
             else:
                 self._send_error(404, f"Code Lab run {run_id} not found")
+        elif parsed.path.startswith("/api/debate/runs/"):
+            run_id = parsed.path.strip("/").split("/")[-1]
+            if self.debate_lab_controller is None:
+                self._send_error(404, "Debate Lab not enabled")
+            elif not self.debate_lab_controller.delete_run(run_id):
+                self._send_error(409, "DELETE_BLOCKED_ACTIVE_RUN: run is still active",
+                                 code="delete_blocked_active_run")
+            else:
+                self._send_json({"status": "deleted", "run_id": run_id})
         elif parsed.path.startswith("/api/experiments/"):
             exp_id = parsed.path.strip("/").split("/")[-1]
             if self.ui_controller.delete_experiment(exp_id):
@@ -239,6 +278,32 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._send_error(404, f"Run {run_id} not found")
         else:
             self._send_json({"run_id": run_id, "events": data.get("events", [])})
+
+    def _code_lab_raw(self, path: str) -> None:
+        """GET /api/code-lab/runs/{id}/raw — immutable RAW snapshot + trajectory.
+
+        Reads directly from the run's RAW directory on disk (source of truth).
+        """
+        if self.code_lab_controller is None:
+            self._send_error(404, "Code Lab not enabled")
+            return
+        run_id = path.strip("/").split("/")[-2]
+        data = self.code_lab_controller.read_raw(run_id)
+        if data is None:
+            self._send_error(404, f"Run {run_id} not found")
+        else:
+            self._send_json(data)
+
+    def _code_lab_read_file(self, run_id: str, rel_path: str) -> None:
+        """GET /api/code-lab/runs/{id}/file/{relpath} — read one workspace file."""
+        if self.code_lab_controller is None:
+            self._send_error(404, "Code Lab not enabled")
+            return
+        content = self.code_lab_controller.read_file(run_id, rel_path)
+        if content is None:
+            self._send_error(404, f"File {rel_path!r} not found in run {run_id}")
+        else:
+            self._send_json({"run_id": run_id, "path": rel_path, "content": content})
 
     def _code_lab_timeline(self, limit: int = 200) -> None:
         """GET /api/code-lab/timeline — lab-wide consolidated event timeline.
@@ -313,6 +378,125 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._send_json({"status": "stopping", "run_id": run_id})
         else:
             self._send_error(404, f"Run {run_id} not found")
+
+    # ── Debate Lab API (Final Integration Pass) ───────────────────────────
+    def _debate_lab_list(self) -> None:
+        if self.debate_lab_controller is None:
+            self._send_json({"total_runs": 0, "running_count": 0, "runs": []})
+        else:
+            self._send_json(self.debate_lab_controller.get_dashboard_data())
+
+    def _debate_lab_get(self, path: str) -> None:
+        if self.debate_lab_controller is None:
+            self._send_error(404, "Debate Lab not enabled")
+            return
+        run_id = path.strip("/").split("/")[-1]
+        data = self.debate_lab_controller.get_run(run_id)
+        if data is None:
+            self._send_error(404, f"Run {run_id} not found")
+        else:
+            self._send_json(data)
+
+    def _debate_lab_events(self, path: str) -> None:
+        if self.debate_lab_controller is None:
+            self._send_error(404, "Debate Lab not enabled")
+            return
+        run_id = path.strip("/").split("/")[-2]
+        data = self.debate_lab_controller.get_run(run_id)
+        if data is None:
+            self._send_error(404, f"Run {run_id} not found")
+        else:
+            self._send_json({"run_id": run_id, "events": data.get("events", [])})
+
+    def _debate_lab_timeline(self, limit: int = 200) -> None:
+        """GET /api/debate/timeline — lab-wide backend-real event timeline."""
+        if self.debate_lab_controller is None:
+            self._send_json({"events": [], "count": 0})
+            return
+        self._send_json(self.debate_lab_controller.get_timeline(limit=limit))
+
+    def _debate_lab_templates(self) -> None:
+        """GET /api/debate/templates — Debate-compatible RoleTemplates only
+        (spec §22/§4): executor_type in {debate, philosophical_debate}."""
+        try:
+            from debate_lab.validation import template_summary
+            from role_templates.registry import get_registry
+            reg = get_registry()
+            templates = [
+                template_summary(tpl) for tpl in reg._latest.values()
+                if (tpl.executor_type or "") in ("debate", "philosophical_debate")
+            ]
+            self._send_json({"templates": templates})
+        except Exception as e:  # pragma: no cover
+            self._send_error(500, f"Failed to list debate templates: {e}", code="server")
+
+    def _debate_lab_create(self, data: Dict[str, Any]) -> None:
+        if self.debate_lab_controller is None:
+            self._send_error(404, "Debate Lab not enabled")
+            return
+        try:
+            from debate_lab.config import DebateLabConfig
+            from experiments import settings as _settings
+            if "prevent_repetition" in data:
+                data["prevent_repetition"] = (
+                    str(data["prevent_repetition"]).lower() in ("true", "1", "on", "yes"))
+            if not data.get("template_id"):
+                data["template_id"] = _settings.default_role_template("philosophical_debate")
+            # DISPATCH by executor_type: Debate Lab only runs debate-compatible
+            # templates (spec §31). A code_lab template is refused here BEFORE
+            # any DebateEngine is constructed; no cross-engine fallback.
+            from role_templates.executor import require_debate
+            try:
+                require_debate(data.get("template_id"))
+            except ValueError as _de:
+                self._send_error(400, str(_de), code="wrong_executor")
+                return
+            cfg = DebateLabConfig.from_dict(data)
+            view = self.debate_lab_controller.create_run(cfg)
+            self._send_json({"run_id": cfg.run_id, "status": "created", "started": False})
+        except (ValueError, TypeError) as e:
+            self._send_error(400, f"Invalid Debate Lab config: {e}", code="invalid")
+        except Exception:
+            self._send_error(500, "Failed to create Debate Lab run", code="server")
+
+    def _debate_lab_start(self, path: str) -> None:
+        if self.debate_lab_controller is None:
+            self._send_error(404, "Debate Lab not enabled")
+            return
+        run_id = path.strip("/").split("/")[-2]
+        if self.debate_lab_controller.start_run(run_id):
+            self._send_json({"status": "started", "run_id": run_id})
+        else:
+            self._send_error(404, f"Run {run_id} not found or already running")
+
+    def _debate_lab_stop(self, path: str) -> None:
+        if self.debate_lab_controller is None:
+            self._send_error(404, "Debate Lab not enabled")
+            return
+        run_id = path.strip("/").split("/")[-2]
+        if self.debate_lab_controller.stop_run(run_id):
+            self._send_json({"status": "stopping", "run_id": run_id})
+        else:
+            self._send_error(404, f"Run {run_id} not found")
+
+    def _debate_lab_message(self, path: str, data: Dict[str, Any]) -> None:
+        """POST /api/debate/runs/{run_id}/message — researcher intervention
+        (§77): a real canonical event, labeled RESEARCHER_INTERVENTION, and fed
+        into the live debate context while the run is active."""
+        if self.debate_lab_controller is None:
+            self._send_error(404, "Debate Lab not enabled")
+            return
+        run_id = path.strip("/").split("/")[-2]
+        content = str(data.get("content", "") or "").strip()
+        if not content:
+            self._send_error(400, "RESEARCHER_MESSAGE_EMPTY: message content is required",
+                             code="invalid")
+            return
+        if not self.debate_lab_controller.researcher_message(run_id, content):
+            self._send_error(404, f"Run {run_id} not found")
+            return
+        self._send_json({"status": "recorded", "run_id": run_id,
+                         "type": "RESEARCHER_INTERVENTION"})
 
     def _create_experiment(self, data: Dict[str, Any]) -> None:
         """Create a new experiment."""
@@ -500,6 +684,7 @@ def start_dashboard(
     port: int = 8080,
     ui_controller: Optional[ExperimentUIController] = None,
     code_lab_controller: Optional[Any] = None,
+    debate_lab_controller: Optional[Any] = None,
 ) -> None:
     """Start the experiment dashboard server.
 
@@ -508,12 +693,16 @@ def start_dashboard(
         port: Port to listen on
         ui_controller: Optional UI controller instance
         code_lab_controller: Optional Code Lab controller instance
+        debate_lab_controller: Optional Debate Lab controller instance
     """
     controller = ui_controller or ExperimentUIController()
     DashboardHandler.ui_controller = controller
     if code_lab_controller is None and _CODE_LAB_AVAILABLE:
         code_lab_controller = CodeLabController()
     DashboardHandler.code_lab_controller = code_lab_controller
+    if debate_lab_controller is None and _DEBATE_LAB_AVAILABLE:
+        debate_lab_controller = DebateLabController()
+    DashboardHandler.debate_lab_controller = debate_lab_controller
 
     server = HTTPServer((host, port), DashboardHandler)
     logger.info(f"Starting dashboard on http://{host}:{port}")
@@ -531,6 +720,7 @@ def run_dashboard_thread(
     port: int = 8080,
     ui_controller: Optional[ExperimentUIController] = None,
     code_lab_controller: Optional[Any] = None,
+    debate_lab_controller: Optional[Any] = None,
 ) -> threading.Thread:
     """Start the dashboard in a background thread.
 
@@ -539,13 +729,14 @@ def run_dashboard_thread(
         port: Port to listen on
         ui_controller: Optional UI controller instance
         code_lab_controller: Optional Code Lab controller instance
+        debate_lab_controller: Optional Debate Lab controller instance
 
     Returns:
         Thread instance
     """
     thread = threading.Thread(
         target=start_dashboard,
-        args=(host, port, ui_controller, code_lab_controller),
+        args=(host, port, ui_controller, code_lab_controller, debate_lab_controller),
         daemon=True,
     )
     thread.start()

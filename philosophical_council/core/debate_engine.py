@@ -42,7 +42,8 @@ logger = logging.getLogger(__name__)
 class DebateEngine:
     """Main engine that orchestrates the philosophical debate."""
 
-    def __init__(self, config: Any, database: Any, llm_client: Any) -> None:
+    def __init__(self, config: Any, database: Any, llm_client: Any,
+                 lab_event_handler=None) -> None:
         self.config = config
         self.db = database
         self.llm = llm_client
@@ -54,6 +55,19 @@ class DebateEngine:
         # Maps speaker name to agent (for direct lookup)
         self._speaker_map: dict[str, Any] = {}
         self._moderator: Optional[Any] = None
+
+        # Admissible speakers for THIS session. Defaults to the historical six
+        # philosophers for backward compatibility; the Debate Lab session
+        # factory sets it to the ACTUALLY registered participant names so a
+        # generic RoleTemplate debate is never restricted to / polluted with
+        # the philosophical set (spec §6.A). register_agent() also adds every
+        # registered participant's display name.
+        self._valid_speakers: set[str] = set(VALID_SPEAKERS)
+        # Optional backend-real event sink (used by Debate Lab controller).
+        # None keeps every existing caller byte-for-byte compatible.
+        self._lab_event_handler = lab_event_handler
+        self._model_routing_method: Optional[str] = None
+        self._response_contract: list = []
 
         # Callbacks for GUI updates
         self._callbacks: list[Callable[[DebateUpdate], None]] = []
@@ -71,7 +85,8 @@ class DebateEngine:
         
         # NEW: Enhanced debate state for intelligent moderation
         from philosophical_council.memory.debate_state import DebateState as ArgumentDebateState
-        self.argument_state = ArgumentDebateState(topic=config.debate.topic)
+        self.argument_state = ArgumentDebateState(
+            topic=config.debate.topic, known_speakers=set(self._valid_speakers))
 
         # Speaker history for repetition detection
         self._recent_speakers: list[str] = []
@@ -89,12 +104,58 @@ class DebateEngine:
         speaker_name = agent.config.name
         if speaker_name:
             self._speaker_map[speaker_name] = agent
+        # The session's admissible speakers derive from the ACTUALLY registered
+        # participants (spec §6.A) — never a global six-philosopher constant.
+        if speaker_name:
+            self._valid_speakers.add(speaker_name)
         logger.info("Registered agent: %s (role: %s)", agent.name, agent.role)
 
     def register_moderator(self, moderator: Any) -> None:
         """Register the moderator agent."""
         self._moderator = moderator
         logger.info("Registered moderator")
+
+    def set_valid_speakers(self, speakers) -> None:
+        """Set the session's admissible speaker names (template-driven path).
+
+        For a RoleTemplate debate this is the set of PARTICIPANT display names
+        (the moderator is not a selectable speaker). Falls back to the default
+        philosophical set when no agents are registered yet.
+        """
+        if speakers:
+            self._valid_speakers = set(speakers)
+            if hasattr(self, "argument_state") and self.argument_state is not None:
+                self.argument_state.known_speakers = set(self._valid_speakers)
+
+    @property
+    def valid_speakers(self) -> set:
+        """The session's admissible speaker names."""
+        return set(self._valid_speakers)
+
+    def set_lab_event_handler(self, handler) -> None:
+        """Register a backend-real event sink (Debate Lab controller)."""
+        self._lab_event_handler = handler
+
+    def set_model_routing_method(self, method: Optional[str]) -> None:
+        """Record the model-routing method in use (provenance only)."""
+        self._model_routing_method = method or None
+
+    def set_response_contract(self, contract) -> None:
+        """Visible response presentation contract (§78) — used to parse labeled
+        sections (ARGUMENT / RATIONALE / HYPOTHESIS / ...) from the agent's
+        ACTUAL response text. Never hidden chain-of-thought."""
+        self._response_contract = list(contract or [])
+
+    def _emit_lab(self, event_type: str, **payload) -> None:
+        """Emit a backend-real event to the lab sink (no-op when unset)."""
+        handler = self._lab_event_handler
+        if handler is None:
+            return
+        ev = {"type": event_type, "time": time.time(), **payload}
+        try:
+            handler(ev)
+        except Exception as exc:  # pragma: no cover - never break the engine
+            logger.warning("lab event handler raised: %s", exc)
 
     def add_callback(self, callback: Callable[[DebateUpdate], None]) -> None:
         """Add a callback for debate updates."""
@@ -187,9 +248,10 @@ class DebateEngine:
                 constraints=["philosophical"],
             )
 
-        # Reset argument state
+        # Reset argument state (session speakers follow this session's roster)
         from philosophical_council.memory.debate_state import DebateState as ArgumentDebateState
-        self.argument_state = ArgumentDebateState(topic=self.config.debate.topic)
+        self.argument_state = ArgumentDebateState(
+            topic=self.config.debate.topic, known_speakers=set(self._valid_speakers))
 
         # Register agents in database
         for role, agent in self._agents.items():
@@ -324,6 +386,9 @@ class DebateEngine:
             model = agent.config.model or ""
             max_tokens = getattr(self.config.debate, 'philosopher_max_tokens', 1500)
             start_time = time.time()
+            self._emit_lab("AGENT_STARTED", role=agent.role, speaker=selected_name,
+                           configured_model=model or None,
+                           model_routing_method=self._model_routing_method or "n/a")
 
             response, finish_reason, continuation_count = self._generate_with_continuation(
                 messages=[
@@ -336,7 +401,17 @@ class DebateEngine:
             )
             # §15: record the ACTUAL (not merely configured) model the backend used.
             resolved_actual = getattr(self.llm, "last_model_used", None) or model
+            participant_selection_mode = (
+                "configured" if model
+                else ("dynamic_router" if self._has_dynamic_router()
+                      else "backend_default"))
             duration = time.time() - start_time
+            self._emit_lab("AGENT_RESPONSE", role=agent.role, speaker=selected_name,
+                           actual_model=resolved_actual or None,
+                           configured_model=model or None,
+                           selection_mode=participant_selection_mode,
+                           duration=duration, finish_reason=finish_reason,
+                           model_routing_method=self._model_routing_method or "n/a")
 
             # ── EMPTY-RESPONSE GUARD (AGENT RULE 7) ────────────────────────
             # Never treat an empty/whitespace model response as a successful
@@ -375,9 +450,27 @@ class DebateEngine:
                 self._recent_speakers.append(selected_name)  # don't re-select repeatedly
                 return False
 
-            # Complete the turn
-            self.turn_manager.complete_turn(turn.turn_id, response, duration)
+            # §65/§78: parse the VISIBLE response sections the agent actually
+            # produced (never hidden chain-of-thought). Empty contract -> {}.
+            from philosophical_council.core.response_format import (
+                infer_message_type, parse_response_sections)
+            sections = parse_response_sections(response, self._response_contract)
+            message_type = infer_message_type(sections, agent.role)
+
+            # Complete the turn (transcript records the parsed sections too)
+            self.turn_manager.complete_turn(turn.turn_id, response, duration,
+                                            sections=sections or None)
             agent.add_to_history(response)
+            self._emit_lab("TURN_COMMITTED", turn=turn.turn_id, round=turn.round_num,
+                           speaker=selected_name, role=agent.role,
+                           actual_model=resolved_actual or None,
+                           configured_model=model or None,
+                           selection_mode=participant_selection_mode,
+                           response=response, duration=duration,
+                           sections=sections or None,
+                           message_type=message_type,
+                           moderator_challenge=decision.get("challenge"),
+                           moderator_reason=decision.get("reason"))
             
             # Update argument state with actual response
             self.argument_state.add_turn(
@@ -436,11 +529,18 @@ class DebateEngine:
             if self.consolidator and turn.turn_id % self.config.debate.mid_term_interval == 0:
                 recent = self.turn_manager.get_recent_turns(10)
                 period = f"turns {turn.turn_id - 9}-{turn.turn_id}"
-                self.consolidator.consolidate_mid_term(
-                    [{"turn_id": t.turn_id, "speaker": t.speaker, "response": t.response} for t in recent],
-                    period,
-                    self.llm,
-                )
+                self._emit_lab("MEMORY_CONSOLIDATION_STARTED", memory="mid_term", period=period)
+                try:
+                    self.consolidator.consolidate_mid_term(
+                        [{"turn_id": t.turn_id, "speaker": t.speaker, "response": t.response} for t in recent],
+                        period,
+                        self.llm,
+                    )
+                    self._emit_lab("MEMORY_CONSOLIDATION_COMPLETED", memory="mid_term", period=period)
+                except Exception as _mce:  # pragma: no cover - observable failure
+                    logger.error("Mid-term consolidation failed: %s", _mce)
+                    self._emit_lab("MEMORY_CONSOLIDATION_FAILED", memory="mid_term", period=period,
+                                   reason=str(_mce)[:200])
 
             # Phase management: advance phases based on debate progress
             if turn.turn_id % 5 == 0 and hasattr(self.argument_state, 'current_phase'):
@@ -448,10 +548,17 @@ class DebateEngine:
 
             # Periodic long-term consolidation
             if self.consolidator and turn.turn_id % self.config.debate.long_term_interval == 0:
-                self.consolidator.consolidate_long_term(
-                    self.mid_term_memory.get_entries() if self.mid_term_memory else [],
-                    self.llm,
-                )
+                self._emit_lab("MEMORY_CONSOLIDATION_STARTED", memory="long_term")
+                try:
+                    self.consolidator.consolidate_long_term(
+                        self.mid_term_memory.get_entries() if self.mid_term_memory else [],
+                        self.llm,
+                    )
+                    self._emit_lab("MEMORY_CONSOLIDATION_COMPLETED", memory="long_term")
+                except Exception as _lce:  # pragma: no cover - observable failure
+                    logger.error("Long-term consolidation failed: %s", _lce)
+                    self._emit_lab("MEMORY_CONSOLIDATION_FAILED", memory="long_term",
+                                   reason=str(_lce)[:200])
 
             # Notify GUI
             self._notify(DebateUpdate(
@@ -468,6 +575,10 @@ class DebateEngine:
                     duration_seconds=duration,
                     finish_reason=finish_reason,
                     was_truncated=finish_reason == "length",
+                    configured_model=model or None,
+                    selection_mode=participant_selection_mode,
+                    model_routing_method=self._model_routing_method or None,
+                    sections=sections or None,
                 ),
                 moderator=ModeratorEvent(
                     turn_id=turn.turn_id,
@@ -477,6 +588,17 @@ class DebateEngine:
                     reason=decision["reason"],
                     question=decision.get("question"),
                     detected_issues=decision.get("detected_issues"),
+                    configured_model=decision.get("_configured_model") or None,
+                    actual_model=decision.get("_actual_model") or None,
+                    selection_mode=decision.get("_selection_mode") or None,
+                    parse_mode=decision.get("_parse_mode") or None,
+                    requested_speaker=decision.get("_requested_speaker") or None,
+                    actual_selected_speaker=selected_name,
+                    override_reason=(
+                        "moderator_request_rejected"
+                        if decision.get("_requested_speaker")
+                        and decision.get("_requested_speaker") != selected_name
+                        else None),
                 ),
                 stats={
                     "turn_id": turn.turn_id,
@@ -664,8 +786,13 @@ class DebateEngine:
         
         # Get alternatives based on argument state
         alternatives = self.argument_state.get_alternatives()
-        alt_text = ", ".join(alternatives[:4]) if alternatives else "All philosophers"
+        alt_text = ", ".join(alternatives[:4]) if alternatives else "All participants"
         
+        # The moderator's admissible speakers are THIS SESSION's registered
+        # participants (spec §6.B) — never a hardcoded six-philosopher list.
+        speaker_list = ", ".join(sorted(self._valid_speakers)) or "All participants"
+        example_speaker = sorted(self._valid_speakers)[0] if self._valid_speakers else "the first participant"
+
         prompt = f"""{self._moderator.system_prompt}
 
 Current debate topic: {self.config.debate.topic}
@@ -682,10 +809,12 @@ AVAILABLE ALTERNATIVES (sorted by relevance): {alt_text}
 Current debate context:
 {context}
 
+Registered participants (select ONLY from this list): {speaker_list}
+
 Return ONLY valid JSON. No markdown. No ```json fences. No commentary before or after the JSON.
 Your response must be a single JSON object with these fields:
-- selected_speaker: One of: Existentialist, Stoic, Nihilist, Spiritual, Skeptic, Pragmatist
-- challenge: A specific philosophical challenge (at least 50 characters) that addresses the current state of the debate
+- selected_speaker: One of: {speaker_list}
+- challenge: A specific challenge (at least 50 characters) that addresses the current state of the debate
 - reason: Why this choice was made, considering who hasn't spoken recently and what needs to be addressed
 - question: Optional deeper question to explore (can be null)
 - detected_issues: Any issues detected in the debate (can be null)
@@ -696,10 +825,13 @@ IMPORTANT RULES:
 3. Address specific unresolved objections or questions
 4. Break repetition by selecting someone with a different perspective
 
-Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning is subjective, but the Stoic just pointed out that this creates a paradox where your position itself has no basis. How do you respond?", "reason": "The Nihilist needs to address the logical contradiction raised by the Stoic.", "question": null, "detected_issues": "Logical contradiction in nihilist's position"}}"""
+Example: {{"selected_speaker": "{example_speaker}", "challenge": "The previous speaker left an unexamined assumption in their argument; address it directly and explain why it does or does not hold.", "reason": "The selected participant can best advance the discussion on this point.", "question": null, "detected_issues": "Unaddressed assumption in the previous argument"}}"""
 
         # Try with validation and retry
         configured_model = self._moderator.config.model or ""
+        routing = self._model_routing_method or "n/a"
+        self._emit_lab("MODERATOR_STARTED", configured_model=configured_model or None,
+                       model_routing_method=routing, speaker_selection_mode="moderator_llm")
         for attempt in range(3):
             try:
                 # Clear prior call's attribution so we only record THIS call's model.
@@ -715,15 +847,20 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
                     temperature=0.5,
                     max_tokens=getattr(self.config.debate, 'moderator_max_tokens', 300),
                 )
-                actual_model = getattr(self.llm, 'last_model_used', None) or configured_model or "dynamic"
-                selection_mode = "configured" if configured_model else ("dynamic" if actual_model else "backend_default")
+                actual_model = getattr(self.llm, 'last_model_used', None) or configured_model or ""
+                selection_mode = (
+                    "configured" if configured_model
+                    else ("dynamic_router" if self._has_dynamic_router()
+                          else "backend_default"))
                 logger.info("MODERATOR RESPONSE | Length: %d | Finish Reason: %s | Configured=%s | Actual=%s | selection=%s",
                             len(response), finish_reason, configured_model or "NONE", actual_model, selection_mode)
 
                 decision = self._moderator.parse_decision(response)
                 decision["_requested_speaker"] = decision.get("selected_speaker", "")
+                decision["_configured_model"] = configured_model
                 decision["_actual_model"] = actual_model
                 decision["_selection_mode"] = selection_mode
+                decision["_routing_method"] = routing
                 decision["_parse_mode"] = self._moderator.last_parse_mode or "DIRECT_JSON"
 
                 # Validate the decision (existence + policy: repetition/over-use)
@@ -731,6 +868,21 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
                     logger.info("MODERATOR DECISION: %s selected by %s | actual_model=%s | parse=%s",
                                 decision.get('selected_speaker'), decision.get('reason', '')[:50],
                                 actual_model, decision.get("_parse_mode"))
+                    self._emit_lab(
+                        "MODERATOR_COMPLETED",
+                        actual_model=actual_model or None,
+                        configured_model=configured_model or None,
+                        selection_mode=selection_mode,
+                        parse_mode=decision.get("_parse_mode"),
+                        requested_speaker=decision.get("_requested_speaker") or None,
+                        actual_speaker=decision.get("selected_speaker") or None,
+                        model_routing_method=routing,
+                        # §67: the moderator is part of the conversation —
+                        # expose its visible challenge + reason.
+                        challenge=decision.get("challenge"),
+                        reason=decision.get("reason"),
+                        question=decision.get("question"),
+                    )
                     return decision
 
                 logger.warning("Moderator decision failed validation: %s", {k: v for k, v in decision.items() if not k.startswith('_')})
@@ -741,10 +893,20 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
         # Final fallback - deterministic but specific challenge.
         logger.error("All moderator retries failed. Using deterministic fallback.")
         fb = self._get_deterministic_fallback()
+        fb["_configured_model"] = configured_model
         fb["_actual_model"] = "deterministic_fallback"
         fb["_selection_mode"] = "deterministic_fallback"
+        fb["_routing_method"] = routing
         fb["_parse_mode"] = "PATTERN_FALLBACK"
         fb["_requested_speaker"] = fb.get("selected_speaker", "")
+        self._emit_lab(
+            "MODERATOR_COMPLETED",
+            actual_model=None, configured_model=configured_model or None,
+            selection_mode="deterministic_fallback", parse_mode="PATTERN_FALLBACK",
+            requested_speaker=fb.get("selected_speaker") or None,
+            actual_speaker=fb.get("selected_speaker") or None,
+            model_routing_method=routing, override_reason="moderator_retries_exhausted",
+        )
         return fb
 
     def _validate_moderator_decision(self, decision: dict[str, str]) -> bool:
@@ -759,14 +921,16 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
             return False
 
         selected = decision.get("selected_speaker", "")
-        if selected not in VALID_SPEAKERS:
+        # §6.C — validate against THIS SESSION's registered participants (the
+        # template-driven roster), never a global six-philosopher constant.
+        if selected not in self._valid_speakers:
             logger.error("Invalid speaker in moderator decision: %s", selected)
             return False
 
         # Existence/activity: a valid name must resolve to a registered agent.
-        # In a REAL engine the 6 agents are always registered; this guard only
-        # fires meaningfully when agents exist but the name is unknown. When no
-        # agents are registered (unit-test seams), VALID_SPEAKERS is the check.
+        # When agents exist but the name is unknown, the proposal is rejected.
+        # When no agents are registered (unit-test seams), the session speaker
+        # set is the check.
         if self._agents and not self._resolve_agent(selected):
             logger.error("Moderator selected unknown speaker: %s", selected)
             return False
@@ -807,9 +971,11 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
         recent = self._recent_speakers[-3:] if self._recent_speakers else []
         last_speaker = recent[-1] if recent else None
 
-        # Pick a different speaker intelligently using argument state
+        # Pick a different speaker intelligently using argument state. The
+        # fallback speaker is chosen from the session's ACTUALLY registered
+        # participants (spec §6.D) — never a hardcoded philosopher.
         alternatives = self.argument_state.get_alternatives(exclude=last_speaker)
-        fallback_speaker = alternatives[0] if alternatives else "Existentialist"
+        fallback_speaker = alternatives[0] if alternatives else self._default_fallback_speaker()
 
         # Try to find unresolved objections or questions
         unresolved_objection = None
@@ -863,8 +1029,8 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
                 )
             else:
                 challenge = (
-                    f"What does {fallback_speaker.lower()} make of the question "
-                    f"'What is the meaning of life?' in light of the current debate?"
+                    f"What does {fallback_speaker.lower()} make of the debate topic "
+                    f"'{self.config.debate.topic}' in light of the current discussion?"
                 )
         else:
             # Last resort - very specific challenge
@@ -880,6 +1046,34 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
             "question": None,
             "detected_issues": "Moderator failed to produce valid JSON after retries.",
         }
+
+    def _default_fallback_speaker(self) -> str:
+        """A deterministic admissible speaker for fallback (never hardcoded).
+
+        Prefers the ACTUALLY registered participants (display names); if no
+        agents are registered (unit-test seams) it falls back to the session
+        speaker set. Deterministic: sorted first element.
+        """
+        registered = sorted(n for n in self._speaker_map if n)
+        if registered:
+            return registered[0]
+        known = sorted(self._valid_speakers)
+        return known[0] if known else "Existentialist"
+
+    def _has_dynamic_router(self) -> bool:
+        """True when a dynamic model router with a non-empty pool is wired.
+
+        ``backend_default`` (not ``dynamic_router``) is the honest selection
+        label when no router pool is configured: the client then falls back to
+        its first available backend model (spec §15).
+        """
+        router = getattr(self.llm, "_router", None)
+        if router is None:
+            return False
+        try:
+            return bool(getattr(router, "available_models", []))
+        except Exception:  # pragma: no cover - defensive
+            return True
 
     def _build_context(self, current_turn: Optional[Any]) -> str:
         """Build context for LLM prompts."""

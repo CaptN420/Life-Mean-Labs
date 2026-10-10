@@ -6,9 +6,11 @@ state/events for the HTTP API and UI (mirrors ExperimentUIController patterns).
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -142,7 +144,145 @@ class CodeLabController:
 
     def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
         view = self._runs.get(run_id)
-        return view.to_dict() if view else None
+        if view is None:
+            return None
+        data = view.to_dict()
+        # Conversation-first surface (mirrors Debate Lab): the canonical
+        # conversation is derived ONLY from real backend events, joined with
+        # the full agent responses from the backend-real agent_trace — never
+        # reconstructed from template/workflow/status.
+        data["conversation"] = self._build_conversation(view.events, view.result)
+        return data
+
+    def _build_conversation(self, events: List[Dict[str, Any]],
+                            result: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Derive the canonical Code Lab conversation from backend events.
+
+        Only real events produce entries. Full visible agent responses come
+        from ``result.agent_trace`` (backend-real, written by the agents),
+        matched to AGENT_RESPONSE / AGENT_FAILED events per-role in sequence so
+        retries (DEVELOPER attempt 2) and the REVIEWER/JUDGE stages align. If a
+        response was never produced (failure / deterministic path), no text is
+        fabricated — ``response`` stays None and the UI shows the honest status.
+        """
+        # Per-role FIFO of agent_trace entries (agent -> list of turn results).
+        trace: Dict[str, deque] = defaultdict(deque)
+        for tr in (result or {}).get("agent_trace") or []:
+            role = tr.get("agent") or tr.get("role")
+            if role:
+                trace[role].append(tr)
+
+        conv: List[Dict[str, Any]] = []
+        for idx, ev in enumerate(events):
+            t = ev.get("type")
+            base: Dict[str, Any] = {
+                "event_index": idx,
+                "time": ev.get("time"),
+                "run_id": ev.get("run_id"),
+            }
+            if t == "RUN_STARTED":
+                conv.append({**base, "type": "RUN_STARTED", "role": None, "stage": None,
+                             "model": None, "turn": None, "response": None,
+                             "message": "Run started", "detail": {
+                                 "llm_available": ev.get("llm_available")}})
+            elif t == "AGENT_RESPONSE":
+                role = ev.get("role")
+                tr = trace[role].popleft() if role in trace else None
+                conv.append({**base, "type": "AGENT_RESPONSE", "role": role,
+                             "stage": ev.get("stage"),
+                             "model": ev.get("model"),
+                             "configured_model": ev.get("configured_model"),
+                             "selection_mode": ev.get("selection_mode"),
+                             "duration_ms": ev.get("duration_ms"),
+                             "finish_reason": ev.get("finish_reason"),
+                             "attempt": (tr or {}).get("attempt"),
+                             "turn": None,
+                             "response": ev.get("response") or (tr or {}).get("response")})
+            elif t == "AGENT_FAILED":
+                role = ev.get("role")
+                tr = trace[role].popleft() if role in trace else None
+                conv.append({**base, "type": "AGENT_FAILED", "role": role,
+                             "stage": ev.get("stage"),
+                             "model": ev.get("model"),
+                             "configured_model": ev.get("configured_model"),
+                             "selection_mode": ev.get("selection_mode"),
+                             "duration_ms": ev.get("duration_ms"),
+                             "error_type": ev.get("error_type"),
+                             "message": ev.get("message"),
+                             "turn": None,
+                             "response": ev.get("response") or (tr or {}).get("response")})
+            elif t == "PLAN_CREATED":
+                conv.append({**base, "type": "PLAN", "role": "PLANNER", "stage": "plan",
+                             "model": None, "turn": None, "response": None,
+                             "router": ev.get("router"),
+                             "plan": ev.get("plan")})
+            elif t == "AGENT_SELECTED":
+                conv.append({**base, "type": "AGENT_SELECTED", "role": None, "stage": None,
+                             "model": None, "turn": None, "response": None,
+                             "detail": {
+                                 "roles": ev.get("roles"),
+                                 "template_id": ev.get("template_id"),
+                                 "template_version": ev.get("template_version"),
+                                 "template_hash": ev.get("template_hash")}})
+            elif t in ("FILE_CREATED", "FILE_MODIFIED"):
+                conv.append({**base, "type": "FILE_EVENT", "role": ev.get("by_agent"),
+                             "stage": ev.get("operation") or t,
+                             "model": None, "turn": ev.get("iteration"), "response": None,
+                             "detail": {"file": ev.get("file") or (ev.get("files") or []),
+                                        "operation": ev.get("operation")}})
+            elif t in ("TEST_STARTED", "TEST_PASSED", "TEST_FAILED"):
+                conv.append({**base, "type": "TEST", "role": "TEST_RUNNER", "stage": "test",
+                             "model": None, "turn": ev.get("iteration"), "response": None,
+                             "detail": {"status": t,
+                                        "passed": ev.get("passed"),
+                                        "failures": ev.get("failures"),
+                                        "total": ev.get("total")}})
+            elif t in ("CRITIQUE_STARTED", "REPAIR_STARTED"):
+                conv.append({**base, "type": "PHASE", "role": "CRITIC" if t == "CRITIQUE_STARTED" else "REPAIR",
+                             "stage": t.split("_STARTED")[0].lower(),
+                             "model": None, "turn": ev.get("iteration"), "response": None,
+                             "message": t.replace("_STARTED", "").title()})
+            elif t == "VALIDATION_COMPLETED":
+                conv.append({**base, "type": "VALIDATION", "role": None, "stage": "validation",
+                             "model": None, "turn": None, "response": None,
+                             "detail": ev.get("results")})
+            elif t == "JUDGE_COMPLETED":
+                conv.append({**base, "type": "JUDGE", "role": "JUDGE", "stage": "judge",
+                             "model": None, "turn": None, "response": None,
+                             "message": "Semantic judge verdict",
+                             "detail": {"verdict": ev.get("verdict")}})
+            elif t in ("RUN_COMPLETED", "RUN_FAILED", "RUN_STOPPED"):
+                detail = {k: ev.get(k) for k in (
+                    "status", "files_created", "iterations", "error_count",
+                    "stage_reached", "deterministic_validation", "semantic_judge_status",
+                ) if ev.get(k) is not None}
+                conv.append({**base, "type": "TERMINAL", "role": None, "stage": None,
+                             "model": None, "turn": None, "response": None,
+                             "message": t.replace("_", " ").title(), "detail": detail})
+        return conv
+
+    def read_raw(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Read the immutable RAW snapshot + trajectory for a run (from disk).
+
+        RAW is the source of truth: the immutable ``run_<id>.json`` snapshot
+        plus the append-only ``trajectory.jsonl`` written by the engine.
+        Returns None if the run is unknown.
+        """
+        view = self._runs.get(run_id)
+        if view is None:
+            return None
+        try:
+            ws = CodeLabWorkspace(CodeLabConfig.from_dict(view.config), base_dir=self._base_dir)
+            snapshot = None
+            sp = ws.raw / f"run_{run_id}.json"
+            if sp.exists():
+                snapshot = json.loads(sp.read_text(encoding="utf-8"))
+            return {"run_id": run_id, "snapshot": snapshot,
+                    "trajectory": ws.read_raw("trajectory")}
+        except Exception as e:  # pragma: no cover
+            logger.warning("read_raw failed for %s: %s", run_id, e)
+            return {"run_id": run_id, "snapshot": None, "trajectory": [],
+                    "error": str(e)}
 
     def list_runs(self) -> List[Dict[str, Any]]:
         with self._lock:

@@ -283,6 +283,11 @@ class CodingMultiAgent:
             "response_present": bool(response.strip()),
             "response_length": len(response),
             "finish_reason": result.get("finish"),
+            # Full visible response — the agent's PUBLIC output (never a prompt,
+            # never internal chain-of-thought). Carried on the event so the
+            # conversation-first UI can render it live while the run is still
+            # executing (agent_trace is only materialized in the final result).
+            "response": response,
         }
         if ok:
             self.emit("AGENT_RESPONSE", ok=True, **payload)

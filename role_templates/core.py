@@ -54,6 +54,10 @@ class RoleSpec:
     permissions: List[str] = field(default_factory=list)
     # Optional *preferred* persona — the experiment may override it.
     default_persona: str = ""
+    # Optional recommended MODEL SLOT (a named, configurable slot such as
+    # GENERAL_REASONING_MODEL / CHEMISTRY_SPECIALIST_MODEL). NEVER a concrete
+    # model id — the actual model stays an experiment-level RoleModelMapping.
+    model_slot: str = ""
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -70,6 +74,7 @@ class RoleSpec:
             "expected_output": self.expected_output,
             "permissions": self.permissions,
             "default_persona": self.default_persona,
+            "model_slot": self.model_slot,
         }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -86,6 +91,7 @@ class RoleSpec:
             expected_output=str(data.get("expected_output", "")),
             permissions=list(data.get("permissions", [])),
             default_persona=str(data.get("default_persona", "")),
+            model_slot=str(data.get("model_slot", "") or ""),
         )
 
 
@@ -104,6 +110,18 @@ class RoleTemplate:
     # executed under a protocol it is not compatible with.
     executor_type: str = ""
     roles: List[RoleSpec] = field(default_factory=list)
+    # Optional visible response presentation contract (§78/§79): a list of
+    # labeled sections the template's agents are GUIDED to produce as their
+    # public scientific communication (e.g. ARGUMENT / RATIONALE / EVIDENCE /
+    # HYPOTHESIS / UNCERTAINTY / NEXT). Advisory — never forced robotic JSON,
+    # and philosophical templates may leave it empty to keep natural prose.
+    # Part of the template identity (hashed).
+    response_contract: List[str] = field(default_factory=list)
+    # Optional SHARED CONTEXT: a preamble injected into EVERY agent's system
+    # prompt (moderator + participants) for this template — e.g. global
+    # scientific rules, record schemas, long-run phase guidance. Empty for
+    # templates that do not use it. Part of the template identity (hashed).
+    shared_context: str = ""
     created_at: str = ""          # metadata only — NOT part of the hash
     updated_at: str = ""          # metadata only — NOT part of the hash
 
@@ -119,6 +137,8 @@ class RoleTemplate:
             "version": self.version,
             "description": self.description,
             "executor_type": self.executor_type,
+            "response_contract": self.response_contract,
+            "shared_context": self.shared_context,
             "roles": [r.content() for r in self.roles],
         }
 
@@ -153,6 +173,8 @@ class RoleTemplate:
             version=str(data.get("version", "1.0.0")),
             description=str(data.get("description", "")),
             executor_type=str(data.get("executor_type", "")),
+            response_contract=list(data.get("response_contract", []) or []),
+            shared_context=str(data.get("shared_context", "") or ""),
             roles=[RoleSpec.from_dict(r) for r in data.get("roles", [])],
             created_at=str(data.get("created_at", "")),
             updated_at=str(data.get("updated_at", "")),

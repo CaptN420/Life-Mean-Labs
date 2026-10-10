@@ -24,6 +24,7 @@ DEFAULT_CONFIG: dict[str, object] = {
         "max_tokens": 700,
         "moderator_max_tokens": 1000,
         "philosopher_max_tokens": 2000,
+        "max_continuations": 2,
         "short_term_turns": 20,
         "mid_term_interval": 10,
         "long_term_interval": 50,
@@ -186,6 +187,7 @@ class DebateConfig:
     max_tokens: int = 2000
     moderator_max_tokens: int = 1000
     philosopher_max_tokens: int = 2000
+    max_continuations: int = 2
     short_term_turns: int = 20
     mid_term_interval: int = 10
     long_term_interval: int = 50
@@ -294,6 +296,7 @@ class Config:
                 "max_tokens": self.debate.max_tokens,
                 "moderator_max_tokens": self.debate.moderator_max_tokens,
                 "philosopher_max_tokens": self.debate.philosopher_max_tokens,
+                "max_continuations": self.debate.max_continuations,
                 "short_term_turns": self.debate.short_term_turns,
                 "mid_term_interval": self.debate.mid_term_interval,
                 "long_term_interval": self.debate.long_term_interval,
@@ -353,6 +356,7 @@ class Config:
                 max_tokens=int(debate.get("max_tokens", 700)),
                 moderator_max_tokens=int(debate.get("moderator_max_tokens", 500)),
                 philosopher_max_tokens=int(debate.get("philosopher_max_tokens", 1500)),
+                max_continuations=int(debate.get("max_continuations", 2)),
                 short_term_turns=int(debate.get("short_term_turns", 20)),
                 mid_term_interval=int(debate.get("mid_term_interval", 10)),
                 long_term_interval=int(debate.get("long_term_interval", 50)),

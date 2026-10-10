@@ -2569,3 +2569,1278 @@ are NOT considered feature expansion.
 ======================================================================
 END ADDENDUM
 ======================================================================
+
+do not implement yet
+
+LIFE_MEAN LABS
+NEXT_STEP ROADMAP UPDATE
+RESEARCH MEMORY / NOTEBOOK / RESEARCH HOME
+
+MISSION
+
+Update the project's next_step / future-roadmap document to capture the
+following research-memory architecture.
+
+IMPORTANT:
+
+THIS IS ROADMAP / DESIGN DOCUMENTATION ONLY.
+
+DO NOT IMPLEMENT THESE FEATURES NOW.
+
+Current feature freeze remains active.
+
+Do not modify runtime behavior, database schemas, APIs, dashboard code,
+executors, DebateEngine, CodeLabEngine, ExperimentalEngine or model routing
+for this task.
+
+The goal is to preserve these ideas accurately so they can be reevaluated
+after the current foundations are stable.
+
+
+======================================================================
+1. CORE VISION
+======================================================================
+
+Life_mean should eventually have:
+
+ONE LAB
+ONE CONNECTED RESEARCH MEMORY
+MANY BOUNDED EXPERIMENTS
+
+Do NOT model the entire Lab as one infinite experiment.
+
+Experiments and runs remain isolated, reproducible and independently
+inspectable.
+
+The Research Memory connects them without destroying experimental boundaries.
+
+
+Concept:
+
+Life_mean
+│
+├── Global Research Memory
+│
+├── Investigations
+│
+│    ├── Experiments
+│
+│    │    └── Runs
+│
+│    │         └── RAW
+│
+│    └── Notebook / Research Journey
+│
+└── Cross-Domain Knowledge Links
+
+
+Principle:
+
+MEMORY CONNECTS EXPERIMENTS.
+
+MEMORY DOES NOT ERASE EXPERIMENT BOUNDARIES.
+
+
+======================================================================
+2. THREE DISTINCT MEMORY LAYERS
+======================================================================
+
+Preserve a strict separation between:
+
+A. RAW
+
+What actually happened.
+
+Examples:
+
+- canonical events
+- actual model outputs
+- tool results
+- validator results
+- researcher interventions
+- actual model attribution
+- timestamps
+- artifacts
+
+RAW is immutable historical evidence.
+
+
+B. RESEARCH LEDGER
+
+Structured scientific knowledge derived from experiments.
+
+Examples:
+
+- questions
+- hypotheses
+- observations
+- results
+- evidence references
+- claims
+- contradictions
+- replication status
+- superseded/retracted claims
+
+The Ledger represents structured research state.
+
+
+C. NOTEBOOK / JOURNEY
+
+Narrative research memory.
+
+Examples:
+
+- what appears important
+- unresolved questions
+- recurring problems
+- researcher reflections
+- AI-generated notes
+- possible connections
+- details worth revisiting
+- candidate follow-up questions
+- current understanding
+
+Notebook content must never silently become RAW evidence or scientific fact.
+
+
+Core principle:
+
+RAW remembers reality.
+
+LEDGER remembers evidence.
+
+NOTEBOOK remembers understanding.
+
+
+======================================================================
+3. NOTEBOOK CURATOR
+======================================================================
+
+Future feature:
+
+NOTEBOOK CURATOR
+
+A small local model may periodically process relevant canonical events and
+create compact research-memory entries.
+
+This is NOT a scientific authority.
+
+The Notebook Curator may:
+
+- summarize important developments
+- identify unresolved questions
+- identify contradictions
+- preserve important details
+- identify assumptions that were not tested
+- generate questions for the next round
+- suggest potentially useful cross-domain links
+- prepare session checkpoints
+
+It may NOT:
+
+- rewrite RAW
+- convert speculation into fact
+- mark a hypothesis supported without evidence
+- automatically change experiment configuration
+- automatically launch experiments
+- automatically publish claims
+
+
+Potential suitable model class:
+
+small local model
+approximately 0.8B–1.7B
+
+Exact model selection remains future experimental work.
+
+
+======================================================================
+4. EVENT-DRIVEN NOTEBOOK PIPELINE
+======================================================================
+
+Future conceptual pipeline:
+
+Canonical Events
+      ↓
+Research Memory Pipeline
+      ↓
+Relevant event selection
+      ↓
+Notebook Curator
+      ↓
+Notebook entries / questions / links
+      ↓
+Research Memory
+
+
+Potential trigger events:
+
+TURN_COMMITTED
+
+STAGE_COMPLETED
+
+EXPERIMENT_COMPLETED
+
+RESEARCHER_INTERVENTION
+
+TOOL_RESULT
+
+VALIDATION_RESULT
+
+HYPOTHESIS_CREATED
+
+HYPOTHESIS_REVISED
+
+HYPOTHESIS_REJECTED
+
+STAGNATION_DETECTED
+
+SESSION_CHECKPOINT
+
+
+Do NOT necessarily run the small model after every message.
+
+Potential triggers should instead include:
+
+- every N meaningful turns
+- end of stage
+- significant tool result
+- important researcher intervention
+- stagnation
+- experiment stop
+- application shutdown
+- stage handoff
+
+
+======================================================================
+5. NOTEBOOK ENTRY PROVENANCE
+======================================================================
+
+Every AI-generated Notebook entry must remain traceable to its sources.
+
+Future NotebookEntry should conceptually preserve fields such as:
+
+entry_id
+
+created_at
+
+topic
+
+summary
+
+open_questions
+
+important_details
+
+contradictions
+
+candidate_followups
+
+confidence
+
+generated_by
+
+model_id
+
+source_event_ids
+
+source_turn_ids
+
+source_experiment_ids
+
+source_run_ids
+
+related_hypothesis_ids
+
+related_result_ids
+
+
+Never create a memory summary that cannot be traced back to the original
+research record.
+
+
+======================================================================
+6. RESEARCHER NOTE != AI NOTE
+======================================================================
+
+Keep authorship explicit.
+
+Examples:
+
+RESEARCHER_NOTE
+
+AI_NOTE
+
+TOOL_EVIDENCE
+
+VALIDATOR_RESULT
+
+RESULT
+
+CLAIM
+
+
+Do not merge:
+
+"I think routing caused this."
+
+with:
+
+"The data shows routing caused this."
+
+
+A Researcher Note may inspire a hypothesis.
+
+An AI Note may inspire a hypothesis.
+
+Neither is automatically evidence.
+
+
+======================================================================
+7. GLOBAL LAB MEMORY
+======================================================================
+
+Future Life_mean Research Memory may span all domains.
+
+Example human-visible organization:
+
+Life_mean Notebook
+│
+├── Chemistry
+│   ├── Organic Chemistry
+│   ├── Molecular Design
+│   └── Molecular Binding
+│
+├── Biology
+│   ├── Biochemistry
+│   └── Molecular Interaction
+│
+├── AI Research
+│   ├── Routing
+│   ├── Small Models
+│   ├── Memory
+│   └── Architecture Zoo
+│
+├── Coding
+│   ├── Agent Systems
+│   └── Validators
+│
+├── Physics
+│
+└── Experimental Methodology
+
+
+Folders/subfolders are primarily a HUMAN ORGANIZATION mechanism.
+
+Do not rely exclusively on folders for intellectual relationships.
+
+
+======================================================================
+8. CROSS-DOMAIN RESEARCH GRAPH
+======================================================================
+
+Future Research Memory should support relationships across domains.
+
+Conceptually:
+
+TREE
+= human organization
+
+GRAPH
+= intellectual relationships
+
+
+Potential relationship types:
+
+RELATED_TO
+
+SUPPORTS
+
+CONTRADICTS
+
+EXTENDS
+
+REPLICATES
+
+SUPERSEDES
+
+USES_METHOD_FROM
+
+SHARES_FAILURE_PATTERN_WITH
+
+POTENTIALLY_RELATED_TO
+
+
+Example:
+
+AI / Debate / Stagnation
+            ↕
+AI / Routing
+            ↕
+Long-Term Memory
+            ↕
+Scientific Team Scheduling
+
+
+Cross-domain connections generated by AI should initially be:
+
+SUGGESTED_LINK
+
+not:
+
+CONFIRMED_LINK
+
+
+A suggested intellectual connection is not evidence.
+
+
+======================================================================
+9. CROSS-DOMAIN QUESTION GENERATION
+======================================================================
+
+A high-value future capability is detecting when research performed in
+different domains points toward a common unresolved question.
+
+Example:
+
+Observations exist in:
+
+- Debate
+- Code Lab
+- Molecular Council
+
+All mention a form of stagnation.
+
+The Notebook Curator might suggest:
+
+PROPOSED CROSS-DOMAIN QUESTION:
+
+"Is stagnation primarily caused by model capability, role scheduling,
+memory compression, or feedback structure?"
+
+
+The suggestion must include WHY it was proposed.
+
+Example provenance:
+
+Related:
+EXP-41
+EXP-88
+NOTE-184
+RESULT-22
+
+
+The system must never claim the connection is established merely because
+similar language occurred.
+
+
+======================================================================
+10. MISSING-EXPERIMENT DETECTION
+======================================================================
+
+Potentially very valuable future feature:
+
+Detect statements/hypotheses that recur in Research Memory but have never
+been directly tested.
+
+Example:
+
+"This explanation appears in four Notebook entries but no experiment has
+isolated the variable."
+
+Possible output:
+
+UNTESTED RESEARCH QUESTION
+
+or:
+
+MISSING_EXPERIMENT_CANDIDATE
+
+
+This should be advisory only.
+
+
+======================================================================
+11. MEMORY RETRIEVAL — CRITICAL DESIGN RULE
+======================================================================
+
+DO NOT inject the entire Lab memory into active models.
+
+This would create:
+
+context pollution
+domain contamination
+prompt growth
+repetition
+loss of precision
+poor reproducibility
+
+
+Preferred architecture:
+
+GLOBAL RESEARCH MEMORY
+        ↓
+deterministic/search retrieval
+        ↓
+candidate relevant memories
+        ↓
+relevance ranking / optional small-model curator
+        ↓
+small selected context
+        ↓
+ACTIVE RUN CONTEXT
+
+
+Example:
+
+50,000 Notebook entries
+
+→ retrieve 20 candidates
+
+→ select 5–10 highly relevant entries
+
+→ inject those into the current stage
+
+
+Global memory is NOT equivalent to model context.
+
+
+======================================================================
+12. THREE CONTEXT LEVELS
+======================================================================
+
+Future architecture should distinguish:
+
+GLOBAL LAB MEMORY
+
+Everything Life_mean has retained.
+
+
+INVESTIGATION MEMORY
+
+Long-term context for one persistent research question.
+
+
+ACTIVE RUN CONTEXT
+
+Small, bounded context actually supplied to a model right now.
+
+
+Concept:
+
+GLOBAL
+  ↓ retrieve
+INVESTIGATION
+  ↓ select
+ACTIVE CONTEXT
+  ↓
+MODEL
+
+
+This separation is critical for model quality.
+
+
+======================================================================
+13. MEMORY SNAPSHOT / REPRODUCIBILITY
+======================================================================
+
+Any future run influenced by Research Memory must preserve which memory
+actually affected it.
+
+Possible provenance:
+
+memory_query
+
+retrieved_entry_ids
+
+entry_versions
+
+retrieval_method
+
+retrieval_timestamp
+
+memory_snapshot_hash
+
+
+Example:
+
+RUN-142
+
+Relevant memory supplied:
+
+NOTE-1842 v3
+NOTE-0992 v1
+HYP-0044
+RESULT-0218
+
+
+This protects reproducibility.
+
+A future Notebook update must not retroactively change what an old run saw.
+
+
+======================================================================
+14. SESSION CLOSE CHECKPOINT
+======================================================================
+
+Future feature:
+
+When Life_mean closes, stops an Investigation, or explicitly saves a research
+checkpoint, create a Research Memory checkpoint.
+
+Conceptual flow:
+
+SESSION / INVESTIGATION END
+        ↓
+collect relevant new events
+        ↓
+Notebook Curator
+        ↓
+checkpoint
+
+
+Possible checkpoint contents:
+
+- current research question
+- major observations
+- active hypotheses
+- results obtained
+- contradicted hypotheses
+- failed approaches
+- unresolved contradictions
+- unresolved questions
+- important researcher notes
+- important AI notes
+- candidate next investigations
+
+
+This is persistent research continuity.
+
+It is NOT model weight training.
+
+
+======================================================================
+15. SESSION OPEN / RESEARCH HOME
+======================================================================
+
+Future Life_mean startup should eventually open to:
+
+RESEARCH HOME
+
+rather than only a conventional metrics dashboard.
+
+
+Research Home should help answer:
+
+"What in my Lab is worth understanding next?"
+
+
+Possible sections:
+
+CONTINUE RESEARCH
+
+UNRESOLVED QUESTIONS
+
+UNRESOLVED CONTRADICTIONS
+
+UNTESTED HYPOTHESES
+
+RESULTS NEEDING REPLICATION
+
+RECENT RESEARCHER NOTES
+
+POTENTIAL CROSS-DOMAIN CONNECTIONS
+
+QUESTIONS WORTH INVESTIGATING
+
+
+Each suggestion must be traceable to research evidence/memory.
+
+
+======================================================================
+16. EXAMPLE RESEARCH HOME
+======================================================================
+
+Concept:
+
+LIFE_MEAN LABS
+RESEARCH HOME
+
+
+CONTINUE
+------------------------------------------------
+
+Molecular Binding
+
+3 unresolved questions
+
+Last checkpoint:
+yesterday
+
+[ Continue Investigation ]
+
+
+AI Routing
+
+Hypothesis H4 awaiting replication
+
+[ Continue Investigation ]
+
+
+WORTH INVESTIGATING
+------------------------------------------------
+
+2 hypotheses appear repeatedly but have never been directly tested.
+
+1 contradiction remains unresolved.
+
+1 result has not yet been replicated.
+
+
+CROSS-DOMAIN CONNECTION
+------------------------------------------------
+
+Debate Stagnation
+        ↕
+Agent Routing
+        ↕
+Long-Term Memory
+
+Possible question:
+
+"Does routing diversity reduce stagnation,
+or merely move repetition between specialists?"
+
+Why suggested:
+
+EXP-41
+EXP-88
+NOTE-184
+RESULT-22
+
+[ Explore ]
+[ Save ]
+[ Ignore ]
+
+
+======================================================================
+17. CREATE INVESTIGATION FROM SUGGESTION
+======================================================================
+
+A future Research Home suggestion may offer:
+
+CREATE INVESTIGATION
+
+This should create only a DRAFT.
+
+Example:
+
+INVESTIGATION DRAFT
+
+Question:
+...
+
+Related memory:
+...
+
+Related experiments:
+...
+
+Candidate hypotheses:
+...
+
+Potential experimental approach:
+...
+
+
+Nothing should execute automatically.
+
+User reviews the Investigation first.
+
+
+Principle:
+
+AI MAY PROPOSE RESEARCH.
+
+AI DOES NOT AUTHORIZE ITS OWN EXPERIMENTS.
+
+
+======================================================================
+18. RESEARCH HOME SHOULD NOT CREATE BUSYWORK
+======================================================================
+
+Do not make the startup page behave like an engagement feed.
+
+The system should not invent endless tasks simply to appear intelligent.
+
+Research Home should prioritize:
+
+- genuinely unresolved issues
+- meaningful contradictions
+- replication gaps
+- untested assumptions
+- relevant cross-domain connections
+- researcher-created priorities
+
+
+It should be acceptable for Research Home to say:
+
+"No high-confidence research suggestions right now."
+
+
+======================================================================
+19. MEMORY INTELLIGENCE VS MODEL TRAINING
+======================================================================
+
+Preserve a clear distinction.
+
+
+LEVEL 1 — MEMORY INTELLIGENCE
+
+Life_mean becomes more useful because it can retrieve:
+
+- previous experiments
+- previous failures
+- unresolved questions
+- evidence
+- cross-domain relationships
+
+No model retraining required.
+
+
+LEVEL 2 — MODEL IMPROVEMENT
+
+Much later:
+
+verified research memory
+      ↓
+curated training dataset
+      ↓
+training candidate
+      ↓
+held-out evaluation
+      ↓
+Compare
+      ↓
+human promote/reject
+
+
+Do not confuse retrieval-based continuity with model-weight learning.
+
+
+======================================================================
+20. RELATION TO EXPERIMENTAL / SANDBOX
+======================================================================
+
+This future Research Memory architecture should eventually integrate with:
+
+ExperimentalEngine
+Sandbox
+Debate Lab
+Code Lab
+General Reasoning
+Tools
+Validators
+
+
+But each executor owns its own detailed execution/conversation.
+
+Experimental owns the trajectory between stages.
+
+Research Memory owns long-term continuity across runs/investigations.
+
+
+Principle:
+
+EXECUTORS OWN THEIR CONVERSATIONS.
+
+EXPERIMENTAL OWNS THE TRAJECTORY.
+
+RESEARCH MEMORY OWNS LONG-TERM CONTINUITY.
+
+
+======================================================================
+21. RELATION TO INVESTIGATION / RESEARCH THREAD
+======================================================================
+
+The future Investigation / Research Thread concept becomes a major consumer of
+Research Memory.
+
+Concept:
+
+INVESTIGATION
+"Why does system X exhibit behavior Y?"
+
+├── Question
+├── H1
+│   ├── Experiment
+│   └── Result
+├── Researcher Note
+├── H2
+│   ├── Experiment
+│   └── Result
+├── Contradictions
+├── Open Questions
+└── Notebook Checkpoints
+
+
+An Investigation persists across application sessions.
+
+Runs remain individually reproducible.
+
+
+======================================================================
+22. LONG-RUN EXPERIMENT MEMORY
+======================================================================
+
+For long experiments such as:
+
+100 turns
+500 turns
+1000 turns
+
+do not repeatedly inject the complete transcript.
+
+Use bounded memory.
+
+Concept:
+
+FULL TRANSCRIPT / RAW
+        ↓
+Notebook checkpoints
+        ↓
+relevant-memory retrieval
+        ↓
+next stage/round context
+
+
+A Notebook checkpoint may preserve:
+
+- current important hypotheses
+- rejected paths
+- unresolved questions
+- significant evidence
+- researcher direction
+- important contradictions
+
+
+This is especially important for long Debate sessions.
+
+
+======================================================================
+23. FOLLOW-UP QUESTION GENERATION
+======================================================================
+
+Future Notebook Curator may identify an underexplored detail from a previous
+round.
+
+Example:
+
+Previous statement:
+
+"Candidate B may be more stable."
+
+But no explanation was recorded.
+
+Notebook Curator may propose:
+
+FOLLOW-UP QUESTION:
+
+"What structural feature is expected to improve stability,
+and what observation would falsify that expectation?"
+
+
+This is valuable because the curator acts as:
+
+MEMORY CURATOR
++
+QUESTION GENERATOR
+
+
+It is not the main scientific reasoner.
+
+
+======================================================================
+24. POSSIBLE NOTEBOOK OBJECT TYPES
+======================================================================
+
+Future design may include objects such as:
+
+NOTEBOOK_ENTRY
+
+OPEN_QUESTION
+
+RESEARCHER_NOTE
+
+AI_NOTE
+
+CROSS_DOMAIN_LINK
+
+SUGGESTED_LINK
+
+MEMORY_CHECKPOINT
+
+FOLLOWUP_SUGGESTION
+
+UNTESTED_ASSUMPTION
+
+REPLICATION_GAP
+
+UNRESOLVED_CONTRADICTION
+
+
+Do not implement schemas now.
+
+These are roadmap concepts only.
+
+
+======================================================================
+25. HUMAN CONTROL
+======================================================================
+
+Human researcher retains authority.
+
+For AI-generated suggestions allow actions such as:
+
+EXPLORE
+
+SAVE QUESTION
+
+CREATE INVESTIGATION DRAFT
+
+CONFIRM LINK
+
+REJECT LINK
+
+IGNORE
+
+MARK NOT RELEVANT
+
+
+Do not automatically:
+
+launch runs
+modify experiments
+publish claims
+confirm cross-domain links
+train models
+
+
+======================================================================
+26. FUTURE IMPLEMENTATION ORDER
+======================================================================
+
+Record this dependency order.
+
+DO NOT implement these steps now.
+
+
+FOUNDATIONS FIRST:
+
+1. Debate Lab stable
+
+2. Code Lab stable
+
+3. Common canonical event contract
+
+4. Common executor contract
+
+5. Experimental stage / handoff architecture
+
+6. Stable RAW + provenance
+
+
+THEN RESEARCH MEMORY:
+
+7. Basic Notebook storage
+
+8. Researcher Notes / AI Notes separation
+
+9. Notebook checkpoints
+
+10. Investigation memory
+
+11. Research Home basic view
+
+12. Relevant-memory retrieval
+
+13. Memory snapshot provenance
+
+14. Notebook Curator small model
+
+15. Follow-up question generation
+
+16. Cross-domain graph
+
+17. Cross-domain suggestion engine
+
+18. Missing-experiment / replication-gap suggestions
+
+
+MUCH LATER:
+
+19. verified-memory dataset generation
+
+20. candidate model training
+
+21. held-out evaluation
+
+22. Compare
+
+23. human promotion/rejection
+
+
+======================================================================
+27. PRIORITY CLASSIFICATION
+======================================================================
+
+Add these ideas to the roadmap with approximately these priorities:
+
+RESEARCH MEMORY ARCHITECTURE
+HIGH VALUE / POST-FOUNDATION
+
+RAW / LEDGER / NOTEBOOK SEPARATION
+FOUNDATIONAL FUTURE DESIGN
+
+NOTEBOOK CURATOR
+HIGH VALUE / PARKED
+
+RESEARCH HOME
+HIGH VALUE / POST-EXPERIMENTAL
+
+INVESTIGATION MEMORY
+HIGH VALUE / PARKED
+
+RELEVANT-MEMORY RETRIEVAL
+REQUIRED BEFORE GLOBAL MEMORY INJECTION
+
+CROSS-DOMAIN GRAPH
+HIGH VALUE / LATER
+
+CROSS-DOMAIN QUESTION GENERATION
+HIGH VALUE / LATER
+
+MISSING-EXPERIMENT DETECTION
+HIGH SCIENTIFIC VALUE / LATER
+
+MODEL RETRAINING FROM VERIFIED MEMORY
+LONG-TERM / NOT CURRENT ROADMAP
+
+
+======================================================================
+28. ANTI-PATTERNS
+======================================================================
+
+Explicitly document these as designs to avoid:
+
+DO NOT:
+
+- turn Life_mean into one infinite experiment
+- inject the full Lab memory into every model
+- let AI summaries overwrite RAW
+- merge Researcher Notes with AI Notes
+- convert Notebook speculation into evidence
+- allow cross-domain similarity to become scientific proof
+- silently update old run context when Notebook changes
+- automatically launch experiments from AI suggestions
+- automatically train models from unverified Notebook entries
+- create a second parallel memory system for each executor
+
+
+======================================================================
+29. ARCHITECTURAL PRINCIPLES TO PRESERVE
+======================================================================
+
+Add these principles prominently:
+
+
+ONE LAB.
+ONE CONNECTED RESEARCH MEMORY.
+MANY BOUNDED EXPERIMENTS.
+
+
+RAW REMEMBERS REALITY.
+LEDGER REMEMBERS EVIDENCE.
+NOTEBOOK REMEMBERS UNDERSTANDING.
+
+
+GLOBAL MEMORY IS NOT ACTIVE MODEL CONTEXT.
+
+
+MEMORY MAY INFORM A RUN,
+BUT THE RUN MUST RECORD WHICH MEMORY IT SAW.
+
+
+AI MAY SUGGEST CONNECTIONS.
+EVIDENCE ESTABLISHES CONNECTIONS.
+
+
+AI MAY PROPOSE RESEARCH.
+THE RESEARCHER RETAINS AUTHORITY.
+
+
+======================================================================
+30. FEATURE FREEZE
+======================================================================
+
+This roadmap update does NOT override the current feature freeze.
+
+Do not implement any of the above until the currently approved roadmap has
+been:
+
+incorporated
+connected
+functional
+tested
+observable
+documented
+reproducible
+
+
+New ideas remain in:
+
+IDEA PARKING LOT — DO NOT IMPLEMENT YET
+
+
+======================================================================
+31. OUTPUT
+======================================================================
+
+Update the appropriate next_step / roadmap text file.
+
+Preserve existing ideas.
+
+Do not delete earlier roadmap content merely because architecture has evolved.
+
+Where an older feature is now better represented by this architecture:
+
+mark it for future reevaluation as one of:
+
+KEEP
+
+REFRAME
+
+MERGE
+
+DEPENDENCY_CHANGED
+
+OBSOLETE
+
+PARKED
+
+PROMOTE
+
+
+Do not perform the complete Roadmap V2 reevaluation during this task.
+
+Only preserve this Research Memory / Notebook / Research Home architecture
+cleanly for the future.
+
+
+FINAL STATUS:
+
+RESEARCH MEMORY / NOTEBOOK / RESEARCH HOME
+= PARKED
+= HIGH VALUE
+= POST-FOUNDATION
+= DO NOT IMPLEMENT YET

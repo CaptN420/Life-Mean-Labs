@@ -92,7 +92,11 @@ def test_c_settings_role_template_defaults(monkeypatch, tmp_path):
     view = S.get_settings()["role_templates"]
     assert view["code_lab"]["default_id"] == "coding-standard"
     assert view["code_lab"]["executable"] is True
-    assert view["philosophical_debate"]["status"] == "NOT_CONNECTED"
+    # Debate Lab integration wired the philosophical debate executor (spec §30):
+    # Settings reads the SAME authoritative capability source as dispatch, so
+    # debate reports EXECUTABLE — never a contradicting NOT_CONNECTED flag.
+    assert view["philosophical_debate"]["status"] == "EXECUTABLE"
+    assert view["philosophical_debate"]["executable"] is True
     # Persist a change (same valid default) and read back.
     S.update_settings({"role_templates": {
         "code_lab": "coding-standard", "philosophical_debate": "philosophical-debate"}})

@@ -439,8 +439,10 @@ def test_n_template_dispatches_to_compatible_executor(registry):
     d = dispatch_template("philosophical-debate")
     assert d["executor_type"] == "philosophical_debate"
     assert d["executor_kind"] == "philosophical_debate"
-    assert d["engine"] == "DebateEngine"
-    assert d["connected"] is False  # not wired right now -> honest refusal
+    # Debate-compatible executors are wired through the Debate Lab integration
+    # (spec §30/§31): philosophical_debate aliases the SAME DebateEngine path.
+    assert "DebateEngine" in d["engine"]
+    assert d["connected"] is True
 
     assert dispatch_template("general-reasoning")["executor_type"] == "general_reasoning"
 

@@ -24,6 +24,7 @@ class Turn:
     model: Optional[str] = None
     duration_seconds: Optional[float] = None
     timestamp: Optional[str] = None
+    sections: Optional[dict] = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -37,6 +38,7 @@ class Turn:
             "response": self.response,
             "model": self.model,
             "duration_seconds": self.duration_seconds,
+            "sections": self.sections,
         }
 
 
@@ -83,12 +85,16 @@ class TurnManager:
         self._turns.append(turn)
         return turn
 
-    def complete_turn(self, turn_id: int, response: str, duration: float) -> None:
-        """Mark a turn as completed with its response."""
+    def complete_turn(self, turn_id: int, response: str, duration: float,
+                      sections: Optional[dict] = None) -> None:
+        """Mark a turn as completed with its response (and optional parsed
+        visible-response sections, §78)."""
         for turn in self._turns:
             if turn.turn_id == turn_id:
                 turn.response = response
                 turn.duration_seconds = duration
+                if sections is not None:
+                    turn.sections = sections
                 return
         logger.warning("Turn %d not found for completion", turn_id)
 

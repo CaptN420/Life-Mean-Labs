@@ -24,6 +24,12 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _executor_connected(executor_type: str) -> bool:
+    """Single source of truth for executor availability (spec §30)."""
+    from role_templates.executor import _executor_connected as _ec
+    return _ec(executor_type)
+
 _OVERRIDES_PATH_ENV = "LIFE_MEAN_OVERRIDES_FILE"
 
 
@@ -170,11 +176,9 @@ _ERROR_MESSAGES: Dict[str, str] = {
 
 
 # ── Role Template default selection (Settings-owned configuration) ─────────
-# EXECUTABLE = a real executor drives this template. philosophical-debate
-# currently CONFIGURES nothing (AutoPilot builds the debate agents manually),
-# so it is honestly marked NOT_CONNECTED until it is wired in.
-_EXECUTABLE_EXECUTORS = {"code_lab"}
-_DEBATE_CONNECTED = False
+# EXECUTABLE = a real executor drives this template. Executor availability has
+# ONE authoritative source: role_templates.executor.EXECUTOR_CAPABILITIES
+# (spec §30). Settings does NOT keep its own connection flags.
 _ROLE_TEMPLATE_SUBSYSTEMS = ("code_lab", "philosophical_debate")
 # Code Lab per-role model pool: roles Code Lab actually invokes.
 _CODING_ROLES = ("planner", "developer", "critic", "reviewer", "judge")
@@ -231,10 +235,9 @@ def _role_templates_view(raw: Dict[str, Any]) -> Dict[str, Any]:
             tid = defaults[subsys]
             tpl = reg.get_template(tid)
             executor = tpl.executor_type if tpl else ""
-            if subsys == "code_lab":
-                connected = tpl is not None and executor in _EXECUTABLE_EXECUTORS
-            else:
-                connected = bool(_DEBATE_CONNECTED)
+            # One authoritative source: the executor capability catalog
+            # (spec §30) — no independent connection flags live here.
+            connected = tpl is not None and _executor_connected(executor)
             view[subsys] = {
                 "default_id": tid,
                 "name": tpl.name if tpl else "",

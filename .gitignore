@@ -1,6 +1,8 @@
 # Code Lab run workspaces (generated state — not source)
 code_lab/runs/
 code_lab_runs/
+# Debate Lab run workspaces + RAW snapshots (generated state — not source)
+debate_lab_runs/
 
 # ── Secrets ──────────────────────────────────────────────
 .env

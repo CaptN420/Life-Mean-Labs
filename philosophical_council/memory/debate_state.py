@@ -152,8 +152,18 @@ class DebateState:
     PHASE_REVISION = "revision"
     PHASE_SYNTHESIS = "synthesis"
 
-    def __init__(self, topic: str = "") -> None:
+    def __init__(self, topic: str = "", known_speakers=None) -> None:
         self.topic = topic
+
+        # Admissible speakers for THIS session. ``None`` means "use the default
+        # philosophical set" (backward compatibility); the DebateEngine sets it
+        # to the ACTUALLY registered participants so a generic RoleTemplate
+        # debate (Scientist/Skeptic/...) is never constrained by — or polluted
+        # with — the six hardcoded philosophical schools (spec §6.F: no memory
+        # component imports DebateEngine speaker constants).
+        self.known_speakers: Optional[set] = (
+            set(known_speakers) if known_speakers else None
+        )
 
         # Thread management
         self.threads: dict[str, ArgumentThread] = {}
@@ -196,6 +206,12 @@ class DebateState:
         # Consecutive turn tracking
         self.consecutive_speaker: Optional[str] = None
         self.consecutive_count: int = 0
+
+        # Repetition policy (session-configurable — Debate Lab wires these from
+        # DebateLabConfig so "prevent repetition / max consecutive same
+        # speaker" are REAL controls, never phantom UI fields).
+        self.prevent_repetition: bool = True
+        self.max_consecutive_same_speaker: int = 1
 
         # Legacy fields for compatibility
         self.status: str = "idle"
@@ -491,11 +507,18 @@ class DebateState:
         return candidates[0][0] if candidates[0][1] > 0 else None
 
     def get_alternatives(self, exclude: Optional[str] = None) -> list[str]:
-        """Get valid speakers sorted by relevance."""
-        from philosophical_council.core.debate_engine import VALID_SPEAKERS
+        """Get valid speakers sorted by relevance.
 
+        The candidate set is the SESSION's known speakers when the engine has
+        set them (generic RoleTemplate debates); otherwise it falls back to the
+        default philosophical VALID_SPEAKERS. It never imports DebateEngine
+        speaker constants (spec §6.F).
+        """
+        from philosophical_council.core.constants import VALID_SPEAKERS
+
+        speakers = self.known_speakers if self.known_speakers else VALID_SPEAKERS
         alternatives = []
-        for speaker in VALID_SPEAKERS:
+        for speaker in speakers:
             if exclude and speaker == exclude:
                 continue
 
@@ -505,7 +528,10 @@ class DebateState:
             score = self._calculate_speaker_score(speaker)
             alternatives.append((speaker, score))
 
-        alternatives.sort(key=lambda x: x[1], reverse=True)
+        # Deterministic ordering (spec §6.D): higher score first; score ties
+        # break alphabetically so the fallback speaker is STABLE across
+        # processes — never dependent on set/hash iteration order.
+        alternatives.sort(key=lambda x: (-x[1], x[0]))
         return [name for name, _ in alternatives]
 
     def _calculate_speaker_score(self, speaker: str) -> float:
@@ -545,12 +571,13 @@ class DebateState:
         count = self.speaker_turn_count.get(speaker, 0)
         avg = self.turn_count / max(len(self.speaker_turn_count), 1)
 
-        # Prevent if they've spoken more than 2.5x the average
-        if count > avg * 2.5 and self.turn_count > 5:
+        # Prevent if they've spoken more than 2.5x the average (only when
+        # repetition prevention is enabled for this session).
+        if self.prevent_repetition and count > avg * 2.5 and self.turn_count > 5:
             return True
 
-        # Prevent consecutive turns (max 1 consecutive by default)
-        if speaker == self.consecutive_speaker and self.consecutive_count >= 1:
+        # Prevent consecutive turns beyond the configured maximum.
+        if speaker == self.consecutive_speaker and self.consecutive_count >= self.max_consecutive_same_speaker:
             return True
 
         return False
