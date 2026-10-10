@@ -144,16 +144,32 @@ class DebateEngine:
         except Exception as exc:  # pragma: no cover
             logger.warning("RAW failure log unavailable: %s", exc)
 
-    def start_debate(self) -> bool:
-        """Start the debate."""
+    def start_debate(self, background: bool = True) -> bool:
+        """Start a NEW debate session with a complete, isolated reset.
+
+        ``background=True`` (default, UI path) runs the loop in a daemon
+        thread. ``background=False`` (AutoPilot controlled path) disables the
+        thread: the caller drives ``step_once()`` synchronously and MUST call
+        ``stop_debate()`` when the session is done. Every start performs a full
+        session reset (turn_manager, speaker history, argument/phase state) so
+        a previous session can never leak its counters into this one.
+
+        Returns True only if a NEW session actually started. False means the
+        engine was already running or start failed — the caller must NOT treat
+        the debate as created.
+        """
         if self._state.status == "running":
-            logger.warning("Debate already running")
+            logger.warning("Debate already running — start_debate refused")
             return False
 
         # Create new debate in database
         debate_id = self.db.debate_repo.create_debate(self.config.debate.topic)
         self.set_debate_id(debate_id)
         self._state = StateDataclass(topic=self.config.debate.topic)
+        # Complete per-session reset (isolated lifecycle, one canonical counter).
+        self.turn_manager.clear()
+        self._recent_speakers = []
+        self._conceptual_level = 1
 
         # Initialize RAW recorder for this experiment
         self._raw_experiment_id = None
@@ -186,10 +202,14 @@ class DebateEngine:
         self._state.start()
         self._notify(DebateUpdate(state=DebateState.RUNNING))
 
-        # Start background thread
-        self._thread = threading.Thread(target=self._debate_loop, daemon=True)
-        self._thread.start()
-        logger.info("Debate started in background thread")
+        if background:
+            # Start background thread (UI path)
+            self._thread = threading.Thread(target=self._debate_loop, daemon=True)
+            self._thread.start()
+            logger.info("Debate started in background thread")
+        else:
+            self._thread = None
+            logger.info("Debate session started (controlled, no background thread)")
         return True
 
     def pause_debate(self) -> None:
@@ -203,10 +223,22 @@ class DebateEngine:
         self._notify(DebateUpdate(state=DebateState.RUNNING))
 
     def stop_debate(self) -> None:
-        """Stop the debate."""
+        """Stop the debate and join any running worker thread."""
         self._state.stop()
         self._running = False
         self.db.debate_repo.finish_debate(self._get_debate_id())
+
+        # Terminate/join the background thread so no orphan keeps generating.
+        thread = self._thread
+        self._thread = None
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=5.0)
+            if thread.is_alive():
+                logger.warning("Debate thread still alive after join timeout")
+            else:
+                logger.info("Debate thread joined/terminated")
+        else:
+            logger.info("No background thread to join (controlled session)")
 
         # Save RAW data if available
         raw_recorder = _get_raw_recorder()
@@ -302,6 +334,8 @@ class DebateEngine:
                 temperature=self.config.debate.temperature,
                 max_tokens=max_tokens,
             )
+            # §15: record the ACTUAL (not merely configured) model the backend used.
+            resolved_actual = getattr(self.llm, "last_model_used", None) or model
             duration = time.time() - start_time
 
             # ── EMPTY-RESPONSE GUARD (AGENT RULE 7) ────────────────────────
@@ -375,7 +409,7 @@ class DebateEngine:
                 response=response,
                 moderator_question=turn.moderator_question,
                 moderator_reason=turn.moderator_reason,
-                model=model,
+                model=resolved_actual,
                 duration_seconds=duration,
                 finish_reason=finish_reason,
                 was_truncated=finish_reason == "length",
@@ -430,7 +464,7 @@ class DebateEngine:
                     response=response,
                     moderator_question=turn.moderator_question,
                     moderator_reason=turn.moderator_reason,
-                    model=model,
+                    model=resolved_actual,
                     duration_seconds=duration,
                     finish_reason=finish_reason,
                     was_truncated=finish_reason == "length",
@@ -665,38 +699,62 @@ IMPORTANT RULES:
 Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning is subjective, but the Stoic just pointed out that this creates a paradox where your position itself has no basis. How do you respond?", "reason": "The Nihilist needs to address the logical contradiction raised by the Stoic.", "question": null, "detected_issues": "Logical contradiction in nihilist's position"}}"""
 
         # Try with validation and retry
+        configured_model = self._moderator.config.model or ""
         for attempt in range(3):
             try:
-                logger.info("MODERATOR REQUEST | Attempt %d | Model: %s", attempt + 1, self._moderator.config.model or "")
+                # Clear prior call's attribution so we only record THIS call's model.
+                if hasattr(self.llm, 'last_model_used'):
+                    self.llm.last_model_used = ""
+                logger.info("MODERATOR REQUEST | Attempt %d | Model: %s", attempt + 1, configured_model)
                 response, finish_reason = self.llm.chat(
                     messages=[
                         {"role": "system", "content": self._moderator.system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    model=self._moderator.config.model or "",
+                    model=configured_model,
                     temperature=0.5,
                     max_tokens=getattr(self.config.debate, 'moderator_max_tokens', 300),
                 )
-                logger.info("MODERATOR RESPONSE | Length: %d | Finish Reason: %s", len(response), finish_reason)
+                actual_model = getattr(self.llm, 'last_model_used', None) or configured_model or "dynamic"
+                selection_mode = "configured" if configured_model else ("dynamic" if actual_model else "backend_default")
+                logger.info("MODERATOR RESPONSE | Length: %d | Finish Reason: %s | Configured=%s | Actual=%s | selection=%s",
+                            len(response), finish_reason, configured_model or "NONE", actual_model, selection_mode)
 
                 decision = self._moderator.parse_decision(response)
+                decision["_requested_speaker"] = decision.get("selected_speaker", "")
+                decision["_actual_model"] = actual_model
+                decision["_selection_mode"] = selection_mode
+                decision["_parse_mode"] = self._moderator.last_parse_mode or "DIRECT_JSON"
 
-                # Validate the decision
+                # Validate the decision (existence + policy: repetition/over-use)
                 if self._validate_moderator_decision(decision):
-                    logger.info("MODERATOR DECISION: %s selected by %s", decision.get('selected_speaker'), decision.get('reason', '')[:50])
+                    logger.info("MODERATOR DECISION: %s selected by %s | actual_model=%s | parse=%s",
+                                decision.get('selected_speaker'), decision.get('reason', '')[:50],
+                                actual_model, decision.get("_parse_mode"))
                     return decision
 
-                logger.warning("Moderator decision failed validation: %s", decision)
+                logger.warning("Moderator decision failed validation: %s", {k: v for k, v in decision.items() if not k.startswith('_')})
 
             except Exception as exc:
                 logger.error("Moderator decision attempt %d failed: %s", attempt, exc)
 
-        # Final fallback - deterministic but specific challenge
+        # Final fallback - deterministic but specific challenge.
         logger.error("All moderator retries failed. Using deterministic fallback.")
-        return self._get_deterministic_fallback()
+        fb = self._get_deterministic_fallback()
+        fb["_actual_model"] = "deterministic_fallback"
+        fb["_selection_mode"] = "deterministic_fallback"
+        fb["_parse_mode"] = "PATTERN_FALLBACK"
+        fb["_requested_speaker"] = fb.get("selected_speaker", "")
+        return fb
 
     def _validate_moderator_decision(self, decision: dict[str, str]) -> bool:
-        """Validate moderator decision has required fields and valid speaker."""
+        """Validate moderator decision: required fields + a valid AND admissible
+        speaker (spec §13). The LLM may propose a speaker, but Life_mean decides
+        whether the proposal is admissible: it must exist, be a real role, not be
+        forbidden by the repetition/over-representation policy, and carry a real
+        challenge + reason. A proposal that violates policy is rejected so the
+        retry loop can re-sample or the deterministic fallback is used.
+        """
         if not decision:
             return False
 
@@ -704,6 +762,28 @@ Example: {{"selected_speaker": "Nihilist", "challenge": "You argued that meaning
         if selected not in VALID_SPEAKERS:
             logger.error("Invalid speaker in moderator decision: %s", selected)
             return False
+
+        # Existence/activity: a valid name must resolve to a registered agent.
+        # In a REAL engine the 6 agents are always registered; this guard only
+        # fires meaningfully when agents exist but the name is unknown. When no
+        # agents are registered (unit-test seams), VALID_SPEAKERS is the check.
+        if self._agents and not self._resolve_agent(selected):
+            logger.error("Moderator selected unknown speaker: %s", selected)
+            return False
+
+        # Policy enforcement (spec §13/§14): reject an inadmissible proposal
+        # (consecutive repeat / strong over-representation) instead of accepting
+        # the LLM blindly. Use should_prevent_speaker (reads via .get, never mutates).
+        if hasattr(self.argument_state, 'should_prevent_speaker'):
+            try:
+                if self.argument_state.should_prevent_speaker(selected):
+                    logger.warning(
+                        "Moderator proposal %s rejected by over-representation policy",
+                        selected,
+                    )
+                    return False
+            except Exception as exc:  # pragma: no cover - guard never blocks debate
+                logger.warning("should_prevent_speaker errored: %s", exc)
 
         challenge = decision.get("challenge", "")
         if not challenge or challenge == "Continue the discussion.":

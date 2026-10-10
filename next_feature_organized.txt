@@ -1607,3 +1607,965 @@ when ready, execute it through reusable specialized engines and controlled
 capabilities, observe every real action, validate deterministically whenever
 possible, preserve RAW evidence, compare outcomes, and build a traceable
 research memory over time.
+
+
+
+======================================================================
+LIFE_MEAN LABS — ADDENDUM
+FIXES + ARCHITECTURAL CLARIFICATIONS + PARKED FEATURES
+======================================================================
+
+STATUS
+
+This section contains important fixes, architectural clarifications,
+and future features discussed after the current roadmap was organized.
+
+FEATURE FREEZE STILL APPLIES.
+
+Items marked PARKED must NOT be implemented unless explicitly promoted
+to the active roadmap.
+
+======================================================================
+A. ACTIVE INTEGRITY FIX — AUTOPILOT / DEBATE
+======================================================================
+
+STATUS:
+ACTIVE P0/P1 REPAIR
+
+Evidence from real runtime logs shows:
+
+- DebateEngine itself performs real LLM calls and real turns.
+- AutoPilot attempts to start another task while the previous debate is active.
+- "Debate already running" is followed by "Created debate".
+- multiple tasks reuse "debate 1".
+- AutoPilot reports 5-turn invalid tasks while the DebateEngine continues.
+- turn counters and phase-transition counters diverge.
+- turn completion can appear out of logical order.
+- mid-term memory consolidation is broken by a schema mismatch.
+- moderator model attribution is blank.
+- moderator selects the same speaker excessively despite stated rotation logic.
+- Stop does not actually terminate model activity.
+- Delete can occur while background execution continues.
+- model calls continue after Stop/Delete.
+- next tasks may still be scheduled after deletion.
+
+Required repair principles:
+
+ONE TASK
+→ ONE OWNED DEBATE SESSION
+→ TERMINAL STATE
+→ NEXT TASK
+
+STOP
+→ CANCEL
+→ NO NEW MODEL CALLS
+→ NO NEXT TASK
+
+DELETE
+→ CANCEL ACTIVE EXECUTION
+→ VERIFY TERMINATED
+→ DELETE
+
+One canonical turn counter must exist.
+
+MidTermEntry schema must match memory summarizer output.
+
+Actual moderator/participant models must be recorded.
+
+Moderator LLM recommendations must be validated by deterministic runtime policy.
+
+======================================================================
+B. ZERO PHANTOM OUTPUT POLICY
+======================================================================
+
+STATUS:
+CORE INTEGRITY RULE
+
+Life_mean must prefer:
+
+REAL FAILURE
+
+over:
+
+FAKE SUCCESS.
+
+UI/runtime/RAW may only claim an action happened if backend evidence exists.
+
+Examples:
+
+Developer says it created file
+!=
+file exists.
+
+Judge expected by workflow
+!=
+Judge executed.
+
+Validator configured
+!=
+Validator ran.
+
+Expected pipeline stage
+!=
+actual stage completion.
+
+Canonical direction:
+
+ACTUAL BACKEND ACTION
+→ EVENT
+→ RAW
+→ UI
+
+Never:
+
+EXPECTED WORKFLOW
+→ FAKE UI ACTIVITY
+
+Required explicit states:
+
+PASS
+FAIL
+ERROR
+NOT_REACHED
+SKIPPED
+UNAVAILABLE
+STOPPED
+INCONCLUSIVE
+
+======================================================================
+C. COMPARE UI — EXPERIMENT BROWSER FIRST
+======================================================================
+
+STATUS:
+ACTIVE UI IMPROVEMENT
+
+Compare should use:
+
+BROWSE
+→ INSPECT
+→ SELECT
+→ COMPARE
+→ UNDERSTAND
+
+Normal users should never need an experiment ID.
+
+Compare page should contain:
+
+EXPERIMENT BROWSER
+- recent
+- search
+- subject navigation
+- filters
+
+EXPERIMENT INSPECTOR
+- overview
+- configuration
+- configured models
+- actual models
+- agents
+- validation
+- result
+- provenance
+- RAW link
+
+COMPARE TRAY
+- explicit Add to Compare
+- remove
+- selected A/B/...
+- basic difference preview
+- Compare button
+
+Infrastructure actions such as:
+
+Register Experiment
+Rebuild RAW Index
+
+belong under Advanced / Manage Index.
+
+Clicking an experiment means INSPECT,
+not automatically selecting it.
+
+======================================================================
+D. TOTAL LAB INTEGRITY AUDIT
+======================================================================
+
+STATUS:
+AUDIT METHODOLOGY / REUSABLE MAINTENANCE PASS
+
+Life_mean integrity audits should use:
+
+STATIC CODE EVIDENCE
++
+RUNTIME EVIDENCE
++
+EXPERIMENT / RAW EVIDENCE
+
+Audit:
+
+Settings
+→ pools
+→ templates
+→ router
+→ actual model
+
+Executors
+→ Debate
+→ Code Lab
+→ General Reasoning
+
+Agents
+→ EventBus
+→ RAW
+→ UI
+
+RAW
+→ Compare
+
+Validators
+→ actual results
+
+Historical experiments should be mined for repeated failures.
+
+Repair loop:
+
+EXPERIMENT EVIDENCE
+→ ISSUE
+→ ROOT CAUSE
+→ PATCH
+→ TEST
+→ CONTROLLED NEW RUN
+→ RAW
+→ COMPARE BEFORE/AFTER
+→ CONFIRMED FIX
+
+Do not call something fixed only because code looks correct.
+
+======================================================================
+E. HYBRID EXECUTION PRINCIPLE
+======================================================================
+
+STATUS:
+CORE ARCHITECTURAL CLARIFICATION
+
+"DETERMINISTIC FIRST" does NOT mean deterministic-only execution.
+
+Life_mean is a HYBRID AI LAB.
+
+Preferred model:
+
+LLM / AGENT
+→ understand / plan
+→ select capability
+→ Tool / Worker / Thinker / Validator
+→ objective or structured result
+→ LLM interprets result
+→ deterministic verification where applicable
+→ next action
+
+LLMs:
+- understand
+- plan
+- interpret
+- adapt
+- generate hypotheses
+- analyze failures
+
+Tools:
+- measure
+- execute
+- verify
+- parse
+- compile
+- test
+- calculate
+
+Workers:
+- perform specialized bounded tasks
+
+Thinkers:
+- provide reasoning strategies
+
+Deterministic evidence has authority over objective measurable claims,
+but deterministic components do not normally replace the entire AI workflow.
+
+Example:
+
+Developer
+→ pytest
+→ FAIL
+→ Critic interprets
+→ Developer repairs
+→ pytest
+→ PASS
+→ Reviewer analyzes
+
+======================================================================
+F. EVIDENCE-DRIVEN CAPABILITY REPAIR LOOP
+======================================================================
+
+STATUS:
+PARKED — HIGH PRIORITY FUTURE FEATURE
+
+If an experiment repeatedly fails because a required capability does not exist:
+
+RUN-001
+→ deterministic/structured failure
+→ CAPABILITY_GAP detected
+→ Lab Manager analyzes evidence
+→ propose Tool / Skill / Worker / Thinker
+→ human approves candidate creation
+→ Code Lab builds candidate
+→ deterministic tests
+→ security/permission validation
+→ human incorporation
+→ enqueue NEW RUN of SAME EXPERIMENT
+→ RUN-002
+→ Compare RUN-001 vs RUN-002
+
+Important:
+
+Same Experiment
+!=
+same Run.
+
+Historical failed run remains immutable.
+
+Example:
+
+RUN-001
+Tool X absent
+→ BLOCKED/FAILED
+
+RUN-002
+Tool X v1 added
+→ PASS
+
+Compare can determine whether the added capability changed the measured result.
+
+LLM that writes capability may NEVER activate it itself.
+
+Budgets required:
+
+max_retries
+max_capability_proposals
+max_capability_builds
+max_repairs
+max_runtime
+
+No infinite self-repair loop.
+
+Suggested name:
+
+EVIDENCE-DRIVEN CAPABILITY REPAIR LOOP
+
+======================================================================
+G. PROTOCOL TERMINOLOGY
+======================================================================
+
+STATUS:
+ARCHITECTURAL CLARIFICATION
+
+Use terminology precisely.
+
+PROTOCOL
+= scientific conditions of an experiment
+
+WORKFLOW
+= sequence used to perform work
+
+PIPELINE
+= runtime stage/data composition
+
+PROCEDURE
+= operational recipe
+
+TEMPLATE
+= reusable starting configuration
+
+SKILL
+= reusable instructions/expertise
+
+TOOL
+= executable capability
+
+WORKER
+= bounded specialized executor
+
+THINKER
+= reasoning strategy
+
+POLICY
+= runtime rules
+
+RUN
+= actual execution occurrence
+
+EXPERIMENT
+= scientific execution unit that may contain runs
+
+Important:
+
+WORKFLOW CAN BE A VARIABLE INSIDE A PROTOCOL.
+
+Therefore:
+
+WORKFLOW != PROTOCOL.
+
+A true ExperimentProtocol may eventually contain:
+
+research question
+hypothesis
+conditions
+controlled variables
+independent variables
+metrics
+validators
+budgets
+stop conditions
+success criteria
+reproducibility requirements
+
+Do not invent/implement it merely for naming cleanup.
+
+======================================================================
+H. PROTOCOL IN RESEARCH PACKAGE
+======================================================================
+
+STATUS:
+PARKED DESIGN
+
+.lmresearch should contain the exact protocol SNAPSHOT used by the experiment.
+
+Example:
+
+experiment.lmresearch
+├── manifest
+├── protocol_snapshot
+├── experiment_design
+├── dependencies
+├── metrics
+├── results
+├── scientific_raw
+└── notes
+
+Protocol snapshot describes:
+
+WHAT WAS TESTED
+UNDER WHICH CONDITIONS
+
+It should reference exact capabilities, not silently contain/activate them.
+
+Dependencies may include:
+
+workflow
+skills
+tools
+workers
+thinkers
+loops
+validators
+extensions
+
+with:
+
+id
+version
+hash
+
+Do NOT create .lmprotocol yet.
+
+If independent protocol exchange later becomes common,
+a dedicated format may be reconsidered.
+
+======================================================================
+I. REPLICATION READINESS CHECK
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+When importing a .lmresearch and choosing Replicate:
+
+IMPORT PACKAGE
+→ read protocol snapshot
+→ resolve dependencies
+→ check local availability
+→ check exact versions/hashes
+→ display readiness
+
+Example:
+
+Protocol            INCLUDED
+Workflow            INSTALLED
+Skill               INSTALLED
+Tool X              MISSING
+Worker Y            MISSING
+Model               UNAVAILABLE
+
+Exact Replication:
+NOT READY
+
+Actions:
+
+[ Resolve Missing Dependencies ]
+[ Find in Store ]
+[ Download Missing ]
+[ Inspect ]
+[ Use Compatible Alternative ]
+[ Bypass ]
+[ Cancel ]
+
+Bypass is allowed but changes classification.
+
+If exact dependency set matches:
+
+EXACT_REPLICATION
+
+If dependencies/protocol differ:
+
+MODIFIED_REPLICATION
+or
+PARTIAL_REPLICATION
+
+All deviations are explicit and recorded.
+
+Do not block experimentation unnecessarily,
+but never mislabel modified work as exact replication.
+
+======================================================================
+J. LIFE_MEAN STORE / GIT CATALOG ARCHITECTURE
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+Git repository/packages remain distribution/versioning source.
+
+Local DB remains rebuildable index.
+
+Store is the UI over the catalog.
+
+Concept:
+
+Git Catalog Repository
+→ catalog manifest
+→ Catalog Sync
+→ schema/hash validation
+→ local SQLite index
+→ Store UI
+
+States remain distinct:
+
+AVAILABLE
+→ DOWNLOADED
+→ VERIFIED
+→ TESTED
+→ INCORPORATED
+→ ENABLED
+
+Sync != Download.
+Download != Incorporate.
+Incorporate != Enable.
+
+Potential repository separation:
+
+Life_Mean_Labs
+= application/core
+
+Life_Mean_Contrib
+= community submissions / quarantine
+
+Life_Mean_Catalog
+= approved catalog
+
+Avoid filling Stable Core repo with arbitrary community packages.
+
+======================================================================
+K. COMMUNITY CONTRIBUTION SECURITY PIPELINE
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+Contributors should use Fork / Pull Request.
+
+No direct push to official catalog.
+
+Pipeline:
+
+COMMUNITY PR
+→ manifest/schema checks
+→ hash/provenance validation
+→ secret scan
+→ dependency audit
+→ static analysis
+→ permission analysis
+→ tests in isolated sandbox
+→ optional read-only LLM security review
+→ candidate security report
+→ human review
+→ Promote to Catalog
+
+Never automatically label arbitrary executable code:
+
+SAFE
+
+Prefer statuses:
+
+AUTOMATED_CHECKS_PASSED
+VERIFIED_CANDIDATE
+NEEDS_REVIEW
+QUARANTINED
+REJECTED
+CATALOG_APPROVED
+
+Untrusted PR execution receives:
+
+NO repository secrets
+NO publishing token
+NO host privileges
+NO admin filesystem
+NO privileged container
+
+LLM reviewer receives read-only:
+
+manifest
+diff
+source code
+tests
+permissions
+scanner results
+dependencies/SBOM
+
+LLM may review.
+LLM may NOT merge, execute with privileges, or publish.
+
+======================================================================
+L. TRUSTED RESEARCHER / TRUSTED PUBLISHER
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+A contributor may earn reduced review friction from a long verified history.
+
+Do NOT infer psychological intent.
+
+Trust should come from observable history:
+
+accepted contributions
+stable signed identity
+clean provenance
+permissions discipline
+reproducibility
+security history
+responsiveness to CI findings
+
+Possible states:
+
+UNVERIFIED
+→ VERIFIED CONTRIBUTOR
+→ TRUSTED RESEARCHER
+→ TRUSTED PUBLISHER
+
+Baseline security checks remain mandatory even for trusted publishers:
+
+schema
+hash/signature
+secret scan
+permissions
+dependency scan
+static checks
+sandbox tests
+
+Trusted status reduces HUMAN review friction,
+not fundamental security.
+
+Historical behavior may define an anomaly profile.
+
+Example:
+
+Researcher normally requests:
+experiment.read
+workspace.read
+
+New package requests:
+network
+subprocess
+
+→ SECURITY_REVIEW_REQUIRED
+
+Trust is revocable.
+
+Keep separate:
+
+SECURITY TRUST
+PROVENANCE TRUST
+SCIENTIFIC EVIDENCE
+
+Trusted researcher != scientifically correct.
+
+======================================================================
+M. PERSISTENT RESEARCH THREAD / INVESTIGATION
+======================================================================
+
+STATUS:
+PARKED — HIGH VALUE FUTURE FEATURE
+
+Avoid representing a long research program as 100 unrelated experiment IDs.
+
+Add a persistent object above experiments:
+
+RESEARCH THREAD / INVESTIGATION
+
+Example:
+
+INV-MEO-001
+"Why does MEO Apex loop less than normal MEO?"
+
+Investigation
+├── Question
+├── Hypothesis H1
+│   └── Experiment / Run
+├── Researcher Observation
+├── Hypothesis H2
+│   ├── Run
+│   └── Run
+├── Results
+├── Open Questions
+└── Current Understanding
+
+Runs/experiments still keep unique IDs for reproducibility.
+
+Human UI works primarily with the Investigation identity.
+
+======================================================================
+N. INVESTIGATION MEMORY / CHECKPOINT
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+When researcher presses Stop:
+
+create a research checkpoint containing:
+
+current question
+observations
+hypotheses tested
+results
+failures
+unresolved questions
+researcher notes
+agent notes
+candidate next hypotheses
+
+Later:
+
+[ Continue Research ]
+
+Agents receive a curated scientific context,
+not the complete raw conversation history.
+
+Persistent memory belongs to Investigation.
+
+Historical RAW remains immutable per Run.
+
+======================================================================
+O. RESEARCHER INTERVENTION DURING ACTIVE EXPERIMENT
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+Researcher should be able to prompt the active investigation.
+
+Example:
+
+Researcher:
+"I learned Apex contains a routing agent.
+I want to test whether Apex actually improves expert selection."
+
+Store as:
+
+RESEARCHER_INTERVENTION
+
+with:
+
+investigation_id
+experiment_id
+run_id
+timestamp
+text
+
+Agents may read the intervention and alter their reasoning trajectory.
+
+Important:
+
+RESEARCHER_OBSERVATION
+!=
+FACT
+
+Agents should treat it as:
+
+new information / hypothesis candidate
+
+and attempt to test it.
+
+======================================================================
+P. STRICT VS ADAPTIVE RESEARCH INTERVENTION
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+If a researcher intervention changes the scientific protocol:
+
+STRICT MODE:
+
+current run
+→ checkpoint
+→ branch/new Run
+→ new protocol snapshot
+→ continue
+
+ADAPTIVE / EXPLORATORY MODE:
+
+continue same exploratory run
+→ intervention explicitly recorded
+→ run marked ADAPTIVE
+
+UI may ask:
+
+"This intervention changes a measured variable."
+
+[ Continue Exploratory Run ]
+[ Branch Into New Hypothesis ]
+[ Save Observation Only ]
+
+This preserves freedom without hiding protocol changes.
+
+======================================================================
+Q. INVESTIGATION PUBLICATION
+======================================================================
+
+STATUS:
+PARKED FEATURE
+
+Catalog may eventually publish an Investigation rather than only isolated runs.
+
+Example:
+
+MEO Apex Routing Investigation
+v4
+
+Question:
+Why does Apex reduce looping?
+
+H1:
+contradicted
+
+H2:
+supported under conditions X
+
+H3:
+testing
+
+Experiments:
+7
+
+Researcher observations:
+12
+
+Latest protocol:
+...
+
+Status:
+ONGOING
+
+This preserves research lineage and evolving understanding.
+
+======================================================================
+R. AI COPILOT / MUTABLE EXPERIMENT DESIGN
+======================================================================
+
+STATUS:
+APPROVED SANDBOX DESIGN
+
+Before execution:
+
+AI Copilot proposes workflow based on researcher's prompt.
+
+Workflow remains editable.
+
+Researcher may change:
+
+stages
+roles
+personas
+models
+pools
+skills
+tools
+validators
+loops
+budgets
+prompts
+routing
+escalation
+
+Generating a team does NOT start execution.
+
+START is the authority boundary.
+
+DRAFT
+→ VALIDATE
+→ CREATE EXECUTION SNAPSHOT
+→ FREEZE RUN
+→ EXECUTE
+
+Core principle:
+
+DO NOT FREEZE CREATIVITY.
+
+FREEZE REPRODUCIBILITY.
+
+======================================================================
+S. FEATURE FREEZE / IDEA PARKING LOT
+======================================================================
+
+STATUS:
+ACTIVE PROJECT RULE
+
+Do not implement new ideas simply because they are interesting.
+
+New ideas are recorded in:
+
+IDEA PARKING LOT
+
+Possible states:
+
+PARKED
+UNDER_REVIEW
+MERGED
+REJECTED
+PROMOTED_TO_ROADMAP
+
+Current active roadmap must become:
+
+INCORPORATED
+CONNECTED
+FUNCTIONAL
+TESTED
+OBSERVABLE
+DOCUMENTED
+REPRODUCIBLE
+
+before a new feature wave begins.
+
+Integrity fixes required to make current features function correctly
+are NOT considered feature expansion.
+
+======================================================================
+END ADDENDUM
+======================================================================

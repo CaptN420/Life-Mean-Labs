@@ -71,6 +71,11 @@ class ExperimentUIController:
         self._configurations: Dict[str, Dict[str, Any]] = {}
         self._callbacks: Dict[str, List[Callable]] = {}
         self._lock = threading.Lock()
+        # Live AutoPilot per experiment so Stop/Delete can reach the actual
+        # runtime (engine threads, task loop), not just flip ExperimentState.
+        self._autopilots: Dict[str, Any] = {}
+        self._stop_requested: Dict[str, bool] = {}
+        self._worker_threads: Dict[str, threading.Thread] = {}
 
     def register_experiment(
         self,
@@ -132,6 +137,8 @@ class ExperimentUIController:
                 daemon=True,
                 name=f"exp-{experiment_id}",
             )
+            self._worker_threads[experiment_id] = thread
+            self._stop_requested[experiment_id] = False
             thread.start()
 
             logger.info(f"Started experiment {experiment_id}")
@@ -140,21 +147,28 @@ class ExperimentUIController:
         return True
 
     def stop_experiment(self, experiment_id: str) -> bool:
-        """Stop an experiment.
+        """Stop an experiment (real cancellation).
 
-        Args:
-            experiment_id: Experiment identifier
-
-        Returns:
-            True if stopped successfully
+        Sets the stop flag (the task loop checks it) AND propagates the stop to
+        the live AutoPilot, which stops the engine's debate session and joins
+        its thread. No NEW task / LLM call may begin after cancellation.
         """
         with self._lock:
             if experiment_id not in self._experiments:
                 return False
 
+            self._stop_requested[experiment_id] = True
             state = self._experiments[experiment_id]
-            state.is_running = False
+            state.is_running = False  # derived UI status becomes STOPPED
+            autopilot = self._autopilots.get(experiment_id)
             logger.info(f"Stopped experiment {experiment_id}")
+
+        # Outside the lock: actually cancel the engine if the loop started one.
+        if autopilot is not None:
+            try:
+                autopilot.stop_experiment(experiment_id)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.error(f"AutoPilot stop failed for {experiment_id}: {exc}")
         # Notify outside lock to avoid deadlock
         self._notify_callbacks(experiment_id, "stopped")
         return True
@@ -162,19 +176,52 @@ class ExperimentUIController:
     def delete_experiment(self, experiment_id: str) -> bool:
         """Delete an experiment from the dashboard.
 
-        Args:
-            experiment_id: Experiment identifier
-
-        Returns:
-            True if deleted successfully, False if not found
+        Never removes an experiment whose execution still runs (a P0 lifecycle
+        violation). If the experiment is active, request cancellation, wait a
+        bounded time for the worker thread to finish, and only then remove it.
+        If cancellation cannot finish in time, refuse the delete truthfully
+        (returns False) rather than log a success while execution continues.
         """
         with self._lock:
             if experiment_id not in self._experiments:
                 logger.warning(f"Experiment {experiment_id} not found for deletion")
                 return False
+            state = self._experiments[experiment_id]
+            if state.is_running:
+                # Request cancellation first; join outside the lock.
+                self._stop_requested[experiment_id] = True
+                autopilot = self._autopilots.get(experiment_id)
+                thread = self._worker_threads.get(experiment_id)
+            else:
+                autopilot = None
+                thread = None
+
+        if autopilot is not None:
+            try:
+                autopilot.stop_experiment(experiment_id)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.error(f"AutoPilot stop failed during delete {experiment_id}: {exc}")
+        if thread is not None:
+            thread.join(timeout=8.0)
+            if thread.is_alive():
+                logger.warning(
+                    f"DELETE_BLOCKED_ACTIVE_EXECUTION: {experiment_id} worker still "
+                    f"alive after join timeout; refusing delete to keep execution managed"
+                )
+                with self._lock:
+                    self._stop_requested[experiment_id] = True
+                    st = self._experiments.get(experiment_id)
+                    if st is not None:
+                        st.is_running = True  # keep visible; it IS still running
+                return False
+
+        with self._lock:
             self._experiments.pop(experiment_id, None)
             self._configurations.pop(experiment_id, None)
             self._callbacks.pop(experiment_id, None)
+            self._autopilots.pop(experiment_id, None)
+            self._stop_requested.pop(experiment_id, None)
+            self._worker_threads.pop(experiment_id, None)
             logger.info(f"Deleted experiment {experiment_id}")
         return True
 
@@ -360,9 +407,14 @@ class ExperimentUIController:
                     raise RuntimeError(msg)
                 from experiments.autopilot import AutoPilot
                 autopilot = AutoPilot()
+                with self._lock:
+                    self._autopilots[experiment_id] = autopilot
                 # Deterministic validator is the authority; AutoPilot reuses it
                 # via _validate_response AFTER the debate.
-                debate_results = autopilot.run_experiment(experiment_id, tasks, config)
+                debate_results = autopilot.run_experiment(
+                    experiment_id, tasks, config,
+                    should_stop=lambda: self._is_stop_requested(experiment_id),
+                )
 
                 valid_count = sum(1 for r in debate_results if r.is_valid)
                 invalid_count = len(debate_results) - valid_count
@@ -424,7 +476,15 @@ class ExperimentUIController:
                 if experiment_id in self._experiments:
                     state = self._experiments[experiment_id]
                     state.is_running = False
+                self._stop_requested.pop(experiment_id, None)
+                self._worker_threads.pop(experiment_id, None)
+                self._autopilots.pop(experiment_id, None)
             self._notify_callbacks(experiment_id, "stopped")
+
+    def _is_stop_requested(self, experiment_id: str) -> bool:
+        """True if a Stop/Delete was requested for this experiment."""
+        with self._lock:
+            return bool(self._stop_requested.get(experiment_id, False))
 
     def _persist_results_to_raw(self, experiment_id: str, results: List[Any],
                                 mode: str = "deterministic",

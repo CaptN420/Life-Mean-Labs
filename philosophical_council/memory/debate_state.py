@@ -809,10 +809,19 @@ class DebateState:
         return quality
 
     def _calculate_semantic_novelty(self, response: str, speaker: str) -> float:
-        """Calculate how novel a response is compared to previous arguments."""
+        """Calculate how novel a response is compared to previous arguments.
+
+        Honest metric (spec §17): an EMPTY or trivially tiny response carries NO
+        measurable content, so it must never be reported as maximally novel
+        (1.0). Only a response with actual substance can be judged; empty/tiny
+        output is 0.0 (no contribution) rather than fake precision.
+        """
+        text = (response or "").strip()
+        if len(text) < 20:
+            return 0.0  # too tiny to measure — not a novel contribution
         my_claims = [c for c in self.all_claims if c.speaker == speaker]
         if not my_claims:
-            return 1.0  # First argument is always novel
+            return 1.0  # First substantive argument is always novel
 
         # Extract concepts from new response
         new_concepts = set(self._extract_concepts(response))

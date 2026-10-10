@@ -336,7 +336,7 @@ class TestDebateEngineFixes(unittest.TestCase):
         self.assertNotIn("Continue the discussion", fallback.get("reason", ""))
 
     def test_turn_id_increases_correctly(self) -> None:
-        """Test that turn IDs increase sequentially."""
+        """Test that turn IDs increase sequentially (policy-compliant rotation)."""
         from philosophical_council.core.debate_engine import DebateEngine
 
         with patch('philosophical_council.core.debate_engine.TurnManager') as MockTurnManager:
@@ -349,36 +349,48 @@ class TestDebateEngineFixes(unittest.TestCase):
             engine._running = True
             engine._state.status = "running"
 
-            # Create and register a Skeptic agent
-            mock_skeptic = MagicMock()
-            mock_skeptic.role = "skeptic"
-            mock_skeptic.name = "Skeptic"
-            mock_skeptic.config.name = "Skeptic"
-            mock_skeptic.system_prompt = "You are a skeptic."
-            mock_skeptic.format_response.return_value = "prompt"
-            engine.register_agent(mock_skeptic)
+            # Register the 6 speakers. A policy-COMPLIANT moderator rotates
+            # among them so the §13 over-representation guard does not veto;
+            # this test proves turn_id sequencing, not acceptance of a repeated
+            # speaker (which is the policy-under-test elsewhere).
+            speakers = ["Existentialist", "Stoic", "Nihilist", "Spiritual", "Skeptic", "Pragmatist"]
+            for name in speakers:
+                mock_agent = MagicMock()
+                mock_agent.role = name.lower()
+                mock_agent.name = name
+                mock_agent.config.name = name
+                mock_agent.system_prompt = f"You are a {name}."
+                mock_agent.format_response.return_value = "prompt"
+                engine.register_agent(mock_agent)
 
-            # Mock moderator decision
+            # Mock moderator decision: rotate speakers, no over-representation veto.
+            rotation = {"i": 0}
+
+            def _rotating_decision(*args, **kwargs):
+                idx = rotation["i"] % len(speakers)
+                rotation["i"] += 1
+                return {
+                    "selected_speaker": speakers[idx],
+                    "challenge": "Test question",
+                    "reason": "Test reason",
+                    "question": None,
+                    "detected_issues": None,
+                }
+
             mock_moderator = MagicMock()
             mock_moderator.system_prompt = "You are a moderator."
-            mock_moderator.parse_decision.return_value = {
-                "selected_speaker": "Skeptic",
-                "challenge": "Test question",
-                "reason": "Test reason",
-                "question": None,
-                "detected_issues": None,
-            }
+            mock_moderator.parse_decision.side_effect = _rotating_decision
             engine._moderator = mock_moderator
 
             # Mock llm.chat to return (response, finish_reason)
             engine.llm.chat.return_value = ("Response", "stop")
 
-            # Simulate multiple turns
+            # Simulate multiple turns (rotation stays policy-compliant)
             for i in range(5):
                 mock_turn = MagicMock()
                 mock_turn.turn_id = i + 1
                 mock_turn.round_num = 1
-                mock_turn.speaker = "Skeptic"
+                mock_turn.speaker = speakers[i % len(speakers)]
                 mock_turn.speaker_role = "skeptic"
                 mock_turn.moderator_question = "Test question"
                 mock_turn.moderator_reason = "Test reason"

@@ -28,10 +28,45 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import ast
+
 from .config import CodeLabConfig
 from .workspace import CodeLabWorkspace, WorkspaceError
 
 logger = logging.getLogger("CodeLab.Engine")
+
+
+def _has_substantive_code(source: str) -> bool:
+    """True only if the module contains real program content.
+
+    A free-form 'main.py' that is merely a dict-literal (e.g. an LLM writing its
+    planning JSON instead of code) is syntactically valid Python (it compiles)
+    but is NOT a program. This rejects phantom outputs at the structural gate:
+    a top-level literal/expression with no def/class/import/assignation is not
+    substantive. Comment/string-only files also return False.
+    """
+    if isinstance(source, bytes):
+        source = source.decode("utf-8", "replace")
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False  # caller already flags syntax separately
+    if not tree.body:
+        return False
+    substantive = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+                   ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign,
+                   ast.AugAssign, ast.If, ast.For, ast.While, ast.With, ast.Try)
+    if any(isinstance(n, substantive) for n in tree.body):
+        return True
+    # Fall back: an Expr that is a bare literal/container (e.g. a JSON dict) is
+    # not a program; an Expr that is a function call / attribute emit is.
+    for n in tree.body:
+        if isinstance(n, ast.Expr) and not isinstance(n.value,
+                (ast.Constant, ast.Dict, ast.List, ast.Tuple, ast.Set,
+                 ast.JoinedStr, ast.Name, ast.BinOp)):
+            return True
+    return False
+
 
 # ── pipeline event types (backend-real, consumed by API/UI) ─────────────
 RUN_STARTED = "RUN_STARTED"
@@ -850,6 +885,15 @@ class CodeLabEngine:
                 results["syntax_validation"] = "FAIL"
                 results[f"{f}_compile"] = f"syntax_error: {e}"
                 results["expected_files_present"][f] = False
+        # HONESTY (rule 12): a file that compiles but contains no program content
+        # (e.g. an LLM that emitted a planning JSON object as if it were source) is
+        # a phantom output, not a PASS. Require substantive code per generated file.
+        for f in py_files:
+            body = self.ws.read_text(f) if hasattr(self.ws, "read_text") else ""
+            if body and not _has_substantive_code(body):
+                ok = False
+                results["syntax_validation"] = "FAIL"
+                results[f"{f}_compile"] = "phantom: literal-only (no def/class/import/assign)"
         results["deterministic_validation"] = ok
         self._emit(VALIDATION_COMPLETED, run_id=self.config.run_id, results={
             "method": results["method"], "deterministic_validation": ok,

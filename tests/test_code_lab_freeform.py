@@ -96,3 +96,40 @@ def test_known_template_uses_oracle_not_freeform(tmp_path):
     assert res["plan"]["plan_id"] == "factorial"
     assert res["validator_protocol"] == "code-lab-v2-known"
     assert "test_factorial.py" in res["files_created"]
+
+
+# A literal planning-JSON emitted by a small/weak codegen model instead of real
+# code. It is syntactically valid Python (a dict literal compiles) but is NOT a
+# program — the exact phantom that must not be declared PASS.
+JSON_PHANTOM_SRC = ('{"title":"Tetris Module Development",'
+                    '"summary":"Im reviewing the users request and planning",'
+                    '"cur_task":"analyzing the request to build HTML5 Tetris."}')
+
+
+def test_freeform_json_phantom_is_fail_not_pass(tmp_path):
+    """§12 (REAL FAILURE > FAKE SUCCESS): a compilable JSON object is not code.
+
+    Regression for the incident where three "make a tetris game" runs were
+    declared `passed` while their only artifact, main.py, was a planning-JSON
+    object (no def/class/import/assignation) written by a summarizer model.
+    Such a file compiles (dict literal) but holds no program — the free-form
+    structural gate must reject it as FAIL, never declare a phantom PASS.
+    """
+    engine, cfg = _ma_engine(tmp_path, JSON_PHANTOM_SRC)
+    res = engine.run()
+
+    assert res["plan"]["plan_id"] == "generic"
+    assert res["status"] == "failed"
+    det = res["validation"]["details"]
+    assert det["deterministic_validation"] is False
+    assert det["syntax_validation"] == "FAIL"
+    # the offending file is reported as phantom, not silently accepted
+    assert any("phantom" in str(v) for v in det.values())
+
+
+def test_freeform_real_code_still_passes(tmp_path):
+    """Guard: the substance check must not reject genuine free-form programs."""
+    engine, cfg = _ma_engine(tmp_path, TETRIS_SRC)
+    res = engine.run()
+    assert res["status"] == "passed"
+    assert res["validation"]["deterministic_validation"] is True

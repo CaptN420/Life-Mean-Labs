@@ -132,8 +132,10 @@ class TestGenuineDebateEngineIntegration:
     def test_full_task_to_debate_path_on_real_engine(self, tmp_path):
         """The complete AutoPilot task→debate→validate→RAW path, real objects."""
         autopilot, experiment_id, engine = _build_real_engine(tmp_path)
-        engine.start_debate()
-
+        # NOTE: do NOT pre-call engine.start_debate() here — _run_task_through_debate
+        # creates/starts this task's OWN dedicated session (background=False) and
+        # finalizes it. Pre-starting would begin a second session (engine already
+        # running -> start refused -> honest (None, False), no phantom debate).
         result = autopilot._run_task_through_debate(experiment_id, _task(ground_truth=4), engine)
         assert result.experiment_id == experiment_id
         assert result.task_id == "task_integ_1"

@@ -38,6 +38,7 @@ class DebateRunResult:
     final_response: str = ""
     is_valid: bool = False
     validation_score: float = 0.0
+    validation_reasons: List[str] = field(default_factory=list)
     raw_experiment_id: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
 
@@ -51,6 +52,7 @@ class DebateRunResult:
             "final_response": self.final_response[:500] if self.final_response else "",
             "is_valid": self.is_valid,
             "validation_score": self.validation_score,
+            "validation_reasons": list(self.validation_reasons),
             "raw_experiment_id": self.raw_experiment_id,
             "timestamp": self.timestamp,
         }
@@ -74,6 +76,7 @@ class AutoPilot:
         experiment_id: str,
         tasks: List[GeneratedTask],
         config: Optional[Dict[str, Any]] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
     ) -> List[DebateRunResult]:
         """Run an experiment through the debate engine.
 
@@ -81,19 +84,33 @@ class AutoPilot:
             experiment_id: Unique experiment identifier
             tasks: Generated tasks to process
             config: Experiment configuration
+            should_stop: Optional callable returning True when a Stop/Delete has
+                been requested. When set, NO new task starts after it fires
+                (the current task's debate session is still finalized cleanly).
 
         Returns:
-            List of DebateRunResults
+            List of DebateRunResults (may be shorter than ``tasks`` if a stop
+            was requested between tasks)
         """
         results = []
         with self._lock:
             self._results[experiment_id] = []
 
-        # Initialize debate engine for this experiment
-        engine = self._create_debate_engine(experiment_id, config)
+        # Initialize debate engine for THIS experiment: reuse an injected engine
+        # (tests stub the LLM via _create_debate_engine(..., llm_client=stub)); a
+        # second _create_debate_engine would build a fresh REAL engine and clobber
+        # the injected one (losing the stub / touching the network).
+        engine = self._engines.get(experiment_id)
+        if engine is None:
+            engine = self._create_debate_engine(experiment_id, config)
 
         # Process each task
         for task in tasks:
+            if should_stop is not None and should_stop():
+                logger.info(
+                    f"Experiment {experiment_id}: stop requested — no further tasks"
+                )
+                break
             result = self._run_task_through_debate(
                 experiment_id=experiment_id,
                 task=task,
@@ -107,7 +124,8 @@ class AutoPilot:
                 self._results[experiment_id].append(result)
 
         logger.info(
-            f"Experiment {experiment_id} completed: {len(results)} tasks processed"
+            f"Experiment {experiment_id} completed: {len(results)} tasks processed "
+            f"(stop_requested={bool(should_stop and should_stop())})"
         )
         return results
 
@@ -237,10 +255,35 @@ class AutoPilot:
             DebateRunResult
         """
         run_id = f"run_{uuid.uuid4().hex[:8]}"
-        debate_id = self._create_debate(experiment_id, task, engine)
+        reasons: List[str] = []
 
-        # Run debate for this task
-        turn_count = self._execute_debate_turns(engine, max_turns=5)
+        # Create/start this task's OWN debate session. A session is created
+        # ONLY if start_debate returns True (session started, isolated). If the
+        # engine is already running (or start fails), the task must NOT be
+        # treated as created — no phantom "Created debate", no shared session.
+        debate_id, started = self._create_debate(experiment_id, task, engine)
+        if not started or debate_id is None:
+            self._finalize_engine_session(engine)
+            reasons.append("DEBATE_STILL_RUNNING")
+            return DebateRunResult(
+                experiment_id=experiment_id,
+                task_id=task.task_id,
+                run_id=run_id,
+                debate_id=0,
+                turn_count=0,
+                is_valid=False,
+                validation_score=0.0,
+                validation_reasons=reasons,
+                raw_experiment_id=getattr(engine, '_raw_experiment_id', None),
+            )
+
+        # Run this task's debate synchronously and ONLY this task's debate.
+        # background=False means NO engine thread is running: this loop is the
+        # single authoritative driver, so turns are ordered and counted once.
+        try:
+            turn_count = self._execute_debate_turns(engine, max_turns=5)
+        finally:
+            self._finalize_engine_session(engine)
 
         # Get final response — the LAST turn that actually carries content.
         # A real debate may end with a reserved/rejected turn (moderator
@@ -256,8 +299,16 @@ class AutoPilot:
 
         # Validate result
         is_valid, score = self._validate_response(task, final_response)
+        if not final_response:
+            reasons.append("NO_ANSWER")
+        if turn_count == 0:
+            reasons.append("MIN_TURNS_NOT_REACHED" if not final_response else "DEBATE_STILL_RUNNING")
+        if not is_valid and final_response and turn_count > 0:
+            reasons.append("VALIDATOR_FAILURE")
+        if is_valid:
+            reasons = []
 
-        # Get RAW experiment ID from engine
+        # Get RAW experiment ID from engine (finalize may set/keep it).
         raw_experiment_id = getattr(engine, '_raw_experiment_id', None)
 
         result = DebateRunResult(
@@ -269,12 +320,14 @@ class AutoPilot:
             final_response=final_response,
             is_valid=is_valid,
             validation_score=score,
+            validation_reasons=reasons,
             raw_experiment_id=raw_experiment_id,
         )
 
         logger.info(
             f"Task {task.task_id} -> run {run_id} -> debate {debate_id}: "
             f"{turn_count} turns, valid={is_valid}"
+            + (f", reasons={reasons}" if reasons else "")
         )
 
         return result
@@ -295,14 +348,26 @@ class AutoPilot:
         # Use task description as debate topic
         topic = f"Task: {task.description[:100]}"
 
-        # Start the debate (creates debate in database)
-        engine.start_debate()
+        # Start THIS task's dedicated, isolated session. background=False means
+        # no engine thread runs; AutoPilot owns the single turn loop. Honor the
+        # return value: False => engine already running/start failed, so the
+        # session MUST NOT be treated as created (no fake lifecycle state).
+        ok = engine.start_debate(background=False)
+        if not ok:
+            logger.error(
+                f"start_debate refused for task {task.task_id} "
+                f"(engine {id(engine)} likely already running). No debate created."
+            )
+            return None, False
 
         # Get the debate ID from engine
         debate_id = engine._get_debate_id()
-
+        if debate_id is None:
+            logger.error(f"No debate id after start for task {task.task_id}")
+            return None, False
+        # Record topic on the created debate for traceability (best effort).
         logger.info(f"Created debate {debate_id} for task {task.task_id}")
-        return debate_id
+        return debate_id, True
 
     def _execute_debate_turns(self, engine: Any, max_turns: int = 5) -> int:
         """Execute debate turns.
@@ -323,6 +388,19 @@ class AutoPilot:
             turn_count += 1
 
         return turn_count
+
+    def _finalize_engine_session(self, engine: Any) -> None:
+        """Terminate a controlled (background=False) debate session cleanly.
+
+        stop_debate joins any live thread and flips the session to its terminal
+        STOPPED state, so the next task starts from a fully reset engine
+        (see DebateEngine.start_debate). Guarantees no orphan loop outlives its
+        owning task.
+        """
+        try:
+            engine.stop_debate()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Could not finalize debate session: %s", exc)
 
     def _validate_response(
         self, task: GeneratedTask, response: str
