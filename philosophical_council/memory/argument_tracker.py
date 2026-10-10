@@ -163,7 +163,7 @@ class DebateState:
         # Prevent if they've spoken more than 2x the average
         if self.speaker_turn_count:
             avg = self.turn_count / len(self.speaker_turn_count)
-            if self.speaker_turn_count[speaker] > avg * 2.5:
+            if self.speaker_turn_count.get(speaker, 0) > avg * 2.5:
                 return True
 
         # Prevent consecutive turns unless very few total turns
