@@ -318,9 +318,21 @@ class ModelRegistry:
         return self._models.get(model_id)
 
     def get_by_name(self, name: str) -> Optional[ModelRecord]:
-        """Get the newest model with the given name."""
+        """Get the newest model with the given name.
+
+        ``created_at`` is ``time.time()``; two candidates registered in the
+        same clock tick can tie. ``max`` is therefore additionally keyed by
+        the registration index (dict insertion order), so the "newest" model
+        is deterministic — independent of PYTHONHASHSEED / dict iteration —
+        and a tie resolves to the most-recently registered candidate.
+        """
         matches = [m for m in self._models.values() if m.name == name]
-        return max(matches, key=lambda m: m.created_at) if matches else None
+        if not matches:
+            return None
+        return max(
+            enumerate(matches),
+            key=lambda iv: (iv[1].created_at, iv[0]),
+        )[1]
 
     def all(self) -> List[ModelRecord]:
         """All models."""
