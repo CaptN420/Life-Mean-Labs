@@ -125,8 +125,12 @@ def _run_debate_code(executor_type: str, cap: Dict[str, Any],
     from experimental.retry_agent import run_debate_code
 
     seed = int(payload.get("seed", 1))
+    mode = str(payload.get("mode", "deterministic"))
+    task_type = str(payload.get("task_type", "retry_controller"))
+    task_prompt = str(payload.get("task_prompt", ""))
     try:
-        trace = run_debate_code(seed=seed)
+        trace = run_debate_code(task_type=task_type, seed=seed, mode=mode,
+                                task_prompt=task_prompt)
     except Exception as e:  # pragma: no cover - defensive
         return {
             "executor": executor_type, "kind": "debate_code",
@@ -135,13 +139,15 @@ def _run_debate_code(executor_type: str, cap: Dict[str, Any],
         }
     return {
         "executor": executor_type, "kind": "debate_code",
-        "dispatched_to": "RetryAgent", "seed": seed,
-        "status": trace.get("status", "failed"),
+        "dispatched_to": "RetryAgent", "seed": seed, "mode": mode,
+        "task_type": task_type,
+        "status": trace.get("status", "failed"), "reproducible": trace.get("reproducible"),
         "result": {
             "debate": trace.get("debate"),
             "handoff": trace.get("handoff"),
             "code_files": trace.get("code_files"),
             "verify": trace.get("verify"),
+            "reason": trace.get("reason"),
         },
     }
 
