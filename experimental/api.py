@@ -22,6 +22,7 @@ from experimental.designer import ExperimentDesigner, DesignerInputError
 from experimental.dispatch import ExecutorNotAvailable, executor_catalog
 from experimental.engine import StopRequested
 from experimental.executors import build_engine
+from experimental.harness import run_executor
 from experimental.schema import ExperimentDesign
 from experimental.store import ExperimentDesignStore
 from experimental.validation import DesignInvalid
@@ -116,6 +117,28 @@ class ExperimentalApiMixin:
             self._send_json({"design_id": design_id, "status": "STOPPED"})
             return
         self._send_json(summary)
+
+    def _experimental_harness(self, data: Dict[str, Any]) -> None:
+        """Run a single connected executor in an isolated, throwaway sandbox.
+
+        Body: ``{executor: <executor_type>, prompt?, tool?, args?, run_tests?...}``
+        A ``not-connected`` executor is refused with EXECUTOR_NOT_AVAILABLE
+        (422) — never faked. This is an OPT-IN experimental surface; the stable
+        core does not depend on it.
+        """
+        executor_type = str((data or {}).get("executor") or "")
+        if not executor_type:
+            self._send_error(400, "missing 'executor'", code="missing_executor")
+            return
+        try:
+            out = run_executor(executor_type, data or {})
+        except ExecutorNotAvailable as e:
+            self._send_error(422, str(e), code=e.category)
+            return
+        except Exception as e:  # pragma: no cover - defensive
+            self._send_error(500, str(e), code="harness_error")
+            return
+        self._send_json(out)
 
     # ── routing helpers (used by dashboard do_GET / do_POST) ───────────────
     @classmethod

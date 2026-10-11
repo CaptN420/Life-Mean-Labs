@@ -601,6 +601,7 @@
             <button class="tab-btn" data-tab="code-lab" onclick="switchTab('code-lab', this)">Code Lab</button>
             <button class="tab-btn" data-tab="settings" onclick="switchTab('settings', this)">Settings</button>
             <button class="tab-btn" data-tab="compare" onclick="switchTab('compare', this)">Compare</button>
+            <button class="tab-btn" data-tab="experimental" onclick="switchTab('experimental', this)">Experimental</button>
         </nav>
 
         <!-- ── Autopilot tab — the REAL experiment workflow (GOAL 7/8) ── -->
@@ -978,6 +979,46 @@
 
     <button class="refresh-btn" onclick="loadExperiments()" title="Refresh">↻</button>
 
+    <!-- ── Experimental tab — OPT-IN sandbox; the stable core does not depend on it ── -->
+    <div id="panel-experimental" class="tab-panel">
+        <p class="subtitle" style="margin-bottom:1rem;"><strong>Sandbox expérimental (couche optionnelle).</strong>
+        Jouer avec un exécuteur isolé, sans que le core stable n'en dépende. Ici vous décrivez/choisissez,
+        le labo s'occupe de l'infra. Rien n'est branché — si un exécuteur prouve sa valeur, il pourra être
+        promu au core. Les exécuteurs <code>not-connected</code> sont honnêtement refusés.</p>
+
+        <div class="grid">
+            <!-- Vision + statut des exécuteurs -->
+            <div class="card">
+                <h2>Vision &amp; exécuteurs</h2>
+                <p style="font-size:0.86rem;line-height:1.5;">Laboratoire expérimental modulaire pour l'étude
+                scientifique des systèmes de débat / génération multi-agents. <strong>Le chercheur décrit
+                l'expérience, le laboratoire s'occupe de l'infrastructure.</strong> C'est un banc d'essai :
+                chaque exécuteur ci-dessous indique s'il est branché (<code>connected</code>) ou réservé
+                (<code>not-connected</code>).</p>
+                <div id="exp-executors"><div class="placeholder">Chargement…</div></div>
+                <p style="font-size:0.78rem;color:var(--muted-foreground);margin-top:0.5rem;">Un exécuteur
+                <code>not-connected</code> (ex. <code>hermes_debate</code>, projet séparé) est listé mais ne
+                peut pas tourner ici — aucun faux résultat n'est produit.</p>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem;">
+            <h2>Harness — run en sandbox</h2>
+            <div class="form-row" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
+                <div class="form-group" style="flex:1;min-width:160px;">
+                    <label for="exp-executor">Exécuteur</label>
+                    <select id="exp-executor" name="executor"></select>
+                </div>
+                <div class="form-group" style="flex:2;min-width:240px;">
+                    <label for="exp-prompt">Prompt / inputs</label>
+                    <textarea id="exp-prompt" rows="2" style="width:100%;font-family:monospace;" placeholder="Create a Python function fibonacci(n) with unit tests."></textarea>
+                </div>
+                <button class="btn-sm" onclick="runHarness()" id="exp-run-btn">RUN</button>
+            </div>
+            <pre id="exp-output" class="placeholder" style="margin-top:0.6rem;max-height:340px;overflow:auto;font-size:0.78rem;"></pre>
+        </div>
+    </div>
+
     <script>
         // Canonical entrypoint guard (GOAL 1/3): the dashboard is served at
         // http://127.0.0.1:8080/dashboard. Opening dashboard.html directly via
@@ -1008,6 +1049,7 @@
             if (name === 'debate') { loadDebateLab(); loadDebateTemplates(); loadDebateModelPool(); }
             if (name === 'settings') loadSettings();
             if (name === 'compare') { loadCompare(); }
+            if (name === 'experimental') { loadExperimental(); }
         }
 
         // ── Compare ───────────── browse / inspect / select / compare ──
@@ -3381,6 +3423,58 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                 const dlTemplateSel = document.getElementById('dl-template');
                 if (dlTemplateSel) dlTemplateSel.addEventListener('change', renderDebateTemplate);
                 setInterval(() => { if (document.getElementById('panel-debate').classList.contains('active')) { loadDebateLab(); } }, 3000);
+
+        // ── Experimental tab (OPT-IN sandbox; stable core does not depend on it) ──
+        function loadExperimental() {
+            fetch('/api/experimental/capabilities')
+                .then(r => r.json())
+                .then(data => {
+                    const executors = data.executors || {};
+                    const sel = document.getElementById('exp-executor');
+                    const keys = Object.keys(executors).sort();
+                    sel.innerHTML = keys.map(k =>
+                        `<option value="${esc(k)}">${esc(k)}${executors[k].connected ? ' (connected)' : ' (reserved)'}</option>`
+                    ).join('');
+                    const rows = keys.map(k => {
+                        const c = executors[k];
+                        const badge = c.connected
+                            ? '<span style="color:#2e9e5b;font-weight:600;">● connected</span>'
+                            : '<span style="color:var(--muted-foreground);font-weight:600;">○ reserved</span>';
+                        return `<tr><td><code>${esc(k)}</code></td><td>${esc(c.engine || '—')}</td><td>${badge}</td></tr>`;
+                    }).join('');
+                    document.getElementById('exp-executors').innerHTML =
+                        '<table class="data-table"><thead><tr><th>Exécuteur</th><th>Cible</th><th>État</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                })
+                .catch(err => {
+                    document.getElementById('exp-executors').innerHTML =
+                        '<div class="placeholder">Erreur chargement: ' + esc(String(err)) + '</div>';
+                });
+        }
+
+        function runHarness() {
+            const executor = document.getElementById('exp-executor').value;
+            const prompt = document.getElementById('exp-prompt').value;
+            const out = document.getElementById('exp-output');
+            const btn = document.getElementById('exp-run-btn');
+            out.textContent = 'Running …';
+            btn.disabled = true;
+            fetch('/api/experimental/harness', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ executor, prompt }),
+            })
+                .then(async r => {
+                    const j = await r.json().catch(() => ({ error: '(non-JSON response)' }));
+                    if (!r.ok) {
+                        out.textContent = 'Échec (' + r.status + '): ' + JSON.stringify(j, null, 2);
+                        return;
+                    }
+                    out.textContent = JSON.stringify(j, null, 2);
+                })
+                .catch(err => { out.textContent = 'Erreur: ' + String(err); })
+                .finally(() => { btn.disabled = false; });
+        }
+
     </script>
 </body>
 </html>

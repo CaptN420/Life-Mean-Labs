@@ -165,6 +165,8 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
                 self._send_json({"status": "stopped"})
         elif parsed.path == "/api/experimental/designs":
             self._experimental_design_create(data)
+        elif parsed.path == "/api/experimental/harness":
+            self._experimental_harness(data)
         elif parsed.path == "/api/compare":
             self._compare_report(data)
         elif parsed.path == "/api/compare/subject":
