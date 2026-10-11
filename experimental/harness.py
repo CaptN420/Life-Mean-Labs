@@ -64,6 +64,8 @@ def run_executor(executor_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             return _run_code(executor_type, cap, payload, root)
         if kind in ("deterministic",):
             return _run_tool(executor_type, cap, payload)
+        if kind in ("debate_code",):
+            return _run_debate_code(executor_type, cap, payload)
         return {
             "executor": executor_type,
             "kind": kind,
@@ -108,6 +110,38 @@ def _run_code(executor_type: str, cap: Dict[str, Any], payload: Dict[str, Any],
             "validation": result.get("validation"),
             "files_created": result.get("files_created"),
             "errors": result.get("errors"),
+        },
+    }
+
+
+def _run_debate_code(executor_type: str, cap: Dict[str, Any],
+                     payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Run the closed DEBATE→SPEC→CODE→VERIFY chain (deterministic, traced).
+
+    The returned trace includes the debate contributions, the handoff
+    DECISION_SPEC, the generated files and the real pytest verification — an
+    inspectable, reproducible chain (no hidden steps).
+    """
+    from experimental.retry_agent import run_debate_code
+
+    seed = int(payload.get("seed", 1))
+    try:
+        trace = run_debate_code(seed=seed)
+    except Exception as e:  # pragma: no cover - defensive
+        return {
+            "executor": executor_type, "kind": "debate_code",
+            "status": "failed", "dispatched_to": "RetryAgent",
+            "result": {"error": str(e)},
+        }
+    return {
+        "executor": executor_type, "kind": "debate_code",
+        "dispatched_to": "RetryAgent", "seed": seed,
+        "status": trace.get("status", "failed"),
+        "result": {
+            "debate": trace.get("debate"),
+            "handoff": trace.get("handoff"),
+            "code_files": trace.get("code_files"),
+            "verify": trace.get("verify"),
         },
     }
 

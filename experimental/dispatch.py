@@ -52,6 +52,10 @@ STAGE_EXECUTORS: Dict[str, Dict[str, Any]] = {
     "deterministic": {"engine": "ToolWorker + validators", "kind": "deterministic",
                       "connected": True, "classifies": ("validation",),
                       "description": "Deterministic validators / tool host."},
+    # ── DEBATE → CODE chain (deterministic design debate → spec → code → verify) ──
+    "debate_code": {"engine": "RetryAgent (debate→spec→code→verify)", "kind": "debate_code",
+                    "connected": True, "classifies": ("debate", "code", "integration"),
+                    "description": "Closed, traceable DEBATE→DECISION_SPEC→CODE→VERIFY chain."},
     "tool_execution": {"engine": "ToolWorker", "kind": "deterministic", "connected": True,
                        "classifies": ("tool",), "description": "Stable tool execution."},
     "validation": {"engine": "ToolWorker + validators", "kind": "deterministic",
