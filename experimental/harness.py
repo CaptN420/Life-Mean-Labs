@@ -145,6 +145,7 @@ def _run_debate_code(executor_type: str, cap: Dict[str, Any],
         "result": {
             "debate": trace.get("debate"),
             "handoff": trace.get("handoff"),
+            "generated_code": trace.get("generated_code"),
             "code_files": trace.get("code_files"),
             "verify": trace.get("verify"),
             "reason": trace.get("reason"),

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 ROLE_SYSTEM = (
     "You are the moderator of a multi-role design debate for building a small "
@@ -26,9 +26,17 @@ ROLE_SYSTEM = (
 PROMPT_TEMPLATE = """Task to design a controller for (no code):
 {task}
 
-Participating roles: Architect, Reliability Engineer, Skeptic, Simplicity Advocate, Moderator.
-First give a 1-2 sentence summary of the debate. Then, ON THE LAST LINE, output ONLY a
-valid JSON object (no markdown, no explanation) with EXACTLY this schema:
+Running the design debate step by step. First, give each participating role's
+position on its own line, EXACTLY one line per role, in this format:
+
+Architect: <position on required inputs / output contract>
+Reliability Engineer: <position on failure handling / stop conditions>
+Skeptic: <position on what is wasteful or over-engineered>
+Simplicity Advocate: <position on minimal viable rule set>
+Moderator: <position synthesizing the agreed priorities into one ordered contract>
+
+Then ON THE LAST LINE, output ONLY a valid JSON object (no markdown, no extra
+text after it) with EXACTLY this schema, as the final line of your answer:
 {{
   "module": "<snake_case_module_name>.py",
   "func": "<function_name>",
@@ -45,12 +53,13 @@ valid JSON object (no markdown, no explanation) with EXACTLY this schema:
   "acceptance_criteria": ["<criterion>", ...]
 }}
 Rules:
+- The five role lines come BEFORE the JSON, one per role.
 - allowed_outputs: UPPER_SNAKE names, at least 2, exactly those referenced by rules.
 - The final rule must use "else": "" and give a default action.
 - decision_rules_priority: first match wins, ordered from highest priority to default.
 - required_inputs must cover every variable used in conditions.
 - constants may only be referenced inside conditions or as default values.
-Return ONLY the JSON on the final line, prefixed by the summary."""
+- Output the role lines, then ONLY the JSON on the final line."""
 from experimental.retry_validator import normalize_spec  # noqa  (schema cleanup)
 
 
@@ -102,14 +111,40 @@ def llm_debate(task_prompt: str) -> Dict[str, Any]:
                            "moderator_output": text},
                 "handoff": None}
     spec = normalize_spec(spec)
+    # Parse per-role contributions so mode B is as traceable as mode A: every
+    # role's individual position is recorded, not just the moderator summary.
+    roles = parse_role_lines(text)
     return {
         "debate": {
-            "roles": [], "deterministic": False, "llm": True,
+            "roles": roles, "deterministic": False, "llm": True,
             "moderator_summary": _summary(text),
             "moderator_output": text,
         },
         "handoff": spec,
     }
+
+
+_ROLE_LABELS = ["Architect", "Reliability Engineer", "Skeptic",
+                "Simplicity Advocate", "Moderator"]
+
+
+def parse_role_lines(text: str) -> List[Dict[str, str]]:
+    """Extract 'Role: position' lines from the LLM debate text.
+
+    Returns up to one contribution per role, in role order; a missing/unparseable
+    line is skipped (the moderator_summary still preserves the full text)."""
+    found: Dict[str, str] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or ":" not in stripped:
+            continue
+        head, _, rest = stripped.partition(":")
+        head = head.strip()
+        if head in _ROLE_LABELS and rest.strip():
+            if head not in found:  # first occurrence wins
+                found[head] = rest.strip()
+    return [{"role": r, "contribution": found[r], "source": "llm_debate_line"}
+            for r in _ROLE_LABELS if r in found]
 
 
 def _summary(text: str) -> str:

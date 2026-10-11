@@ -138,3 +138,49 @@ def test_debate_code_mode_b_llm_gate_inconclusive():
     assert "backend down" in tr["reason"]
     assert tr["reproducible"] is False
 
+
+def test_debate_code_trace_is_symmetric_both_modes():
+    # Every run — mode A OR mode B — must expose the SAME seven trace links:
+    # 5 individual role contributions, the DECISION_SPEC + spec_hash, the
+    # generated code, the file list, and the real pytest verification. If a
+    # mode hid any link, the chain would not be fully accountable.
+    import experimental.retry_agent as RA
+    from experimental.retry_llm import parse_role_lines, _extract_json, LLMUnavailable
+
+    def _check(r):
+        res = r["result"]
+        roles = (res["debate"] or {}).get("roles", [])
+        assert len(roles) == 5
+        assert [c["role"] for c in roles] == [
+            "Architect", "Reliability Engineer", "Skeptic",
+            "Simplicity Advocate", "Moderator"]
+        assert (res["handoff"] or {}).get("spec_hash")
+        assert res.get("generated_code") and "def " in res["generated_code"]
+        assert res["code_files"]
+        v = res["verify"] or {}
+        assert "pytest" in v.get("command", "")
+        assert v.get("ok") is True and v.get("failed") == 0 and v.get("errors", 0) == 0
+        assert r["reproducible"] in (True, False)
+
+    # MODE A
+    _check(run_executor("debate_code", {"seed": 5, "task_type": "alert_routing"}))
+
+    # MODE B (simulated LLM with per-role lines)
+    llm_out = (
+        "Architect: minimal state.\nReliability Engineer: fail open on fraud.\n"
+        "Skeptic: do not over-decline.\nSimplicity Advocate: one rule set.\n"
+        "Moderator: agreed; fraud declines.\n"
+        '{"module":"g.py","func":"g_f","required_inputs":["fraud"],'
+        '"allowed_outputs":["APPROVE","DECLINE"],'
+        '"decision_rules_priority":[{"if":"fraud","action":"DECLINE"},'
+        '{"else":"","action":"APPROVE"}],"constants":{},'
+        '"edge_cases":["fraud -> decline"]}')
+
+    def _fake(task):
+        return {"debate": {"roles": parse_role_lines(llm_out),
+                           "deterministic": False, "llm": True,
+                           "moderator_output": llm_out},
+                "handoff": _extract_json(llm_out)}
+    RA.run_debate_b = _fake
+    _check(run_executor("debate_code", {"mode": "llm", "task_prompt": "g"}))
+
