@@ -49,7 +49,28 @@ The long game is **self-improvement**: the weakness analyzer and curriculum cont
 | `library/` + `core/` | Tools, personas, protocols, reliability managers |
 | `analysis/` + `autopilot/` | Weakness analysis, curriculum controller, model lifecycle (stable / candidate / rejected) |
 
-**Status:** phases 0–9 complete · **508 tests passing** · 10 skipped (external deps) · dashboard with Autopilot, Settings & Code Lab tabs.
+**Status:** phases 0–9 complete · **713 tests passing** · 12 skipped (external deps) · 2 known failures (`test_runtime_restore.py` — subprocess path issue, pre-existing) · dashboard with Autopilot, Settings & Code Lab tabs.
+
+## 🧪 Provenance & Integrity
+
+The system enforces **deterministic audit trails** for every LLM call:
+
+- **`AGENT_STARTED` → `AGENT_RESPONSE` / `AGENT_FAILED`**: Every agent turn is tracked with a monotonically increasing `trace_index`, ensuring no orphaned events.
+- **Provenance hashes**: Each event records `system_prompt_hash`, `sampling_settings_hash`, `input_context_hash`, and `response_hash` — enabling deterministic replay and verification.
+- **Model provenance**: Records both `configured_model` (what was asked for) and `actual_model` (what was used), plus `selection_mode` (`configured` / `dynamic` / `backend_default`).
+- **Retry integrity**: Failed attempts get their own `trace_index`; successful retries are distinct events.
+
+**Proof**: `tests/test_code_lab_event_provenance.py` validates:
+- Balanced event pairs (STARTED = RESPONSE + FAILED)
+- Unique trace indices across retries
+- Schema completeness (`schema_version`, `collection_contract_version`)
+- Real engine runs write valid `events.jsonl`
+
+Run the provenance tests:
+```bash
+python -m pytest tests/test_code_lab_event_provenance.py -v
+# 12 passed — every agent event is accounted for with full metadata
+```
 
 ## ⚙️ Install & run
 
