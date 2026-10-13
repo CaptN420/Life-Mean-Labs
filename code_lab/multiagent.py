@@ -15,6 +15,8 @@ the deterministic fallback — the system NEVER fakes an LLM turn (rule 4/15).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
@@ -23,6 +25,49 @@ import os
 
 from .config import CodeLabConfig, ENV_LLM_BASE, ENV_LLM_KEY
 logger = logging.getLogger("CodeLab.MultiAgent")
+
+
+# ── hash provenance helpers ────────────────────────────────────────────────
+
+def _sha256_hex(data: str) -> str:
+    """Compute SHA256 of UTF-8 serialized data as hex string."""
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def _serialize_for_hash(obj: Any) -> str:
+    """Deterministic serialization for hashing.
+
+    Converts the object to a canonical JSON string (sorted keys, no extra
+    whitespace) so the hash is reproducible across runs.
+    """
+    if isinstance(obj, str):
+        return obj
+    try:
+        return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return str(obj)
+
+
+def _compute_hashes(system_prompt: str, messages: List[Dict[str, Any]],
+                    response: str, sampling_temp: float, sampling_max: int) -> Dict[str, str]:
+    """Compute provenance hashes for one LLM call.
+
+    Returns dict with keys:
+      system_prompt_hash, input_context_hash, response_hash, sampling_settings_hash
+    All values are hex SHA256 strings (never None when called).
+    """
+    sp_hash = _sha256_hex(system_prompt)
+    ctx_hash = _sha256_hex(_serialize_for_hash(messages))
+    resp_hash = _sha256_hex(response)
+    sampling_hash = _sha256_hex(f"temp={sampling_temp},max={sampling_max}")
+    return {
+        "system_prompt_hash": sp_hash,
+        "input_context_hash": ctx_hash,
+        "response_hash": resp_hash,
+        "sampling_settings_hash": sampling_hash,
+    }
 
 
 def resolve_llm_credentials(base_url: str = "", api_key: str = "") -> tuple:
@@ -148,6 +193,14 @@ class CodingAgent:
         # Record ACTUAL model when none was configured (router/fallback decided).
         if not self.model_used:
             self.model_used = getattr(self.llm, "last_model_used", "") or ""
+        # Compute provenance hashes at the authoritative model-call boundary.
+        hashes = _compute_hashes(
+            system_prompt=self.prompt,
+            messages=messages,
+            response=text,
+            sampling_temp=temperature,
+            sampling_max=max_tokens,
+        )
         # Phantom-turn guard (rule 8): empty output is FAILURE.
         if not text or not text.strip() or text.startswith("[Error"):
             return {
@@ -157,6 +210,8 @@ class CodingAgent:
                 "finish": finish,
                 "duration": round(dur, 2),
                 "error": "empty_response" if not text.strip() else "llm_error",
+                "_hashes": hashes,
+                "_messages": messages,
             }
         self.history.append({"role": "assistant", "content": text})
         return {
@@ -166,6 +221,8 @@ class CodingAgent:
             "finish": finish,
             "duration": round(dur, 2),
             "error": None,
+            "_hashes": hashes,
+            "_messages": messages,
         }
 
 
@@ -271,6 +328,7 @@ class CodingMultiAgent:
         Diagnostic metadata only — never secrets, never full prompts. Records
         CONFIGURED vs ACTUAL model for provenance. If trace_index < 0 the
         STARTED/RSP pair linkage is incomplete (logged but not fabricated).
+        Hashes are extracted from the turn result and passed to the EventLogger.
         """
         agent = self._agent(role)
         configured = self.role_model(role)
@@ -278,9 +336,12 @@ class CodingMultiAgent:
         ok = bool(result.get("ok"))
         dur_ms = int((time.time() - started_ts) * 1000)
         response = result.get("response") or ""
-        # Compute provenance hashes for deterministic replay.
-        system_prompt = agent.prompt or ""
-        sampling_settings = f"temp=0.4,max=1200" if role == "PLANNER" else "temp=0.4,max=2000"
+        # Extract provenance hashes computed at the model-call boundary.
+        hashes = result.get("_hashes") or {}
+        system_prompt_hash = hashes.get("system_prompt_hash")
+        input_context_hash = hashes.get("input_context_hash")
+        response_hash = hashes.get("response_hash")
+        sampling_settings_hash = hashes.get("sampling_settings_hash")
         payload = {
             "role": role,
             "stage": stage,
@@ -297,6 +358,11 @@ class CodingMultiAgent:
             # conversation-first UI can render it live while the run is still
             # executing (agent_trace is only materialized in the final result).
             "response": response,
+            # Provenance hashes at the authoritative model-call boundary.
+            "system_prompt_hash": system_prompt_hash,
+            "input_context_hash": input_context_hash,
+            "response_hash": response_hash,
+            "sampling_settings_hash": sampling_settings_hash,
         }
         if trace_index >= 0:
             payload["trace_index"] = trace_index
