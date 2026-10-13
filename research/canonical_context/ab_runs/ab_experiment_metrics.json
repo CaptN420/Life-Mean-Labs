@@ -1,0 +1,122 @@
+{
+  "experiment_type": "CONTROLLED_CANONICAL_CONTEXT_AB",
+  "historical_reference": "codelab_554fc20975",
+  "created_at": "2026-10-13",
+  "frozen_config": {
+    "git_commit": "b63fb89",
+    "backend_url": "http://localhost:1234/v1",
+    "api_key_length": 35,
+    "seed": 42,
+    "template_id": "coding-standard",
+    "template_version": "1.0.0",
+    "max_iterations": 10,
+    "timeout_seconds": 60,
+    "role_models": {
+      "planner": "bonsai-4b",
+      "developer": "google/gemma-4-12b",
+      "critic": "granite-3.0-3b-a800m-instruct",
+      "reviewer": "falcon-h1-3b-instruct",
+      "judge": "lfm2.5-1.2b-thinking"
+    }
+  },
+  "condition_a": {
+    "run_id": "codelab_ab_original_context",
+    "condition": "ORIGINAL_CONTEXT",
+    "prompt_sha256": "f298913da508299e2e7e1bb99e979e773bd22e0658f70e34239c564aa8ba396b",
+    "prompt_length_chars": 2599,
+    "prompt_tokens_approx": 391,
+    "status": "FAILED",
+    "duration_seconds": 252.494,
+    "iterations": 0,
+    "files_created": 0,
+    "agent_trace_count": 3,
+    "test_status": "NOT_REACHED",
+    "validator_outcome": "NOT_REACHED",
+    "error_classification": "AGENT_OUTPUT_FAILURE",
+    "agent_trace": [
+      {
+        "index": 0,
+        "agent": "PLANNER",
+        "response_length": 5397,
+        "duration": 100.9,
+        "finish": "stop"
+      },
+      {
+        "index": 1,
+        "agent": "DEVELOPER",
+        "response_length": 952,
+        "duration": 79.7,
+        "finish": "length"
+      },
+      {
+        "index": 2,
+        "agent": "DEVELOPER",
+        "attempt": 2,
+        "response_length": 914,
+        "duration": 67.6,
+        "finish": "length"
+      }
+    ]
+  },
+  "condition_b": {
+    "run_id": "codelab_ab_canonical_state",
+    "condition": "CANONICAL_STATE",
+    "prompt_sha256": "9745eb8970127686b6696df0bdafb389e3738045ab3f38716c1d29a89abf8587",
+    "prompt_length_chars": 1346,
+    "prompt_tokens_approx": 204,
+    "status": "FAILED",
+    "duration_seconds": 205.38,
+    "iterations": 0,
+    "files_created": 0,
+    "agent_trace_count": 3,
+    "test_status": "NOT_REACHED",
+    "validator_outcome": "NOT_REACHED",
+    "error_classification": "AGENT_OUTPUT_FAILURE",
+    "agent_trace": [
+      {
+        "index": 0,
+        "agent": "PLANNER",
+        "response_length": 3720,
+        "duration": 55.5,
+        "finish": "stop"
+      },
+      {
+        "index": 1,
+        "agent": "DEVELOPER",
+        "response_length": 0,
+        "duration": 80.9,
+        "finish": "length"
+      },
+      {
+        "index": 2,
+        "agent": "DEVELOPER",
+        "attempt": 2,
+        "response_length": 0,
+        "duration": 65.9,
+        "finish": "length"
+      }
+    ]
+  },
+  "comparative_metrics": {
+    "context_reduction_percent": 48.2,
+    "planner_response_reduction_percent": 31.1,
+    "planner_duration_reduction_percent": 45.0,
+    "total_duration_reduction_percent": 18.6,
+    "behavioral_comparability": "INCONCLUSIVE",
+    "decision_preservation": "NOT_TESTED",
+    "causality_status": "UNKNOWN"
+  },
+  "verdict": {
+    "experiment_status": "COMPLETED",
+    "configuration_match": "PASS",
+    "condition_a_status": "FAILED",
+    "condition_b_status": "FAILED",
+    "provenance_a": "PASS",
+    "provenance_b": "PASS",
+    "validator_a": "NOT_REACHED",
+    "validator_b": "NOT_REACHED",
+    "context_reduction": "48.2%",
+    "decision_preservation": "NOT_TESTED",
+    "causality_status": "UNKNOWN"
+  }
+}
