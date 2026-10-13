@@ -27,6 +27,49 @@ def test_harness_refuses_unknown_executor():
         run_executor("no_such_executor", {})
 
 
+def test_harness_sweep_executor_connected_and_passes():
+    # The robustness sweep is a connected executor and runs through the same
+    # harness seam (kind=sweep). Small run to keep the test fast; every
+    # deterministic run must PASS with a stable spec_hash per type.
+    out = run_executor("sweep", {"runs": 3})
+    assert out["kind"] == "sweep"
+    assert out["status"] == "passed"
+    assert out["result"]["all_green"] is True
+    assert out["result"]["status_counts"].get("PASS") == 3
+    # each type keeps exactly one distinct spec_hash (no hidden state)
+    for _, m in out["result"]["matrix"].items():
+        assert m["spec_hashes_distinct"] == 1
+
+
+def test_harness_llm_sweep_synthesis():
+    import experimental.retry_agent as RA
+    from experimental.harness import run_executor
+
+    def _mk(module):
+        from experimental.retry_validator import normalize_spec
+        h = {"module": module, "func": "f", "required_inputs": ["a"],
+             "allowed_outputs": ["A", "B"],
+             "decision_rules_priority": [{"if": "a", "action": "A"},
+                                         {"else": "", "action": "B"}],
+             "constants": {}, "edge_cases": ["x -> A"]}
+        return {"debate": {"roles": [{"role": "Architect",
+                                      "contribution": "x", "source": "llm"}]},
+                "handoff": normalize_spec(h)}
+
+    original = RA.run_debate_b
+    try:
+        RA.run_debate_b = lambda task, model="": _mk("stable.py")  # converge
+        out = run_executor("llm_sweep", {"turns": 3, "prompt": "task"})
+        assert out["kind"] == "llm_sweep"
+        assert out["status"] == "passed"
+        assert out["result"]["convergence"] == "HIGH_CONVERGENCE"
+        syn = out["result"]["synthesis"]
+        assert syn["observation"] and syn["conclusion"] and syn["next_leads"]
+        assert "stable spec_hash" in syn["observation"]
+    finally:
+        RA.run_debate_b = original
+
+
 def test_harness_code_run_passes_in_temp_sandbox(tmp_path):
     # code executor -> real CodeLabEngine in a throwaway workspace
     # (patch base via temp usage; harness makes its own temp root)
@@ -130,7 +173,7 @@ def test_debate_code_mode_b_llm_gate_inconclusive():
     import experimental.retry_agent as RA
     from experimental.retry_llm import LLMUnavailable
 
-    def _fake(task):
+    def _fake(task, model=""):
         raise LLMUnavailable("backend down (test)")
     RA.run_debate_b = _fake
     tr = RA.run_debate_code(mode="llm", task_prompt="design a circuit breaker")
@@ -176,11 +219,51 @@ def test_debate_code_trace_is_symmetric_both_modes():
         '{"else":"","action":"APPROVE"}],"constants":{},'
         '"edge_cases":["fraud -> decline"]}')
 
-    def _fake(task):
+    def _fake(task, model=""):
         return {"debate": {"roles": parse_role_lines(llm_out),
                            "deterministic": False, "llm": True,
                            "moderator_output": llm_out},
                 "handoff": _extract_json(llm_out)}
     RA.run_debate_b = _fake
     _check(run_executor("debate_code", {"mode": "llm", "task_prompt": "g"}))
+
+
+def test_pick_exec_model_prefers_instruct():
+    # The mode-B default model must be a chat/instruct model that will actually
+    # produce the DECISION_SPEC — never a reasoning/planner/embedding model.
+    from experimental.retry_llm import pick_exec_model
+    models = ["text-embedding-bge-m3", "reasoning-summarizer-qwen3.5",
+              "qwen3.5-0.8b-base", "meta-llama-3.1-8b-instruct",
+              "granite-3.0-3b-a800m-instruct"]
+    assert pick_exec_model(models) == "meta-llama-3.1-8b-instruct"
+    # no instruct-marked model -> first non-bad trait model
+    assert pick_exec_model(["text-embedding-bge-m3", "bonsai-1.7b"]) == "bonsai-1.7b"
+    # empty -> empty
+    assert pick_exec_model([]) == ""
+
+
+def test_debate_code_llm_bad_spec_is_inconclusive_not_failed():
+    # When the LLM hands a spec that fails schema normalization, the chain must
+    # be INCONCLUSIVE (honest: moderator text preserved, no contract) — never a
+    # raw 'failed' crash and never a fake pass.
+    import experimental.retry_agent as RA
+
+    def _bad_spec(task, model=""):
+        # LLM returns JSON unserialisable spec (missing required fields)
+        return {"debate": {"roles": [
+                                {"role": "Moderator", "contribution": "x",
+                                 "source": "llm"}],
+                           "deterministic": False, "llm": True,
+                           "moderator_output": "malformed"},
+                "handoff": {"module": "x.py", "func": "f"}}  # no allowed_outputs
+
+    original = RA.run_debate_b
+    try:
+        RA.run_debate_b = _bad_spec
+        tr = RA.run_debate_code(mode="llm", task_prompt="task")
+        assert tr["status"] == "INCONCLUSIVE"
+        assert "allowed_outputs" in tr["reason"]
+        assert tr["reproducible"] is False
+    finally:
+        RA.run_debate_b = original
 

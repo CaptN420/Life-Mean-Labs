@@ -56,6 +56,15 @@ STAGE_EXECUTORS: Dict[str, Dict[str, Any]] = {
     "debate_code": {"engine": "RetryAgent (debate→spec→code→verify)", "kind": "debate_code",
                     "connected": True, "classifies": ("debate", "code", "integration"),
                     "description": "Closed, traceable DEBATE→DECISION_SPEC→CODE→VERIFY chain."},
+    # ── Robustness sweep: N-run matrix across task types (uses debate_code chain) ──
+    "sweep": {"engine": "RobustnessSweep (debate_code x N runs)", "kind": "sweep",
+              "connected": True, "classifies": ("sweep", "validation", "integration"),
+              "description": "N-run robustness sweep across catalogue task types; aggregates a matrix."},
+    # ── LLM multi-turn experiment: 30 tours mode B + structured synthesis ──
+    "llm_sweep": {"engine": "LLMMultiTurn (mode-B x N tours + synthesis)", "kind": "llm_sweep",
+                  "connected": True, "classifies": ("sweep", "debate", "llm", "llm_sweep"),
+                  "description": "Runs the LLM debate chain N times (default 30), aggregates, "
+                                 "and yields observation / conclusion / next-leads from the real traces."},
     "tool_execution": {"engine": "ToolWorker", "kind": "deterministic", "connected": True,
                        "classifies": ("tool",), "description": "Stable tool execution."},
     "validation": {"engine": "ToolWorker + validators", "kind": "deterministic",

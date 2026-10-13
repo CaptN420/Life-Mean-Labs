@@ -1,0 +1,1086 @@
+LIFE_MEAN LABS
+FUTURE — PUBLIC REPO + DISTRIBUTED COLLABORATION + ARCHITECTURE ALIGNMENT
+
+STATUS
+------
+FUTURE DESIGN / READY-TO-PASTE PROMPTS.
+DO NOT IMPLEMENT DURING THE CURRENT STABILIZATION PASS.
+
+CORE PRINCIPLES
+---------------
+LOCAL DB = everything that happened locally.
+SHARED COLLAB DATA = only what participants explicitly agreed to share.
+PUBLIC REPO = only sanitized, deliberately exported material.
+GIT MUST NEVER RECEIVE THE LOCAL DATABASE DIRECTLY.
+TAILSCALE/WIREGUARD PROTECTS TRANSPORT; IT DOES NOT DECIDE WHAT DATA IS SAFE TO SEND.
+ONE COORDINATOR OWNS CANONICAL RUN STATE.
+REMOTE NODES EXECUTE ONLY APPROVED BOUNDED REQUESTS.
+SHARED EVIDENCE MAY BE COPIED TO ALL PARTICIPANTS.
+PRIVATE MEMORY REMAINS PRIVATE.
+SHARE CAPABILITY != SHARE DATA.
+GENERATED != VERIFIED.
+STABILITY BEFORE SPECTACLE.
+
+
+======================================================================
+PROMPT 1 — CREATE A SANITIZED PUBLIC REPOSITORY
+======================================================================
+
+LIFE_MEAN LABS
+PUBLIC REPOSITORY SANITIZATION + RELEASE GATE
+
+MISSION
+
+Prepare a NEW public-facing repository from the current private development
+repository without exposing private research data, credentials, machine-specific
+state, local model artifacts, private RAW, Notebook content, or collaboration data
+that was not explicitly approved for publication.
+
+DO NOT make the existing private repository public automatically.
+
+If the private repository or its Git history may ever have contained secrets,
+private RAW, tokens, credentials, personal paths, local research data, or sensitive
+collaboration artifacts, create a CLEAN public repository/export instead of
+publishing the old Git history.
+
+DO NOT PUSH OR PUBLISH AUTOMATICALLY.
+Produce a release-ready sanitized tree and an audit report.
+
+----------------------------------------------------------------------
+1. DATA CLASSIFICATION
+----------------------------------------------------------------------
+
+Classify files/data as:
+
+PUBLIC_CODE
+PUBLIC_DOCS
+PUBLIC_EXAMPLE
+PUBLIC_TEST_FIXTURE
+
+LOCAL_ONLY
+PRIVATE_RAW
+PRIVATE_NOTEBOOK
+PRIVATE_LEDGER
+PRIVATE_DATABASE
+PRIVATE_WORKSPACE
+PRIVATE_MODEL
+PRIVATE_CONFIG
+PRIVATE_CREDENTIAL
+PRIVATE_COLLAB
+GENERATED_CACHE
+BUILD_ARTIFACT
+UNKNOWN
+
+UNKNOWN defaults to NOT PUBLIC.
+
+----------------------------------------------------------------------
+2. NEVER EXPORT AUTOMATICALLY
+----------------------------------------------------------------------
+
+Never include without explicit approval:
+
+.env
+API keys
+tokens
+passwords
+authorization headers
+SSH keys
+Tailscale auth material
+connection strings
+full environment dumps
+
+SQLite/local DB files
+private RAW
+Notebook/Journey
+Research Ledger containing private material
+private experiment transcripts
+private collaboration transcripts
+private shared-run data not marked publishable
+user identity/contact information
+
+local model weights
+GGUF/safetensors/checkpoints
+training datasets unless explicitly approved
+generated workspaces
+temporary files
+caches
+node_modules
+venvs
+build outputs
+coverage artifacts
+logs containing private prompts/data
+machine-specific absolute paths
+
+----------------------------------------------------------------------
+3. PUBLIC EXPORT MODEL
+----------------------------------------------------------------------
+
+Preferred architecture:
+
+PRIVATE WORKING REPO / LOCAL LAB
+        ↓
+Sanitized Export Builder
+        ↓
+SharePolicyValidator
+        ↓
+secret scan
+        ↓
+path/privacy scan
+        ↓
+human review
+        ↓
+CLEAN PUBLIC REPO
+
+Never:
+
+LOCAL DB
+→ git add .
+→ GitHub
+
+Public repository receives only deliberately selected files.
+
+----------------------------------------------------------------------
+4. SHARE POLICY
+----------------------------------------------------------------------
+
+Define a policy document describing:
+
+LOCAL_ONLY
+COLLAB_SHARED
+PUBLISHABLE
+PUBLIC
+
+Promotion is explicit:
+
+LOCAL_ONLY
+→ candidate
+→ sanitized
+→ reviewed
+→ PUBLISHABLE
+→ public export
+
+No LLM may promote private data automatically.
+
+----------------------------------------------------------------------
+5. SHARE POLICY VALIDATOR
+----------------------------------------------------------------------
+
+Design a release gate named conceptually:
+
+SharePolicyValidator
+
+It should verify before export:
+
+- file is in allowed path/classification
+- no known secret pattern
+- no credential file
+- no private database
+- no unapproved RAW
+- no unapproved Notebook/Ledger
+- no unapproved collaboration artifact
+- no private absolute path
+- no large local model artifact
+- no hidden generated workspace
+- provenance/license information is acceptable
+- examples use synthetic/sanitized data
+
+FAIL CLOSED.
+
+If classification is unknown:
+DO NOT EXPORT.
+
+----------------------------------------------------------------------
+6. GIT HYGIENE
+----------------------------------------------------------------------
+
+Audit:
+
+.gitignore
+.gitattributes
+tracked files
+untracked files
+Git history risk
+large files
+secret patterns
+machine-specific paths
+
+Create/update ignore rules for local/private artifacts.
+
+Important:
+Deleting a secret from the current working tree does not remove it from Git history.
+
+If history is contaminated:
+recommend a clean public repository with sanitized files only.
+
+Do not rewrite private repository history without explicit authorization.
+
+----------------------------------------------------------------------
+7. PUBLIC REPO STRUCTURE
+----------------------------------------------------------------------
+
+Recommend a clear public structure based on repository reality, for example:
+
+README.md
+LICENSE
+SECURITY.md
+CONTRIBUTING.md
+docs/
+examples/
+src/
+tests/
+schemas/
+templates/
+scripts/
+
+examples/ must contain synthetic or explicitly sanitized data only.
+
+Do not invent directories if they do not help current architecture.
+
+----------------------------------------------------------------------
+8. PUBLIC DOCUMENTATION
+----------------------------------------------------------------------
+
+README should clearly state:
+
+Life_mean Labs is local-first.
+Private research stays local by default.
+Collaboration is opt-in.
+Public sharing is explicit.
+RAW/provenance are first-class concepts.
+Future distributed collaboration does not require publishing private memory.
+
+Do not claim features are implemented unless verified.
+
+----------------------------------------------------------------------
+9. RELEASE AUDIT
+----------------------------------------------------------------------
+
+Run/report:
+
+git status
+git diff --check
+test suite
+secret scan
+private-path scan
+large-file scan
+generated-artifact scan
+license/dependency concerns where practical
+
+Never print secret values in reports.
+
+----------------------------------------------------------------------
+10. OUTPUT
+----------------------------------------------------------------------
+
+Produce:
+
+PUBLIC_RELEASE_AUDIT.md
+PUBLIC_EXPORT_POLICY.md
+recommended .gitignore changes
+sanitized export tree
+list of excluded private classes
+list of unresolved UNKNOWN files
+
+Final verdict:
+
+PUBLIC_READY
+PUBLIC_READY_WITH_LIMITATIONS
+NOT_PUBLIC_READY
+
+DO NOT PUSH.
+DO NOT CREATE A PUBLIC REPOSITORY REMOTELY.
+WAIT FOR HUMAN APPROVAL.
+
+
+======================================================================
+PROMPT 2 — FUTURE CLIENT/SERVER COLLABORATION ARCHITECTURE
+======================================================================
+
+LIFE_MEAN LABS
+DISTRIBUTED COLLABORATION — CLIENT / RENDEZVOUS SERVER / REMOTE EXECUTOR
+
+MISSION
+
+Design the future Life_mean collaboration architecture.
+
+DESIGN ONLY unless a later task explicitly authorizes implementation.
+
+Goal:
+
+Two or more independent Life_mean Labs may collaborate in one experiment while:
+
+- retaining local-first operation
+- keeping private Lab memory private
+- sharing only explicitly approved experiment data
+- preserving an equal local copy of the shared experiment for participants
+- allowing each node to contribute models, Workers, Tools, templates or compute
+- protecting traffic from passive interception
+- preserving provenance and reproducibility
+- requiring explicit human acceptance before participation
+
+----------------------------------------------------------------------
+1. ROLES
+----------------------------------------------------------------------
+
+LIFE_MEAN CLIENT / NODE
+
+Owns:
+- local models
+- local Workers/Tools
+- local private RAW
+- local Notebook
+- local DB
+- local permissions
+- accept/decline authority
+
+COLLAB RENDEZVOUS SERVER
+
+Owns only what is needed for:
+- presence
+- node discovery
+- invitation delivery
+- session negotiation
+- compatibility metadata
+- minimal connection metadata
+
+It should NOT become the canonical owner of private research.
+
+COORDINATOR NODE
+
+For one collaborative run, one participant becomes Coordinator.
+
+Coordinator owns:
+- canonical experiment/run state
+- turn/stage order
+- lifecycle
+- budgets
+- canonical EventBus decisions
+- validation of remote results
+- canonical shared-run manifest
+
+REMOTE NODE
+
+Executes only approved bounded requests and returns structured results.
+
+----------------------------------------------------------------------
+2. USER EXPERIENCE
+----------------------------------------------------------------------
+
+When a collaborator proposes a session:
+
+LIFE_MEAN COLLAB PROPOSAL
+
+From:
+<identity / pseudonym>
+
+Experiment:
+<title>
+
+Requested capabilities:
+- model X
+- Worker Y
+- Tool Z
+- template A
+
+Estimated:
+- max turns
+- approximate runtime
+- allowed tool calls
+- data categories requested
+
+Shared during session:
+explicit list
+
+Stored locally after session:
+explicit list
+
+Never shared automatically:
+explicit list
+
+Actions:
+
+[ INSPECT ]
+[ ACCEPT ]
+[ DECLINE ]
+
+No execution before ACCEPT.
+
+----------------------------------------------------------------------
+3. CONSENT SNAPSHOT
+----------------------------------------------------------------------
+
+At acceptance/create-run time freeze:
+
+participants
+node identities
+requested capabilities
+approved capabilities
+data-sharing policy
+retention policy
+protocol/config snapshot
+budgets
+permissions
+transport mode
+coordinator identity
+
+The active run may not silently broaden permissions.
+
+Any material permission/data-sharing change requires new approval or a branch/new run.
+
+----------------------------------------------------------------------
+4. DATA ZONES
+----------------------------------------------------------------------
+
+Keep separate:
+
+PRIVATE_LOCAL
+- private RAW
+- Notebook
+- Ledger
+- unrelated files
+- secrets
+- unrelated experiments
+
+COLLAB_SHARED
+- approved conversation/context
+- approved model outputs
+- approved tool results
+- validator results
+- protocol/config snapshot
+- shared artifacts
+- provenance
+- shared run events
+
+PUBLIC
+- only explicitly sanitized/published exports
+
+Never infer:
+COLLAB_SHARED == PUBLIC.
+
+----------------------------------------------------------------------
+5. CONTEXT FIREWALL
+----------------------------------------------------------------------
+
+Before any outbound remote execution:
+
+FULL LOCAL STATE
+        ↓
+Context Firewall
+        ↓
+minimum approved bounded state
+        ↓
+Remote ExecutionRequest
+
+The firewall should enforce:
+- allowlisted fields
+- denylisted private classes
+- path redaction
+- secret filtering
+- experiment scope
+- participant consent
+- capability-specific minimum context
+
+Remote nodes receive only what they need.
+
+Encryption does not replace minimization.
+
+----------------------------------------------------------------------
+6. TRANSPORT SECURITY
+----------------------------------------------------------------------
+
+For V1, strongly consider:
+
+Tailscale / WireGuard private networking
+
+Benefits:
+- encrypted transport
+- no direct public port exposure required
+- simpler peer connectivity
+- practical friend/lab collaboration
+
+Do not hardwire Life_mean permanently to one transport.
+
+Abstract transport behind a CollaborationTransport interface.
+
+Tailscale protects transport.
+Life_mean still needs application authorization.
+
+----------------------------------------------------------------------
+7. APPLICATION SECURITY
+----------------------------------------------------------------------
+
+Every session/request should conceptually include:
+
+session_id
+request_id
+sender_node_id
+receiver_node_id
+sequence_number
+timestamp / expiry
+capability_id
+payload hash
+policy snapshot reference
+
+Reject:
+- unknown node
+- expired session
+- duplicated/replayed request
+- unauthorized capability
+- data outside approved scope
+- budget overflow
+
+Future option:
+message signatures / node signatures.
+
+Do NOT invent custom cryptography.
+
+----------------------------------------------------------------------
+8. REMOTE EXECUTION CONTRACT
+----------------------------------------------------------------------
+
+Preferred shape:
+
+ExecutionRequest
+- session_id
+- run_id
+- step_id
+- objective
+- bounded state/context
+- requested capability
+- expected result/schema
+- budget
+- permissions
+
+ExecutionResult
+- request_id
+- status
+- actual node
+- actual model/tool/worker
+- structured result
+- artifacts allowed for sharing
+- errors
+- timing
+- provenance
+- result hash
+
+Remote result is not automatically accepted as truth.
+Coordinator validates it.
+
+----------------------------------------------------------------------
+9. SHARED RUN REPLICATION
+----------------------------------------------------------------------
+
+For equitable collaboration:
+
+the approved COLLAB_SHARED run record should be persisted locally by all
+participants who opted into retention.
+
+Example:
+
+PC A:
+shared_run_hash = ABC
+
+PC B:
+shared_run_hash = ABC
+
+Private Notebook interpretation may differ.
+
+Core principle:
+
+SHARED EVIDENCE.
+INDEPENDENT PRIVATE INTERPRETATION.
+
+----------------------------------------------------------------------
+10. EVENT INTEGRITY
+----------------------------------------------------------------------
+
+Future shared event stream may be append-only/hash-linked:
+
+event_id
+previous_event_hash
+payload_hash
+sender_node
+timestamp
+
+At run finalization create a shared manifest containing:
+
+run_id
+participants
+protocol/config hash
+final event hash
+artifact hashes
+capability versions
+actual models/nodes
+
+Future signing may be added later.
+
+Do not build blockchain or distributed consensus unnecessarily.
+
+----------------------------------------------------------------------
+11. DISCONNECTION
+----------------------------------------------------------------------
+
+Define explicit behavior for:
+
+remote node disconnect
+coordinator disconnect
+timeout
+participant leaves
+capability disappears
+network partition
+rejoin
+
+Never silently fabricate completion.
+
+Possible outcomes:
+
+WAITING_FOR_REMOTE
+REMOTE_UNAVAILABLE
+PARTICIPANT_LEFT
+INCONCLUSIVE
+FAILED
+STOPPED
+
+----------------------------------------------------------------------
+12. LOCAL-FIRST REQUIREMENT
+----------------------------------------------------------------------
+
+If rendezvous server disappears:
+
+local Life_mean must still work.
+
+Existing local experiments must remain usable.
+
+The collaboration server is optional infrastructure, not the core Lab.
+
+----------------------------------------------------------------------
+13. FUTURE COLLAB MODES
+----------------------------------------------------------------------
+
+LOCAL EXPERIMENT
+one Lab
+
+DISTRIBUTED EXPERIMENT
+multiple machines controlled by one Lab
+
+COLLABORATIVE EXPERIMENT
+multiple independent Labs
++ explicit consent
++ shared evidence
++ independent private memory
+
+----------------------------------------------------------------------
+14. OUTPUT
+----------------------------------------------------------------------
+
+Produce a design document only:
+
+DISTRIBUTED_COLLAB_ARCHITECTURE.md
+
+Include:
+
+- trust boundaries
+- data flow
+- threat model
+- consent flow
+- client/server responsibilities
+- Context Firewall
+- remote execution contract
+- shared-run storage
+- disconnect behavior
+- Tailscale V1 integration point
+- future transport abstraction
+- what MUST remain local
+
+NO IMPLEMENTATION unless explicitly authorized.
+
+
+======================================================================
+PROMPT 3 — ARCHITECTURE REFACTOR / CLIENT-SERVER ALIGNMENT
+======================================================================
+
+LIFE_MEAN LABS
+ARCHITECTURE ALIGNMENT REFACTOR — NO FEATURE EXPANSION
+
+MISSION
+
+Refactor the repository structure so the current codebase is easier to understand,
+test, publish, and later extend toward optional distributed collaboration.
+
+This is an ORGANIZATIONAL / ARCHITECTURAL REFACTOR.
+
+DO NOT implement distributed collaboration.
+DO NOT implement a rendezvous server.
+DO NOT implement CLEF.
+DO NOT implement Bonsai.
+DO NOT implement training.
+DO NOT add new user-facing features.
+
+Preserve current behavior.
+
+----------------------------------------------------------------------
+1. FIRST AUDIT REALITY
+----------------------------------------------------------------------
+
+Before moving files, map:
+
+entrypoints
+imports
+API routes
+dashboard/client code
+backend/server code
+core runtime
+executors
+EventBus
+SmartRouter
+LLM configuration
+Workers
+Tools
+Validators
+RAW/persistence
+Settings
+Debate
+Code Lab
+Experimental
+tests
+legacy folders
+
+Do not move code based only on filenames.
+
+----------------------------------------------------------------------
+2. TARGET CONCEPTUAL BOUNDARIES
+----------------------------------------------------------------------
+
+The repository should make these boundaries obvious:
+
+CORE
+- domain/runtime primitives
+- lifecycle
+- events
+- routing
+- contracts
+
+EXECUTORS
+- Debate
+- Code Lab
+- General Reasoning
+- deterministic executors
+
+CAPABILITIES
+- Tools
+- Workers
+- Thinkers
+- Skills
+
+PERSISTENCE
+- RAW
+- DB
+- provenance
+
+SECURITY
+- data classification
+- sanitization
+- secret handling
+- future SharePolicy / ContextFirewall interfaces
+
+CLIENT
+- user-facing UI/client integration
+
+SERVER
+- current backend/API service
+- local service endpoints
+
+COLLAB
+- FUTURE interfaces/contracts only if already justified
+- no working remote collaboration implementation yet
+
+CONTRACTS
+- canonical schemas / DTOs shared across layers
+
+LEGACY
+- only for code proven historical/unconnected
+
+Do not duplicate stable systems just to match this naming.
+
+----------------------------------------------------------------------
+3. POSSIBLE STRUCTURE
+----------------------------------------------------------------------
+
+Adapt to actual language/tooling.
+
+Example only:
+
+src/life_mean/
+    core/
+    contracts/
+    executors/
+    capabilities/
+    persistence/
+    security/
+    api/
+    collab/
+
+web/
+    client/
+
+tests/
+
+docs/
+
+Do not force this exact tree if current repository reality suggests a better one.
+
+----------------------------------------------------------------------
+4. IMPORTANT RULE
+----------------------------------------------------------------------
+
+CLIENT != CORE
+
+SERVER/API != ORCHESTRATOR
+
+COLLAB != CORE
+
+UI asks.
+Backend validates.
+Core acts.
+Executors execute.
+Capabilities perform bounded work.
+Persistence records reality.
+
+Future remote execution should plug into the same executor/capability contracts,
+not create a second Life_mean architecture.
+
+----------------------------------------------------------------------
+5. SINGLE SOURCE OF TRUTH
+----------------------------------------------------------------------
+
+There must be one authoritative implementation for:
+
+EventBus
+SmartRouter
+LLM config
+executor registry
+capability registry
+lifecycle state
+RAW writer
+model attribution
+
+Do not create client/server copies of these.
+
+----------------------------------------------------------------------
+6. PUBLIC/PRIVATE BOUNDARY
+----------------------------------------------------------------------
+
+Prepare clear locations/policies for:
+
+public source code
+examples
+tests
+
+versus runtime local data:
+
+data/
+raw/
+notebook/
+ledger/
+workspaces/
+models/
+secrets/
+runtime caches/
+
+Runtime-local paths should be ignored by Git by default.
+
+Do not move or delete user data automatically.
+
+----------------------------------------------------------------------
+7. REFACTOR SAFETY
+----------------------------------------------------------------------
+
+For every move:
+
+update imports
+update package exports
+update tests
+update resource paths
+update build/package config
+preserve API behavior
+preserve config behavior
+
+Avoid giant one-shot moves.
+
+Prefer small coherent moves with tests between them.
+
+----------------------------------------------------------------------
+8. LEGACY
+----------------------------------------------------------------------
+
+Do not dump uncertain folders into legacy.
+
+Evidence required:
+
+no active imports
+no runtime callers
+no API/UI references
+no meaningful tests
+no current entrypoint
+
+Historical Hermes/CLEF code must be preserved for its dedicated future audit.
+
+----------------------------------------------------------------------
+9. TESTING
+----------------------------------------------------------------------
+
+After each phase:
+
+import smoke
+unit tests
+integration tests
+API smoke
+dashboard/backend startup where available
+
+At end:
+
+full test suite
+git diff --check
+
+No test weakening merely to make refactor green.
+
+----------------------------------------------------------------------
+10. OUTPUT
+----------------------------------------------------------------------
+
+Before changes, produce:
+
+ARCHITECTURE_REFACTOR_PLAN.md
+
+with:
+
+CURRENT TREE
+CURRENT RESPONSIBILITIES
+DUPLICATIONS
+AMBIGUOUS OWNERSHIP
+PROPOSED TREE
+MOVE MAP
+IMPORT RISKS
+PUBLIC/PRIVATE DATA BOUNDARIES
+PHASED REFACTOR ORDER
+
+Then perform only the explicitly approved refactor scope.
+
+Do not commit/push automatically.
+
+
+======================================================================
+PROMPT 4 — ROADMAP-ONLY CAPTURE OF DISTRIBUTED COLLAB
+======================================================================
+
+LIFE_MEAN LABS
+ROADMAP ADDENDUM — DISTRIBUTED / COLLABORATIVE LABS
+DOCUMENTATION ONLY
+
+MISSION
+
+Add the following concepts to FUTURE / IDEA PARKING LOT.
+
+DO NOT IMPLEMENT.
+
+Preserve current feature freeze.
+
+Add:
+
+1. OPTIONAL RENDEZVOUS SERVER
+   - presence
+   - invitations
+   - session negotiation
+   - minimal metadata
+   - not owner of private research
+
+2. LIFE_MEAN NODE / CLIENT
+   - local models
+   - Workers/Tools
+   - private RAW/Notebook/DB
+   - accept/decline authority
+
+3. COORDINATOR + REMOTE EXECUTOR
+   - one canonical run authority
+   - remote bounded execution
+   - structured ExecutionRequest/ExecutionResult
+
+4. COLLAB PROPOSAL UX
+   - Inspect
+   - Accept
+   - Decline
+   - requested capabilities
+   - budgets
+   - explicit data-sharing scope
+   - explicit retention
+
+5. DATA ZONES
+   - PRIVATE_LOCAL
+   - COLLAB_SHARED
+   - PUBLISHABLE
+   - PUBLIC
+
+6. CONTEXT FIREWALL
+   - minimum necessary outbound state
+   - allowlist fields
+   - secrets/path filtering
+   - consent enforcement
+
+7. TRANSPORT
+   - Tailscale/WireGuard as practical V1 candidate
+   - abstract transport interface
+   - no custom cryptography
+
+8. SHARED RUN
+   - approved collaborative evidence copied locally to participants
+   - identical hashes where possible
+   - private Notebook interpretation stays local
+
+9. SHARED EVIDENCE / INDEPENDENT INTERPRETATION
+
+10. GIT/PUBLICATION MODEL
+    - local DB is not synchronized to Git
+    - sanitized exports only
+    - SharePolicyValidator before public export
+    - private repo history must not be blindly made public
+
+11. FUTURE PACKAGE COMPOSITION
+    - one Lab may contribute Research Template
+    - another Decision/State Template
+    - another Tool/Worker/model
+    - composition is versioned/hashable
+    - SHARE CAPABILITY != SHARE DATA
+
+12. SECURITY THREAT MODEL
+    - passive interception
+    - compromised node
+    - malicious/over-permissioned collaborator
+    - replay
+    - accidental oversharing
+    - secret leakage
+    - poisoned shared artifact
+
+13. COLLAB MODES
+    - LOCAL
+    - DISTRIBUTED SAME-LAB
+    - COLLABORATIVE MULTI-LAB
+
+14. DISCONNECT SEMANTICS
+    - explicit WAITING / UNAVAILABLE / LEFT / INCONCLUSIVE / FAILED / STOPPED
+
+15. PUBLIC REPO SANITIZATION
+    - clean export repo preferred if private history may be contaminated
+    - synthetic examples
+    - secret scan
+    - path scan
+    - no private DB/RAW/Notebook by default
+
+Keep all items PARKED until current baseline is stabilized and common
+ExecutionRequest / ExecutionResult / Event / Capability contracts are trustworthy.
+
+FINAL STATUS:
+DOCUMENTED ONLY
+NO RUNTIME CHANGE
+NO NETWORK CHANGE
+NO DATABASE CHANGE
+NO PUBLIC PUSH

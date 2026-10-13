@@ -92,6 +92,8 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._debate_lab_events(parsed.path)
         elif parsed.path.startswith("/api/debate/runs/"):
             self._debate_lab_get(parsed.path)
+        elif _feedback_match := re.match(r"^/api/experimental/feedback/([A-Za-z0-9]+)$", parsed.path):
+            self._experimental_feedback_get(_feedback_match.group(1))
         elif parsed.path == "/api/experimental/capabilities":
             self._experimental_capabilities()
         elif parsed.path == "/api/experimental/designs":
@@ -167,6 +169,8 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._experimental_design_create(data)
         elif parsed.path == "/api/experimental/harness":
             self._experimental_harness(data)
+        elif parsed.path == "/api/experimental/harness/start":
+            self._experimental_harness_start(data)
         elif parsed.path == "/api/compare":
             self._compare_report(data)
         elif parsed.path == "/api/compare/subject":

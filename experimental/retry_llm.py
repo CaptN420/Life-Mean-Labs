@@ -67,11 +67,45 @@ def _join(parts):
     return "".join(parts)
 
 
-def llm_debate(task_prompt: str) -> Dict[str, Any]:
+# Model router override: prefer a chat/instruct model that executes the task,
+# never a reasoning/planner/summarizer that only yields a plan, and never text
+# embeddings/rerankers. Used only when the caller leaves ``model`` empty.
+# Priority: models explicitly marked instruct/conversational first (they follow
+# the strict JSON format reliably), then any model not clearly a bad trait.
+_EXEC_MARKERS = ("-instruct", "-it", "-sft", "-chat", "it-text", "3.1-8b",
+                 "-4b-instruct")
+_BAD_MARKERS = ("embedding", "reranker", "reasoning", "summarizer", "think",
+                "thinking", "-base", "depth", "plan", "agent")
+
+
+def pick_exec_model(models):
+    """Pick the best available chat/instruct model, excluding non-executors.
+
+    First pass: models whose name marks them as instruction-tuned/instruct.
+    Second pass: the first model that isn't clearly a planner/embedding/base.
+    """
+    if not models:
+        return ""
+    for m in models:
+        ml = m.lower()
+        if any(b in ml for b in _BAD_MARKERS):
+            continue
+        if any(x in ml for x in _EXEC_MARKERS):
+            return m
+    for m in models:
+        ml = m.lower()
+        if any(b in ml for b in _BAD_MARKERS):
+            continue
+        return m
+    return models[0]
+
+
+def llm_debate(task_prompt: str, model: str = "") -> Dict[str, Any]:
     """Run the LLM design debate; returns {'debate':..., 'handoff':...}.
 
     Raises LLMUnavailable on backend/auth errors so the orchestrator can turn
-    it into INCONCLUSIVE honestly.
+    it into INCONCLUSIVE honestly. A spec that does not survive normalization
+    is returned as handoff=None (INCONCLUSIVE upstream), never a crash.
     """
     # A missing backend can hang on the network probe; bound it so a mode-B
     # run becomes INCONCLUSIVE (via LLMUnavailable) instead of blocking the
@@ -84,6 +118,12 @@ def llm_debate(task_prompt: str) -> Dict[str, Any]:
         probe = probe_llm(base_url, api_key)
         if not probe.get("available"):
             raise LLMUnavailable(probe.get("error") or "LLM backend unavailable")
+        effective = model
+        if not effective:
+            # Never default to a reasoning/planner model: force a chat/instruct
+            # model that will actually produce the DECISION_SPEC.
+            from experimental.retry_llm import pick_exec_model
+            effective = pick_exec_model(probe.get("models") or [])
         client = LLMClient(base_url=base_url, api_key=api_key)
         user = PROMPT_TEMPLATE.format(task=task_prompt)
         text, finish = client.chat(
@@ -91,26 +131,40 @@ def llm_debate(task_prompt: str) -> Dict[str, Any]:
                 {"role": "system", "content": ROLE_SYSTEM},
                 {"role": "user", "content": user},
             ],
-            model="",
+            model=effective,  # forced: never the resolver's trait-behavorial default
             temperature=0.2,
             max_tokens=2048,
         )
         return text
 
-    with ThreadPoolExecutor(max_workers=1) as pool:
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
         fut = pool.submit(_call)
         try:
-            text = fut.result(timeout=90)
+            text = fut.result(timeout=120)
         except LLMUnavailable:
             raise
         except Exception as exc:  # network/timeout/finish errors
             raise LLMUnavailable(f"mode-B call failed: {type(exc).__name__}: {exc}") from exc
+    finally:
+        # Do NOT wait on a possibly-hung worker thread (shutdown(wait=True)
+        # would block a 30-tour sweep if a backend stops responding).
+        pool.shutdown(wait=False, cancel_futures=True)
     spec = _extract_json(text)
     if spec is None:
         return {"debate": {"roles": [], "deterministic": False,
                            "moderator_output": text},
                 "handoff": None}
-    spec = normalize_spec(spec)
+    try:
+        spec = normalize_spec(spec)
+    except ValueError as exc:
+        # LLM gave a spec that failed schema validation -> honest INCONCLUSIVE
+        # (the moderator captured below, minus a usable contract).
+        return {"debate": {"roles": parse_role_lines(text),
+                           "deterministic": False, "llm": True,
+                           "moderator_output": text,
+                           "normalization_error": str(exc)},
+                "handoff": None}
     # Parse per-role contributions so mode B is as traceable as mode A: every
     # role's individual position is recorded, not just the moderator summary.
     roles = parse_role_lines(text)
@@ -119,6 +173,7 @@ def llm_debate(task_prompt: str) -> Dict[str, Any]:
             "roles": roles, "deterministic": False, "llm": True,
             "moderator_summary": _summary(text),
             "moderator_output": text,
+            "normalization_error": None,
         },
         "handoff": spec,
     }

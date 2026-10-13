@@ -251,11 +251,11 @@ def run_debate_a(task_type: str) -> Dict[str, Any]:
     return {"roles": contributions, "deterministic": True, "task_type": task_type}
 
 
-def run_debate_b(task_prompt: str) -> Dict[str, Any]:
+def run_debate_b(task_prompt: str, model: str = "") -> Dict[str, Any]:
     """LLM design debate for an arbitrary task (MODE B)."""
     # lazy imports so the deterministic path never touches the LLM stack
     from experimental.retry_llm import llm_debate
-    return llm_debate(task_prompt)
+    return llm_debate(task_prompt, model=model)
 
 
 # ── 2. HANDOFF ─────────────────────────────────────────────────────────────
@@ -366,15 +366,18 @@ def _verify(ws: Path) -> Dict[str, Any]:
 
 # ── Orchestrator ───────────────────────────────────────────────────────────
 def run_debate_code(task_type: str = "retry_controller", seed: int = 1,
-                    mode: str = "deterministic", task_prompt: str = "") -> Dict[str, Any]:
+                    mode: str = "deterministic", task_prompt: str = "",
+                    model: str = "") -> Dict[str, Any]:
     """Run DEBATE -> SPEC -> CODE -> VERIFY; return the full trace.
 
     mode='deterministic' (A): uses the catalogue. mode='llm' (B): LLM debate +
-    spec, validated before compile. ``task_prompt`` is required in LLM mode.
-    """
+    spec, validated before compile. ``task_prompt`` is required in LLM mode,
+    and ``model`` (optional) forces a specific chat model for mode B."""
+    trace_safe_model = model  # recorded without any secrets
     root = Path(tempfile.mkdtemp(prefix="debate_code_"))
     trace: Dict[str, Any] = {"seed": seed, "mode": mode,
-                             "reproducible": (mode == "deterministic")}
+                             "reproducible": (mode == "deterministic"),
+                             "model": trace_safe_model or None}
     try:
         if mode == "llm":
             if not task_prompt.strip():
@@ -383,7 +386,7 @@ def run_debate_code(task_type: str = "retry_controller", seed: int = 1,
                 return trace
             from experimental.retry_llm import LLMUnavailable
             try:
-                debate = run_debate_b(task_prompt)
+                debate = run_debate_b(task_prompt, model=model)
             except LLMUnavailable as exc:
                 trace["status"] = "INCONCLUSIVE"
                 trace["reason"] = str(exc)
@@ -392,7 +395,8 @@ def run_debate_code(task_type: str = "retry_controller", seed: int = 1,
             trace["debate"] = debate.get("debate", {})
             if not isinstance(handoff, dict):
                 trace["status"] = "INCONCLUSIVE"
-                trace["reason"] = "LLM produced no usable DECISION_SPEC"
+                nerr = (debate.get("debate") or {}).get("normalization_error")
+                trace["reason"] = (nerr or "LLM produced no usable DECISION_SPEC")
                 return trace
             trace["handoff"] = handoff
         else:

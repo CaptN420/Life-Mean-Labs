@@ -1003,7 +1003,14 @@
         </div>
 
         <div class="card" style="margin-top:1rem;">
-            <h2>Harness — run en sandbox</h2>
+            <h2>Feedback temps réel <span id="exp-fb-badge" style="font-size:0.72rem;font-weight:normal;"></span></h2>
+            <p style="font-size:0.82rem;">Timeline live des runs longs (<code>llm_sweep</code>) : chaque
+            tour publié dès qu'il finit. La synthèse (observation / conclusion / pistes) apparaît en fin.</p>
+            <pre id="exp-feedback" class="placeholder" style="max-height:300px;overflow:auto;font-size:0.78rem;white-space:pre-wrap;"></pre>
+        </div>
+
+            <div class="card" style="margin-top:1rem;">
+        <h2>Harness — run en sandbox</h2>
             <div class="form-row" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
                 <div class="form-group" style="flex:1;min-width:160px;">
                     <label for="exp-executor">Exécuteur</label>
@@ -3455,13 +3462,62 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
             const executor = document.getElementById('exp-executor').value;
             const prompt = document.getElementById('exp-prompt').value;
             const out = document.getElementById('exp-output');
+            const fb = document.getElementById('exp-feedback');
+            const fbBadge = document.getElementById('exp-fb-badge');
             const btn = document.getElementById('exp-run-btn');
             out.textContent = 'Running …';
             btn.disabled = true;
+            const payload = { executor, prompt };
+
+            // Long multi-turn runs (llm_sweep) stream live feedback via the
+            // start + poll endpoints; others stay synchronous.
+            if (executor === 'llm_sweep') {
+                fb.textContent = '(démarrage…)';
+                fbBadge.textContent = '● running';
+                fbBadge.style.color = '#e0a33c';
+                fetch('/api/experimental/harness/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                })
+                    .then(async r => {
+                        const j = await r.json();
+                        if (!r.ok) { fb.textContent = 'Échec: ' + JSON.stringify(j); return; }
+                        const runId = j.run_id;
+                        const timer = setInterval(async () => {
+                            const fr = await fetch('/api/experimental/feedback/' + runId).catch(() => null);
+                            if (!fr) return;
+                            const e = await fr.json();
+                            if (!e.status) return;
+                            const lines = (e.events || []).map(ev => '[' + new Date(ev.ts * 1000).toLocaleTimeString() + '] ' + ev.text);
+                            fb.textContent = lines.join('\n') || '(pas encore de retour)';
+                            fb.scrollTop = fb.scrollHeight;
+                            if (e.status !== 'running') {
+                                clearInterval(timer);
+                                fbBadge.textContent = '● ' + e.status;
+                                fbBadge.style.color = e.status === 'passed' ? '#2e9e5b' : '#c0392b';
+                                if (e.result) {
+                                    const res = e.result.result || {};
+                                    if (res.synthesis) {
+                                        const s = res.synthesis;
+                                        fb.textContent += '\n\n— SYNTHÈSE —\nobservation: ' + s.observation
+                                            + '\nconclusion: ' + s.conclusion
+                                            + '\npistes:\n' + (s.next_leads || []).map(x => '  • ' + x).join('\n');
+                                    }
+                                    out.textContent = JSON.stringify(e.result, null, 2);
+                                }
+                            }
+                        }, 800);
+                    })
+                    .catch(err => { fb.textContent = 'Erreur: ' + String(err); })
+                    .finally(() => { btn.disabled = false; });
+                return;
+            }
+
             fetch('/api/experimental/harness', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ executor, prompt }),
+                body: JSON.stringify(payload),
             })
                 .then(async r => {
                     const j = await r.json().catch(() => ({ error: '(non-JSON response)' }));

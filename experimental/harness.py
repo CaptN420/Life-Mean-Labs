@@ -31,14 +31,17 @@ def _sandbox_dir() -> Path:
     return Path(tempfile.mkdtemp(prefix="exp_harness_"))
 
 
-def run_executor(executor_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def run_executor(executor_type: str, payload: Dict[str, Any],
+                 feedback_store=None, run_id: str = "") -> Dict[str, Any]:
     """Run a single connected executor in an isolated, throwaway sandbox.
 
     Args:
         executor_type: a key of :data:`STAGE_EXECUTORS`
             (code / deterministic / code_lab / ...); must be ``connected``.
-        payload: executor-specific inputs, e.g.
-            ``{"prompt": "...", "tool": "math_gcd", "args": {...}}``.
+        payload: executor-specific inputs such as ``prompt``/``tool``/``args``.
+        feedback_store: optional :class:`RunFeedbackStore` used by long
+            multi-turn runners (e.g. ``llm_sweep``) to publish live progress.
+        run_id: the store key for this run's feedback events.
 
     Returns:
         dict with ``executor``, ``kind``, ``status``
@@ -66,6 +69,11 @@ def run_executor(executor_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             return _run_tool(executor_type, cap, payload)
         if kind in ("debate_code",):
             return _run_debate_code(executor_type, cap, payload)
+        if kind in ("sweep",):
+            return _run_sweep(executor_type, cap, payload)
+        if kind in ("llm_sweep",):
+            return _run_llm_sweep(executor_type, cap, payload,
+                                  feedback_store=feedback_store, run_id=run_id)
         return {
             "executor": executor_type,
             "kind": kind,
@@ -149,6 +157,112 @@ def _run_debate_code(executor_type: str, cap: Dict[str, Any],
             "code_files": trace.get("code_files"),
             "verify": trace.get("verify"),
             "reason": trace.get("reason"),
+        },
+    }
+
+
+def _run_sweep(executor_type: str, cap: Dict[str, Any],
+               payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Run the robustness sweep (N runs across catalogue task types).
+
+    Uses the same debate_code chain; aggregates a matrix of per-type
+    pass / stable-hash / average duration and a global status. This is the
+    large-run confidence check: if the chain is sound, every run in a
+    deterministic sweep must PASS with no drift in spec_hash.
+    """
+    from experimental.sweep import sweep
+
+    runs = int(payload.get("runs", 30))
+    types = list(payload.get("types") or [])
+    if not types:
+        from experimental.retry_agent import CATALOG
+        types = list(CATALOG)
+    if runs < 1:
+        runs = 30
+    try:
+        result = sweep(runs, types)
+    except Exception as e:  # pragma: no cover - defensive
+        return {
+            "executor": executor_type, "kind": "sweep",
+            "status": "failed", "dispatched_to": "RobustnessSweep",
+            "result": {"error": str(e)},
+        }
+    return {
+        "executor": executor_type, "kind": "sweep",
+        "dispatched_to": "RobustnessSweep", "runs": runs, "types": types,
+        "status": "passed" if result.get("all_green") else "failed",
+        "result": {
+            "runs": result.get("runs"),
+            "status_counts": result.get("status_counts"),
+            "matrix": result.get("matrix"),
+            "failures": result.get("failures"),
+            "total_duration_s": result.get("total_duration_s"),
+            "all_green": result.get("all_green"),
+        },
+    }
+
+
+def _run_llm_sweep(executor_type: str, cap: Dict[str, Any],
+                   payload: Dict[str, Any],
+                   feedback_store=None, run_id: str = "") -> Dict[str, Any]:
+    """Run the LLM multi-turn experiment (mode-B chain N times + synthesis).
+
+    Each tour goes through run_debate_code(mode='llm') so every tour is fully
+    traced. The synthesis (observation / conclusion / next_leads) is computed
+    deterministically from the aggregated real traces — never fabricated. An
+    unavailable backend yields an honest NO_CONVERGENCE, not a fake pass.
+
+    When ``feedback_store`` + ``run_id`` are given, a live event is published
+    after every tour (kind='tour', text='tour N/M -> STATUS hash=...') so the
+    UI can render a real-time timeline instead of waiting for the whole sweep.
+    """
+    from experimental.llm_sweep import run_llm_sweep
+
+    turns = int(payload.get("turns", 30))
+    task_prompt = str(payload.get("task_prompt") or payload.get("prompt") or "")
+    model = str(payload.get("model") or "")
+    if turns < 1:
+        turns = 30
+
+    def _report(tour, status, spec_hash):
+        if feedback_store is not None and run_id:
+            feedback_store.add_event(
+                run_id,
+                f"tour {tour}/{turns} -> {status}"
+                + (f"  hash={spec_hash}" if spec_hash else ""),
+                tour=tour, kind="tour")
+
+    try:
+        result = run_llm_sweep(turns, task_prompt, on_tour=_report, model=model)
+    except Exception as e:  # pragma: no cover - defensive
+        return {
+            "executor": executor_type, "kind": "llm_sweep",
+            "status": "failed", "dispatched_to": "LLMMultiTurn",
+            "result": {"error": str(e)},
+        }
+    # status reflects whether the chain itself was usable this run (a real
+    # signal, not just a green badge): passed only if >0 tours produced PASS.
+    n_pass = (result.get("status_counts") or {}).get("PASS", 0)
+    # synthesis text goes to the feedback stream too.
+    if feedback_store is not None and run_id:
+        syn = result.get("synthesis") or {}
+        if syn.get("conclusion"):
+            feedback_store.add_event(
+                run_id,
+                f"[synthesis] {syn['conclusion']}", kind="synthesis")
+    return {
+        "executor": executor_type, "kind": "llm_sweep",
+        "dispatched_to": "LLMMultiTurn", "turns": turns,
+        "status": "passed" if n_pass > 0 else "inconclusive",
+        "result": {
+            "turns": result.get("turns"),
+            "status_counts": result.get("status_counts"),
+            "pass_rate": result.get("pass_rate"),
+            "spec_hashes_distinct": result.get("spec_hashes_distinct"),
+            "convergence": result.get("convergence"),
+            "synthesis": result.get("synthesis"),
+            "verify_failures": result.get("verify_failures"),
+            "inconclusive_reasons": result.get("inconclusive_reasons"),
         },
     }
 

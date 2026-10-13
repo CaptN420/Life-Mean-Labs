@@ -1,0 +1,836 @@
+LIFE_MEAN LABS
+EMERGENT STATE / CONCEPTUAL ATTRACTOR RESEARCH
+
+MISSION
+
+Investigate whether repeated multi-agent reasoning can form a persistent
+conceptual attractor that may be represented by a very compact symbolic state
+(bit, multi-bit state, token, vector, graph state, etc.).
+
+DO NOT assume the phenomenon is real.
+DO NOT assume this is a new form of information.
+DO NOT force the "bit" hypothesis.
+
+Goal:
+
+OBSERVE
+→ EXTRACT
+→ COMPARE
+→ FORM HYPOTHESES
+→ TEST
+→ FALSIFY
+→ UPDATE
+→ DESIGN NEXT EXPERIMENT
+
+This must become a LIVING RESEARCH DOSSIER that evolves after every experiment.
+
+
+======================================================================
+1. INITIAL OBSERVATION FROM HISTORICAL DATA
+======================================================================
+
+Historical multi-agent chemistry/physics/math runs showed repeated convergence
+toward concepts resembling:
+
+TIME SCALE
+→ EFFECTIVE RATE
+→ GRADIENT
+→ FLUX
+→ INTERFACE / SURFACE
+→ THROUGHPUT
+→ LIMITATION / SATURATION
+
+Examples observed in historical material include concepts such as:
+
+τ
+k_eff
+J
+surface/interface
+diffusion
+gradient
+limitation
+
+Some generated equations repeatedly moved toward forms such as:
+
+Ndot = J
+
+Ndot = J + ΔC
+
+Ndot = J + ΔC * (1 + R)
+
+and related variants.
+
+IMPORTANT:
+
+Some equations were dimensionally questionable or invalid.
+
+Therefore:
+
+REPEATED PATTERN
+!=
+VALID PHYSICS.
+
+
+======================================================================
+2. IMPORTANT HISTORICAL ANOMALY
+======================================================================
+
+Historical structured memory included states similar to:
+
+{
+  "approved_equations": 0,
+  "partial_equations": 0
+}
+
+while textual logs could still contain statements suggesting equations had been
+"approved".
+
+This creates an important research question:
+
+If canonical equation memory was empty,
+WHERE DID THE RECURRING CONCEPTUAL STRUCTURE PERSIST?
+
+Possible sources include:
+
+- prompt structure
+- conversation context
+- previous turns
+- fallback instructions
+- shared memory
+- role prompts
+- model priors
+- repeated vocabulary
+- hidden application state
+- compression/summarization
+- validation policy
+- selection effects
+
+
+======================================================================
+3. PRIMARY HYPOTHESES
+======================================================================
+
+Maintain competing hypotheses.
+
+H1 — PROMPT ATTRACTOR
+
+The pattern is primarily induced by instructions/prompts.
+
+
+H2 — MODEL PRIOR
+
+The same underlying model naturally tends toward common transport-style
+representations.
+
+
+H3 — MEMORY CRYSTALLIZATION
+
+Repeated observations reinforce a pattern until it becomes a persistent
+conceptual state.
+
+
+H4 — SELECTION EFFECT
+
+Validators/fallbacks preferentially preserve certain concepts and eliminate
+others.
+
+
+H5 — MULTI-AGENT DYNAMICS
+
+Role interaction itself causes convergence toward reusable abstractions.
+
+
+H6 — COMPACT STATE HYPOTHESIS
+
+Once an attractor has formed, only a very small amount of state may be needed
+to reactivate it.
+
+Example:
+
+{
+  "TRANSPORT_SCHEMA_ACTIVE": 1
+}
+
+may reproduce much of the behavior previously requiring a large history.
+
+
+H7 — MULTI-STATE REPRESENTATION
+
+One bit may be insufficient.
+
+Example:
+
+{
+  "transport_schema": {
+    "state": "ACTIVE",
+    "support": 0.78
+  }
+}
+
+Possible states:
+
+ABSENT
+CANDIDATE
+ACTIVE
+CONTRADICTED
+STALLED
+
+
+H8 — ARTIFACT / NULL HYPOTHESIS
+
+No meaningful emergent state exists.
+
+The apparent pattern is explained entirely by prompt/model/fallback repetition.
+
+
+======================================================================
+4. CANONICAL OBSERVATION FORMAT
+======================================================================
+
+For every meaningful observation create an object similar to:
+
+{
+  "observation_id": "OBS-0001",
+
+  "source": {
+    "experiment_id": "...",
+    "run_id": "...",
+    "turn_ids": [],
+    "event_ids": [],
+    "files": []
+  },
+
+  "observation": "Flux-related concepts repeatedly reappear.",
+
+  "observed_features": [
+    "gradient",
+    "flux",
+    "surface",
+    "limitation"
+  ],
+
+  "frequency": null,
+
+  "evidence_type": "HISTORICAL_TRACE",
+
+  "confidence": 0.0,
+
+  "alternative_explanations": [
+    "prompt repetition",
+    "fallback policy",
+    "model prior"
+  ],
+
+  "notes": ""
+}
+
+Do not fabricate unavailable frequency/count values.
+
+
+======================================================================
+5. PATTERN OBJECT
+======================================================================
+
+Represent candidate attractors separately from raw observations.
+
+Example:
+
+{
+  "pattern_id": "PATTERN-001",
+
+  "name": "Gradient-Flux-Limitation Attractor",
+
+  "status": "CANDIDATE",
+
+  "structure": [
+    "driving_gradient",
+    "local_flux",
+    "interface_or_surface",
+    "aggregate_throughput",
+    "limitation"
+  ],
+
+  "supporting_observations": [
+    "OBS-0001",
+    "OBS-0004"
+  ],
+
+  "contradicting_observations": [],
+
+  "possible_causes": [
+    "memory",
+    "prompt",
+    "model_prior",
+    "fallback_policy"
+  ],
+
+  "scientific_validity": "NOT_ESTABLISHED",
+
+  "system_behavior_validity": "UNDER_TEST",
+
+  "confidence": 0.0
+}
+
+
+======================================================================
+6. CLAIM FORMAT
+======================================================================
+
+Every conclusion must have explicit epistemic status.
+
+Example:
+
+{
+  "claim_id": "CLAIM-001",
+
+  "statement":
+    "The historical system repeatedly returned to a transport-like conceptual schema.",
+
+  "status": "OBSERVED_IN_DATA",
+
+  "supports": [
+    "OBS-0001",
+    "OBS-0004"
+  ],
+
+  "does_not_establish": [
+    "new physical law",
+    "new fundamental information unit",
+    "independent scientific validity of generated equations"
+  ]
+}
+
+Allowed statuses:
+
+OBSERVED_IN_DATA
+SUPPORTED_IN_THIS_LAB
+WEAKLY_SUPPORTED
+CONTRADICTED
+INCONCLUSIVE
+UNTESTED
+FALSIFIED
+
+
+======================================================================
+7. COMPACT STATE EXPERIMENT
+======================================================================
+
+One major experiment should test:
+
+WHAT IS THE MINIMUM INFORMATION REQUIRED TO REACTIVATE THE PATTERN?
+
+
+Condition A — ZERO MEMORY
+
+Fresh model/context.
+No attractor information.
+
+
+Condition B — ONE BIT
+
+{
+  "TRANSPORT_SCHEMA_ACTIVE": 1
+}
+
+
+Condition C — SMALL SYMBOLIC STATE
+
+{
+  "pattern": "TRANSPORT_SCHEMA",
+  "state": "ACTIVE",
+  "features": [
+    "gradient",
+    "flux",
+    "limitation"
+  ]
+}
+
+
+Condition D — SHORT TEXT SUMMARY
+
+Compact natural-language explanation of the pattern.
+
+
+Condition E — FULL HISTORY
+
+Historical context / relevant transcript.
+
+
+Use the SAME:
+
+task
+model
+temperature
+budget
+roles
+validators
+available tools
+
+where possible.
+
+
+======================================================================
+8. MEASURE
+======================================================================
+
+Compare conditions using measurable signals such as:
+
+pattern recurrence
+
+time/turns until recurrence
+
+concept frequency
+
+concept ordering
+
+similarity between trajectories
+
+new concept diversity
+
+stagnation
+
+validation success
+
+failure rate
+
+tokens required
+
+context size
+
+rounds to stable pattern
+
+dependency on exact vocabulary
+
+
+Do not reduce evaluation to a single similarity score.
+
+
+======================================================================
+9. CRITICAL FALSIFICATION TEST
+======================================================================
+
+Remove explicit attractor vocabulary from prompts/fallbacks.
+
+Especially terms equivalent to:
+
+gradient
+flux
+surface
+transport
+limitation
+saturation
+
+Then repeat.
+
+If the pattern disappears:
+
+PROMPT/POLICY explanation gains support.
+
+If it persists:
+
+other hypotheses gain support.
+
+
+======================================================================
+10. MEMORY TEST
+======================================================================
+
+Compare:
+
+MEMORY ON
+
+vs
+
+MEMORY RESET BETWEEN CYCLES.
+
+
+If the pattern strongly persists only with memory:
+
+MEMORY CRYSTALLIZATION gains support.
+
+If it persists without memory:
+
+investigate model priors / prompt / task structure.
+
+
+======================================================================
+11. MODEL TEST
+======================================================================
+
+Repeat with different model families.
+
+Important historical confound:
+
+multiple named agents may actually use the SAME underlying model.
+
+Therefore:
+
+MULTIPLE AGENT NAMES
+!=
+INDEPENDENT MODELS.
+
+Record:
+
+configured_model
+actual_model
+role
+prompt
+temperature
+context
+
+
+======================================================================
+12. PARTICLE / GRAPH INTERPRETATION
+======================================================================
+
+OPTIONAL RESEARCH MODEL:
+
+Treat observations/events as particles/nodes.
+
+Example:
+
+EVENTS
+    ↓
+similarity / relations
+    ↓
+clusters
+    ↓
+stable pattern
+    ↓
+compact state representation
+
+Possible interpretation:
+
+INFORMATION MAY BE REPRESENTED BY:
+
+configuration
++
+relations
++
+temporal evolution
+
+rather than by one event alone.
+
+Call this provisionally:
+
+EMERGENT STATE ENCODING
+
+This is a computational representation hypothesis,
+NOT a claim about fundamental physical information.
+
+
+======================================================================
+13. STATE COMPRESSION QUESTION
+======================================================================
+
+Test whether:
+
+LARGE HISTORY
+
+can be compressed into:
+
+SMALL STATE
+
+without significantly changing future trajectory.
+
+Measure:
+
+information size
+vs
+behavioral preservation.
+
+Possible result:
+
+100 KB history
+→ 20-byte symbolic state
+→ similar downstream decisions
+
+If observed reproducibly, report:
+
+COMPACT STATE PRESERVES BEHAVIOR UNDER CONDITIONS X.
+
+Do NOT report:
+
+"we discovered a new bit."
+
+
+======================================================================
+14. EVOLVING RESEARCH STATE
+======================================================================
+
+After EVERY experiment update:
+
+{
+  "research_state_version": 1,
+
+  "current_question":
+    "Can a conceptual attractor be preserved by compact symbolic state?",
+
+  "strongest_observations": [],
+
+  "active_hypotheses": [],
+
+  "weakened_hypotheses": [],
+
+  "falsified_hypotheses": [],
+
+  "confounders": [],
+
+  "unknowns": [],
+
+  "current_conclusion": "",
+
+  "conclusion_strength": "INCONCLUSIVE",
+
+  "next_best_experiment": "",
+
+  "why_this_experiment": ""
+}
+
+Increment the version.
+
+Never overwrite historical research states.
+
+
+======================================================================
+15. EXPERIMENT RESULT FORMAT
+======================================================================
+
+Every experiment must end with:
+
+{
+  "experiment": "EXP-XXX",
+
+  "question": "...",
+
+  "conditions": {},
+
+  "observations": [],
+
+  "evidence": [],
+
+  "unexpected_results": [],
+
+  "supports": [],
+
+  "weakens": [],
+
+  "falsifies": [],
+
+  "remaining_confounders": [],
+
+  "conclusion": "...",
+
+  "confidence": 0.0,
+
+  "next_questions": [],
+
+  "recommended_next_test": "..."
+}
+
+
+======================================================================
+16. EVIDENCE HIERARCHY
+======================================================================
+
+Keep separate:
+
+RAW EVENT
+↓
+OBSERVATION
+↓
+PATTERN
+↓
+HYPOTHESIS
+↓
+EXPERIMENTAL SUPPORT
+↓
+REPLICATION
+↓
+CLAIM
+
+Never jump directly:
+
+LLM OUTPUT
+→ FACT.
+
+
+======================================================================
+17. RESEARCH BEHAVIOR
+======================================================================
+
+The team must actively attempt to DESTROY its preferred explanation.
+
+Ask:
+
+Could this simply be prompt leakage?
+
+Could repeated words create apparent convergence?
+
+Does the same phenomenon occur with unrelated tasks?
+
+Does it survive a different model?
+
+Does it survive memory reset?
+
+Can a fake/random state bit produce the same effect?
+
+Can the attractor be reversed?
+
+Can two competing attractors coexist?
+
+How much information is actually necessary?
+
+Does increasing state information monotonically improve behavioral preservation?
+
+Is the phenomenon stable or merely stochastic?
+
+
+======================================================================
+18. NEXT-QUESTION GENERATION
+======================================================================
+
+Do not produce generic questions.
+
+Each new question must reference evidence.
+
+Example:
+
+{
+  "question_id": "Q-017",
+
+  "question":
+    "Does TRANSPORT_SCHEMA_ACTIVE=1 reproduce the concept ordering seen with full history?",
+
+  "triggered_by": [
+    "PATTERN-001",
+    "EXP-004"
+  ],
+
+  "why_it_matters":
+    "Would distinguish compact-state persistence from simple transcript replay.",
+
+  "testable": true
+}
+
+
+======================================================================
+19. STOP / CONTINUE
+======================================================================
+
+Continue research when:
+
+- a meaningful uncertainty remains
+- competing hypotheses can be distinguished experimentally
+- new evidence changes the research state
+
+Stop a cycle when:
+
+- evidence is insufficient
+- experiment budget is reached
+- no discriminating experiment is available
+- result is stable enough to checkpoint
+
+INCONCLUSIVE is valid.
+
+
+======================================================================
+20. FINAL RESEARCH PRINCIPLE
+======================================================================
+
+We are NOT trying to prove:
+
+"a new bit exists."
+
+We are testing a more precise question:
+
+CAN A COMPLEX MULTI-AGENT TRAJECTORY FORM A REUSABLE ATTRACTOR,
+AND CAN THE INFORMATION NEEDED TO REACTIVATE THAT ATTRACTOR
+BE COMPRESSED INTO A SMALL EXPLICIT STATE?
+
+Every conclusion must answer:
+
+WHAT DID WE OBSERVE?
+
+WHAT EVIDENCE SUPPORTS IT?
+
+WHAT COULD ALSO EXPLAIN IT?
+
+WHAT DID THE EXPERIMENT RULE OUT?
+
+WHAT REMAINS UNKNOWN?
+
+WHY DID OUR BELIEF CHANGE?
+
+WHAT EXPERIMENT SHOULD COME NEXT?
+
+-let diferent agent routing per turn a a fundamental rule
+
+if you have no tool build it
+
+  • Compare the distinct spec_hash: which features vary between the converged and drifted tours?
+  • Strengthen the DECISION_SPEC prompt (required_inputs / allowed_outputs enumeration) to reduce INCONCLUSIVE drift.
+  • Decide the acceptance rule: is PASS-or-INCONCLUSIVE enough, or must a minimum pass_rate hold before the chain counts as usable?
+
+— SYNTHÈSE —
+observation: 12/30 tours PASS, 17 distinct spec_hash, 13 INCONCLUSIVE.
+conclusion: The chain is sound but the LLM debate drifts: not every tour converged to a usable, verified spec. This is the expected non-reproducibility of mode B — now measured, not guessed.
+pistes:
+  • Compare the distinct spec_hash: which features vary between the converged and drifted tours?
+  • Strengthen the DECISION_SPEC prompt (required_inputs / allowed_outputs enumeration) to reduce INCONCLUSIVE drift.
+  • Decide the acceptance rule: is PASS-or-INCONCLUSIVE enough, or must a minimum pass_rate hold before the chain counts as usable?
+ SYNTHÈSE —
+observation: 9/30 tours PASS, 20 distinct spec_hash, 10 INCONCLUSIVE.
+conclusion: The chain is sound but the LLM debate drifts: not every tour converged to a usable, verified spec. This is the expected non-reproducibility of mode B — now measured, not guessed.
+pistes:
+  • Compare the distinct spec_hash: which features vary between the converged and drifted tours?
+  • Strengthen the DECISION_SPEC prompt (required_inputs / allowed_outputs enumeration) to reduce INCONCLUSIVE drift.
+  • Decide the acceptance rule: is PASS-or-INCONCLUSIVE enough, or must a minimum pass_rate hold before the chain counts as usable?
+
+— SYNTHÈSE —
+observation: 9/30 tours PASS, 23 distinct spec_hash, 7 INCONCLUSIVE.
+conclusion: The chain is sound but the LLM debate drifts: not every tour converged to a usable, verified spec. This is the expected non-reproducibility of mode B — now measured, not guessed.
+pistes:
+  • Compare the distinct spec_hash: which features vary between the converged and drifted tours?
+  • Strengthen the DECISION_SPEC prompt (required_inputs / allowed_outputs enumeration) to reduce INCONCLUSIVE drift.
+  • Decide the acceptance rule: is PASS-or-INCONCLUSIVE enough, or must a minimum pass_rate hold before the chain counts as usable?
+
+ExperimentContext(
+    observation=...,
+    open_question=...,
+    experiment_question=...
+)
+
+— SYNTHÈSE —
+observation: 13/30 tours PASS, 19 distinct spec_hash, 11 INCONCLUSIVE.
+conclusion: The chain is sound but the LLM debate drifts: not every tour converged to a usable, verified spec. This is the expected non-reproducibility of mode B — now measured, not guessed.
+pistes:
+  • Compare the distinct spec_hash: which features vary between the converged and drifted tours?
+  • Strengthen the DECISION_SPEC prompt (required_inputs / allowed_outputs enumeration) to reduce INCONCLUSIVE drift.
+  • Decide the acceptance rule: is PASS-or-INCONCLUSIVE enough, or must a minimum pass_rate hold before the chain counts as usable?
+
+note:analise output of the llm to miror it into json passe it to the next llm only the json to make it understanding the information
+
+ SYNTHÈSE —
+observation: 19/30 tours PASS, 23 distinct spec_hash, 7 INCONCLUSIVE.
+conclusion: The chain is sound but the LLM debate drifts: not every tour converged to a usable, verified spec. This is the expected non-reproducibility of mode B — now measured, not guessed.
+pistes:
+  • Compare the distinct spec_hash: which features vary between the converged and drifted tours?
+  • Strengthen the DECISION_SPEC prompt (required_inputs / allowed_outputs enumeration) to reduce INCONCLUSIVE drift.
+  • Decide the acceptance rule: is PASS-or-INCONCLUSIVE enough, or must a minimum pass_rate hold before the chain counts as usable?
+note etablise a protocole to manage the philosofy and the smal step goal eache turn try tu solve by the protocole
+
+RULES
+- do not invent missing evidence
+- stop after validator PASS
+- do not send PRIVATE_LOCAL data remotely
+- retry at most 3 times
+- if output is truncated, classify TRUNCATED_OUTPUT
+
+— SYNTHÈSE —
+observation: 16/30 tours PASS, 25 distinct spec_hash, 5 INCONCLUSIVE.
+conclusion: The chain is sound but the LLM debate drifts: not every tour converged to a usable, verified spec. This is the expected non-reproducibility of mode B — now measured, not guessed.
+pistes:
+  • Compare the distinct spec_hash: which features vary between the converged and drifted tours?
+  • Strengthen the DECISION_SPEC prompt (required_inputs / allowed_outputs enumeration) to reduce INCONCLUSIVE drift.
+  • Decide the acceptance rule: is PASS-or-INCONCLUSIVE enough, or must a minimum pass_rate hold before the chain counts as usable?
