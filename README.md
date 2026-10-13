@@ -2,6 +2,22 @@
 
 *A multi-agent system & synthetic-data laboratory — where machines argue to think, and think to generate.*
 
+**STATUS:** Experimental / active development
+
+**Current milestone:**
+✓ Code Lab provenance
+✓ reproducible event traces
+✓ validators
+→ collecting prospective trajectories
+
+**Next research milestone:**
+Canonical Context Experiment
+
+**Research question:**
+How much context can an agent lose
+before it loses the ability to make
+the correct next decision?
+
 Life_mean is an exploratory research lab that combines **philosophical multi-agent debate** with a **deterministic synthetic-data pipeline**. At its heart sits a *philosophical council* — agents shaped after real schools of thought — working together on the question of how an AI can build its own training data with both creativity and honesty.
 
 ---
