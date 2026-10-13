@@ -149,6 +149,7 @@ class CodeLabEngine:
         event_bus=None,
         base_dir: Optional[Path] = None,
         llm_client=None,
+        event_logger=None,
     ) -> None:
         """Build an engine. All collaborators are injectable for testing.
 
@@ -169,6 +170,7 @@ class CodeLabEngine:
         self.router = router
         self.event_bus = event_bus
         self.llm_client = llm_client
+        self.event_logger = event_logger
 
         self.events: List[Dict[str, Any]] = []
         self._status: str = "idle"
@@ -177,11 +179,92 @@ class CodeLabEngine:
     def _emit(self, event_type: str, **payload: Any) -> None:
         ev = {"type": event_type, "time": time.time(), **payload}
         self.events.append(ev)
+        # Write structured events.jsonl for P0 integrity (provenance).
+        if self.event_logger is not None and hasattr(self, "config") and self.config.run_id:
+            try:
+                self._emit_to_logger(event_type, ev)
+            except Exception as e:  # pragma: no cover - logger failure must not break run
+                logger.warning("event_logger emit failed: %s", e)
         if self.event_handler is not None:
             try:
                 self.event_handler(ev)
             except Exception as e:  # pragma: no cover
                 logger.warning("event handler raised: %s", e)
+
+    def _emit_to_logger(self, event_type: str, ev: Dict[str, Any]) -> None:
+        """Route an engine event into the EventLogger for structured provenance."""
+        run_id = self.config.run_id
+        if not run_id:
+            return
+        # TASK_RECEIVED: emitted immediately after logger init (not deferred to RUN_STARTED).
+        if event_type == "TASK_RECEIVED":
+            prompt = getattr(self.config, "prompt", "") or ""
+            self.event_logger.log_task_received(run_id, prompt)
+        # AGENT_STARTED / AGENT_RESPONSE / AGENT_FAILED.
+        elif event_type == "AGENT_STARTED":
+            role = ev.get("role", "")
+            actual_model = ev.get("model") or None  # None if unavailable (not defaulted to "auto")
+            trace_index = ev.get("trace_index")  # None if missing (not defaulted to 0)
+            self.event_logger.log_agent_started(run_id, trace_index, role, actual_model)
+        elif event_type == "AGENT_RESPONSE":
+            role = ev.get("role", "")
+            actual_model = ev.get("model") or None
+            trace_index = ev.get("trace_index")  # None if missing
+            self.event_logger.log_agent_response(
+                run_id, trace_index, role, actual_model,
+                attempt_id=ev.get("attempt_id"),
+                model_call_id=ev.get("model_call_id"),
+                configured_model=ev.get("configured_model") or None,
+                fallback_reason=ev.get("fallback_reason"),
+                role_template_id=ev.get("template_id"),
+                system_prompt_hash=ev.get("system_prompt_hash"),
+                sampling_settings_hash=ev.get("sampling_settings_hash"),
+                input_context_ref=ev.get("input_context_ref"),
+                input_context_hash=ev.get("input_context_hash"),
+                response_ref=ev.get("response_ref"),
+                response_hash=ev.get("response_hash"),
+                event_seq_start=ev.get("event_seq_start"),
+                event_seq_end=ev.get("event_seq_end"),
+            )
+        elif event_type == "AGENT_FAILED":
+            role = ev.get("role", "")
+            actual_model = ev.get("model") or None
+            trace_index = ev.get("trace_index")  # None if missing
+            self.event_logger.log_agent_failed(
+                run_id, trace_index, role, actual_model,
+                attempt_id=ev.get("attempt_id"),
+                model_call_id=ev.get("model_call_id"),
+                configured_model=ev.get("configured_model") or None,
+                error_type=ev.get("error_type"),
+                finish_reason=ev.get("finish_reason"),
+                truncated=ev.get("truncated"),
+                fallback_reason=ev.get("fallback_reason"),
+                system_prompt_hash=ev.get("system_prompt_hash"),
+                sampling_settings_hash=ev.get("sampling_settings_hash"),
+                input_context_ref=ev.get("input_context_ref"),
+                input_context_hash=ev.get("input_context_hash"),
+                response_ref=ev.get("response_ref"),
+                response_hash=ev.get("response_hash"),
+            )
+        # FILE_CREATED / FILE_MODIFIED -> FILE_MUTATION.
+        elif event_type in ("FILE_CREATED", "FILE_MODIFIED"):
+            file_path = ev.get("file", "")
+            operation = ev.get("operation") or event_type
+            self.event_logger.log_file_mutation(run_id, file_path, operation)
+        # TEST_RESULT (TEST_PASSED / TEST_FAILED).
+        # pytest iteration is NOT an agent trace index — use null.
+        elif event_type in ("TEST_PASSED", "TEST_FAILED"):
+            status = "passed" if event_type == "TEST_PASSED" else "failed"
+            self.event_logger.log_test_result(
+                run_id, status, occurred_after_trace_index=None,
+                occurred_before_trace_index=None
+            )
+        # RUN_COMPLETED / RUN_FAILED terminal events.
+        elif event_type == RUN_COMPLETED:
+            self.event_logger.log_run_completed(run_id, final_status="passed")
+        elif event_type == RUN_FAILED:
+            error_type = ev.get("error_type") or "unknown"
+            self.event_logger.log_run_failed(run_id, error_type=error_type)
 
     def _ensure_recorder(self):
         if self.recorder is not None:
@@ -222,6 +305,23 @@ class CodeLabEngine:
             if self.config.multi_agent and not getattr(self, "_role_template", None):
                 self._role_template = self._resolve_role_template()
             self.ws = CodeLabWorkspace(self.config, base_dir=self.base_dir).create()
+
+            # Wire EventLogger deterministically AFTER workspace creation
+            # and BEFORE any agent/model action (P0 integrity).
+            if self.event_logger is None:
+                try:
+                    from .event_logger import EventLogger
+                    self.event_logger = EventLogger(self.ws.logs)
+                except Exception as e:  # pragma: no cover
+                    logger.warning("EventLogger init failed: %s", e)
+
+            # Emit TASK_RECEIVED immediately (not deferred to RUN_STARTED).
+            if self.event_logger is not None:
+                try:
+                    prompt = getattr(self.config, "prompt", "") or ""
+                    self.event_logger.log_task_received(self.config.run_id, prompt)
+                except Exception as e:  # pragma: no cover
+                    logger.warning("TASK_RECEIVED emit failed: %s", e)
 
             plan = self._plan()
             self._status = "planning_done"
@@ -279,10 +379,16 @@ class CodeLabEngine:
         require a backend — deterministic validation must run even when LM Studio
         is stopped / unauthenticated (§7). The probe is only performed on the
         LLM-dependent (multi-agent) path.
+
+        If a fake/stub ``llm_client`` was injected (tests), skip the network
+        probe and report available so the multi-agent path is exercised offline.
         """
         if not self.config.multi_agent:
             return {"llm_available": False, "llm_error": "not used (deterministic)",
                     "llm_models": []}
+        # If a fake/stub client was injected, skip the network probe entirely.
+        if getattr(self, "llm_client", None) is not None:
+            return {"llm_available": True, "llm_error": None, "llm_models": ["injected-stub"]}
         from .multiagent import probe_llm, resolve_llm_credentials
         base_url, api_key = resolve_llm_credentials()
         self._llm_base_url = base_url
@@ -397,13 +503,22 @@ class CodeLabEngine:
         return tpl
 
     def _agent_event(self, ev: Dict[str, Any]) -> None:
-        """Route a multi-agent event into the engine event log + handler."""
-        self.events.append(ev)
-        if self.event_handler is not None:
-            try:
-                self.event_handler(ev)
-            except Exception as e:  # pragma: no cover
-                logger.warning("event handler raised: %s", e)
+        """Route a multi-agent event into the engine event log + handler.
+
+        Also calls ``self._emit()`` so AGENT_STARTED / AGENT_RESPONSE /
+        AGENT_FAILED land in the EventLogger (events.jsonl) for P0 provenance.
+        Without this, agent events bypass the structured logger entirely —
+        TASK_RECEIVED and FILE_MUTATION would be logged but no model-call
+        provenance would appear.
+
+        ``self._emit()`` already appends to ``self.events`` and calls
+        ``self.event_handler``, so we delegate to it rather than duplicating
+        those paths here.
+        """
+        try:
+            self._emit(ev.get("type", "UNKNOWN"), **ev)
+        except Exception as e:  # pragma: no cover - logger failure must not break run
+            logger.warning("_agent_event _emit failed: %s", e)
 
     def _plan(self) -> Dict[str, Any]:
         """PLANNER: detect plan and (if available) route via SmartRouter.
@@ -1019,4 +1134,5 @@ def build_default_engine(config: Optional[CodeLabConfig] = None, **kw) -> CodeLa
             engine.event_bus = EventBus()
         except Exception:
             engine.event_bus = None
+
     return engine

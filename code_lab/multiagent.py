@@ -210,6 +210,8 @@ class CodingMultiAgent:
         self.template_id = template_id
         self.template_version = template_version
         self.template_hash = template_hash
+        # Authoritative monotonically increasing trace_index for agent responses.
+        self._trace_index_counter: int = 0
 
     def role_model(self, role: str) -> str:
         # 1) Experiment-level CONFIGURED model mapping (RoleModelMapping).
@@ -253,25 +255,32 @@ class CodingMultiAgent:
         CONFIGURED vs ACTUAL model for provenance. Template provenance rides on
         emit() itself."""
         agent = self._agent(role)
+        trace_index = self._trace_index_counter
+        self._trace_index_counter += 1
         self.emit("AGENT_STARTED", role=role, stage=stage,
-                  model=agent.model_used or "auto",
+                  model=agent.model_used or None,
                   configured_model=self.role_model(role) or None,
                   selection_mode=self._selection_mode(role),
+                  trace_index=trace_index,
                   run_id=self.run_id)
 
     def _emit_agent_result(self, role: str, stage: str, result: Dict[str, Any],
-                           started_ts: float) -> None:
+                           started_ts: float, trace_index: int = -1) -> None:
         """Emit AGENT_RESPONSE / AGENT_FAILED AFTER inference, with duration.
 
         Diagnostic metadata only — never secrets, never full prompts. Records
-        CONFIGURED vs ACTUAL model for provenance.
+        CONFIGURED vs ACTUAL model for provenance. If trace_index < 0 the
+        STARTED/RSP pair linkage is incomplete (logged but not fabricated).
         """
         agent = self._agent(role)
         configured = self.role_model(role)
-        actual = agent.model_used or "auto"
+        actual = agent.model_used or None
         ok = bool(result.get("ok"))
         dur_ms = int((time.time() - started_ts) * 1000)
         response = result.get("response") or ""
+        # Compute provenance hashes for deterministic replay.
+        system_prompt = agent.prompt or ""
+        sampling_settings = f"temp=0.4,max=1200" if role == "PLANNER" else "temp=0.4,max=2000"
         payload = {
             "role": role,
             "stage": stage,
@@ -289,6 +298,8 @@ class CodingMultiAgent:
             # executing (agent_trace is only materialized in the final result).
             "response": response,
         }
+        if trace_index >= 0:
+            payload["trace_index"] = trace_index
         if ok:
             self.emit("AGENT_RESPONSE", ok=True, **payload)
         else:
@@ -321,18 +332,20 @@ class CodingMultiAgent:
         self._emit_agent_started(role, stage)
         t0 = time.time()
         agent = self._agent(role)
+        trace_index = getattr(self, "_trace_index_counter", 0) - 1  # index just assigned
         try:
             res = task_fn(**kw)
-            self._emit_agent_result(role, stage, res, t0)
+            self._emit_agent_result(role, stage, res, t0, trace_index)
             return {"agent": role, **res}
         except Exception as exc:  # noqa: BLE001 - must never orphan a STARTED
             dur_ms = int((time.time() - t0) * 1000)
             self.emit(
                 "AGENT_FAILED", ok=False,
                 role=role, stage=stage,
-                model=agent.model_used or "auto",
+                model=agent.model_used or None,
                 configured_model=self.role_model(role) or None,
                 selection_mode=self._selection_mode(role),
+                trace_index=trace_index,
                 run_id=self.run_id,
                 duration_ms=dur_ms,
                 response_present=False,
