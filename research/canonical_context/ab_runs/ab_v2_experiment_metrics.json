@@ -1,0 +1,65 @@
+{
+  "experiment_type": "CONTROLLED_CANONICAL_CONTEXT_AB_V2",
+  "date": "2026-10-13",
+  "configuration": {
+    "git_commit": "3a008c3",
+    "backend_url": "http://localhost:1234/v1",
+    "developer_max_tokens": 8000,
+    "role_models": {
+      "planner": "bonsai-4b",
+      "developer": "bonsai-1.7b",
+      "critic": "granite-3.0-3b-a800m-instruct",
+      "reviewer": "falcon-h1-3b-instruct",
+      "judge": "lfm2.5-1.2b-thinking"
+    },
+    "prompt_sha256": "f298913da508299e2e7e1bb99e979e773bd22e0658f70e34239c564aa8ba396b",
+    "historical_reference": "codelab_554fc20975"
+  },
+  "condition_a": {
+    "run_id": "codelab_ab_v2_original_context",
+    "condition": "ORIGINAL_CONTEXT",
+    "status": "PASSED",
+    "duration_seconds": 39.1,
+    "files_created": ["main.py"],
+    "syntax_validation": "PASS",
+    "deterministic_validation": "PASS",
+    "provenance_complete": true,
+    "agent_trace": [
+      {"agent": "PLANNER", "ok": true, "finish": "stop", "duration": 16.63},
+      {"agent": "DEVELOPER", "ok": true, "finish": "stop", "duration": 22.41}
+    ]
+  },
+  "condition_b": {
+    "run_id": "codelab_ab_v2_canonical_state",
+    "condition": "CANONICAL_STATE",
+    "status": "PASSED",
+    "duration_seconds": 29.3,
+    "files_created": ["main.py"],
+    "syntax_validation": "PASS",
+    "deterministic_validation": "PASS",
+    "provenance_complete": true,
+    "agent_trace": [
+      {"agent": "PLANNER", "ok": true, "finish": "stop"},
+      {"agent": "DEVELOPER", "ok": true, "finish": "stop"}
+    ]
+  },
+  "comparison": {
+    "duration_delta_seconds": -9.8,
+    "duration_delta_percent": -25.1,
+    "files_same": true,
+    "validation_same": true,
+    "provenance_same_structure": true
+  },
+  "verdict": {
+    "experiment_status": "COMPLETED",
+    "configuration_match": "PASS",
+    "condition_a_status": "PASSED",
+    "condition_b_status": "PASSED",
+    "provenance_a": "PASS",
+    "provenance_b": "PASS",
+    "validator_a": "PASS",
+    "validator_b": "PASS",
+    "decision_preservation": "NOT_TESTED",
+    "causality_status": "UNKNOWN"
+  }
+}

@@ -429,7 +429,7 @@ class CodingMultiAgent:
 
     def develop(self, plan_text: str, language: str) -> Dict[str, Any]:
         return self._turn("DEVELOPER", "develop",
-                          lambda: self._agent("DEVELOPER").turn(self._develop_task(plan_text, language), max_tokens=2000))
+                          lambda: self._agent("DEVELOPER").turn(self._develop_task(plan_text, language), max_tokens=8000))
 
     def critique(self, source: str, test_result: Dict[str, Any],
                  language: str) -> Dict[str, Any]:
