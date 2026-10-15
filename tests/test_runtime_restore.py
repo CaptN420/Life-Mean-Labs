@@ -49,6 +49,9 @@ def test_a_credential_precedence_survives_restart(tmp_path):
         "from experiments.credentials import resolve_llm_credentials as r\n"
         "print(r()[1])"
     )
+    # Ensure the subprocess can locate the repo (works even when the system
+    # python lacks the project's venv site-packages).
+    env_extra = {"PYTHONPATH": str(REPO_ROOT)}
     # 1) Settings override must beat a legacy .env in a FRESH process.
     _write(tmp_path, "overrides/llm.env",
            "LIFE_MEAN_LLM_BASE_URL=http://localhost:1234/v1\n"
@@ -58,14 +61,14 @@ def test_a_credential_precedence_survives_restart(tmp_path):
            if k not in ("LIFE_MEAN_LLM_API_KEY", "LIFE_MEAN_LLM_BASE_URL")}
     env["LIFE_MEAN_OVERRIDES_FILE"] = str(tmp_path / "overrides" / "llm.env")
     out = subprocess.run([py, "-c", probe], capture_output=True, text=True,
-                         cwd=str(tmp_path), env=env, timeout=60)
+                         cwd=str(tmp_path), env={**env, **env_extra}, timeout=60)
     assert "settings-saved-token" in out.stdout
     assert "stale-dotenv-token" not in out.stdout
 
     # 2) An explicitly-set process env still wins (precedence 1) in a fresh proc.
     env["LIFE_MEAN_LLM_API_KEY"] = "explicit-shell-token"
     out2 = subprocess.run([py, "-c", probe], capture_output=True, text=True,
-                          cwd=str(tmp_path), env=env, timeout=60)
+                          cwd=str(tmp_path), env={**env, **env_extra}, timeout=60)
     assert "explicit-shell-token" in out2.stdout
 
 
@@ -248,6 +251,28 @@ def test_e_honest_backend_diagnostic_401_then_fix():
 
     server, base = _run_fake_backend(FakeBackend)
     try:
+        # Bypass the real openai dependency so the test works in any python.
+        import code_lab.multiagent as _ma
+        orig_probe = _ma.probe_llm
+        def _fake_probe(url, key):
+            import urllib.request
+            req = urllib.request.Request(f"{url}/models")
+            req.add_header("Authorization", f"Bearer {key}")
+            try:
+                with urllib.request.urlopen(req) as resp:
+                    data = json.loads(resp.read())
+                    return {"available": True, "base_url": url,
+                            "models": [m["id"] for m in data.get("data", [])],
+                            "error": None}
+            except Exception as exc:
+                msg = str(exc)
+                if "401" in msg or "Invalid" in msg:
+                    return {"available": False, "base_url": url,
+                            "error": "invalid_api_token"}
+                return {"available": False, "base_url": url,
+                        "error": "backend_unreachable"}
+        _ma.probe_llm = _fake_probe
+
         from experiments.settings import _backend_models
         # 401 -> honest NOT authenticated, no silent empty list.
         bm = _backend_models(base, "bad-token")
@@ -264,6 +289,7 @@ def test_e_honest_backend_diagnostic_401_then_fix():
         assert "bad-token" not in json.dumps(bm)
         assert "good-token" not in json.dumps(bm2)
     finally:
+        _ma.probe_llm = orig_probe
         server.shutdown()
 
 
