@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+#
+# Image Pi isolée pour le bridge code-lab.
+# - User non privilégié
+# - FS racine read-only sauf /workspace et /tmp/pi-runtime
+# - Pas de docker.sock, pas de secrets hôte
+# - LM Studio accessible via host.docker.internal:1234
+#
+
+FROM node:24-bookworm-slim
+
+# Variables d'environnement
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PI_SECURITY_DEFAULT_MODE=DEV \
+    HOME=/home/pi \
+    PATH="/home/pi/.local/bin:$PATH"
+
+# Créer l'utilisateur pi
+RUN groupadd -r pi && useradd -r -g pi -m pi
+
+# Installer Pi
+COPY --chown=pi:pi releases/1.2.0 /usr/share/pi
+RUN npm install -g --ignore-scripts /usr/share/pi 2>&1
+
+# Répertoires de travail
+WORKDIR /workspace
+RUN mkdir -p /workspace /tmp/pi-runtime && chown -R pi:pi /workspace /tmp/pi-runtime
+
+# Extension pi-security-gate
+COPY --chown=pi:pi ../extensions/pi-security-gate \
+     /home/pi/.pi/agent/extensions/pi-security-gate
+
+# Entrypoint Pi en mode RPC
+ENTRYPOINT ["pi", "--mode", "rpc", "--no-session"]
+
+# Santé : vérifier que pi est accessible
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node -e "console.log('ok')" || exit 1

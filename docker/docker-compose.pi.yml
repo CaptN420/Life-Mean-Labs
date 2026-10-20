@@ -1,0 +1,50 @@
+# docker-compose pour le sandbox Pi isolé
+#
+# Usage :
+#   cd HOME-EXT/docker && docker-compose -f docker-compose.pi.yml up -d
+#
+
+services:
+  pi-sandbox:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.pi
+    image: pi-sandbox:local
+    user: pi
+    read_only: true
+    tmpfs:
+      - /tmp/pi-runtime:size=67108864
+    volumes:
+      # Workspace isolé (copié, pas bind-mount)
+      - pi_workspace:/workspace:rw
+      # Home Pi conteneur-isolé (pas l'hôte)
+      - pi_agent_home:/home/pi/.pi/agent:rw
+    environment:
+      # LM Studio local via host.docker.internal
+      - LIFE_MEAN_LLM_BASE_URL=http://host.docker.internal:1234/v1
+      # Pas de clé API exposée — LM Studio local ne nécessite pas de key
+      - LIFE_MEAN_LLM_API_KEY=
+      - PI_SECURITY_DEFAULT_MODE=DEV
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - pi-net
+    # Limites
+    pids_limit: 64
+    mem_limit: 2G
+    cpu_quota: 200000
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+volumes:
+  pi_workspace:
+    driver: local
+  pi_agent_home:
+    driver: local
+
+networks:
+  pi-net:
+    driver: bridge

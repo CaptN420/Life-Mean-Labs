@@ -184,6 +184,19 @@ class CodingAgent:
         system = {"role": "system", "content": self.prompt}
         user = {"role": "user", "content": task}
         messages = [system] + self.history + [user]
+        
+        # Apply compression if enabled (feature flag: COMPRESSION_ENABLED=true)
+        from code_lab.compression_adapter import compress_context_if_enabled
+        compression_result = compress_context_if_enabled(
+            messages=messages,
+            system_prompt=self.prompt,
+            user_query=task,
+        )
+        if compression_result.get("compressed"):
+            messages = compression_result.get("messages", messages)
+            logger.debug("Compression applied: %.1f%% reduction", 
+                        compression_result.get("stats", {}).get("reduction_pct", 0))
+        
         t0 = time.time()
         text, finish = self.llm.chat(
             messages, model=self.model_used or None,

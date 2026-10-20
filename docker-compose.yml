@@ -1,0 +1,45 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: life-mean-dashboard:local
+    init: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:${LIFE_MEAN_PORT:-8080}:8080"
+    # No host bind mounts. These are Docker-managed volumes, not C: paths.
+    volumes:
+      - life_mean_data:/app/data
+      - life_mean_overrides:/app/overrides
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 67108864
+      - life_mean_code_lab_runs:/app/code_lab_runs
+      - life_mean_debate_lab_runs:/app/debate_lab_runs
+      - life_mean_philosophical_council:/app/philosophical_council/storage/raw_data
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8080/dashboard', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  life_mean_data:
+  life_mean_overrides:
+  life_mean_code_lab_runs:
+  life_mean_debate_lab_runs:
+  life_mean_philosophical_council:

@@ -135,6 +135,8 @@ class SubjectTree:
 
     def _walk(self, base: Path) -> Dict[str, Any]:
         node: Dict[str, Any] = {"subjects": {}, "experiments": []}
+        if not base.is_dir():
+            return node
         for entry in sorted(os.listdir(base)):
             p = base / entry
             if p.is_dir():

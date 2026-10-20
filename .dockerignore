@@ -1,0 +1,72 @@
+# Git and Docker metadata
+.git
+.gitignore
+.dockerignore
+Dockerfile
+compose*.yml
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node dependencies and build output
+node_modules/
+build/
+dist/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/.env.example
+.lmstudio/
+overrides/
+
+# Generated, legacy, and heavy runtime data
+code_lab/runs/
+code_lab_runs/
+debate_lab_runs/
+data/
+autopilot/data/
+storage/
+benchmarks/
+dogfood-output/
+tmp/
+legacy/
+External/
+historical/
+docs/
+experiments/integ_*/
+experiments/exp_*/
+*.log
+*.db
+*.debate.db
+
+# Separate projects and frontend dependencies
+hermes-debate/
+hermes-orchestrator/
+**/node_modules/
+
+# Reports and text artifacts are not needed for the runtime image
+*.rst
+*.txt
+AUDIT_*.md
+PHASE_*.md
+DESIGN_*.md
+IMPLEMENTATION_*.md
+MIA_*.md
+PROTOCOL_*.md
+CHANGES.md
+CODE_LAB.md
+FUTURE_*.txt
+next_feature_organized.txt
