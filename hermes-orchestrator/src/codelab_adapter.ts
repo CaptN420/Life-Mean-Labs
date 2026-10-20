@@ -46,7 +46,7 @@ interface CodeLabTask {
 
 interface TaskResult {
   task_id: string;
-  status: 'pending' | 'pending_approval' | 'running' | 'completed' | 'failed' | 'approved' | 'rejected' | 'expired';
+  status: 'pending' | 'pending_approval' | 'running' | 'completed' | 'failed' | 'approved' | 'rejected' | 'expired' | 'blocked_isolation_required';
   files_modified: string[];
   diff: string;
   tests_passed: boolean;
@@ -54,6 +54,48 @@ interface TaskResult {
   errors: string[];
   duration_seconds: number;
   audit_trail: Record<string, unknown>[];
+}
+
+// ── Isolation entitlement ────────────────────────────────────────────────────
+//
+// SÉCURITÉ (Phase 0.5) : on DISTINGUE clairement
+//   1. L'AUTORISATION MÉTIER  -> securityGate.checkSecurity() (permission/approbation).
+//   2. L'ISOLATION EFFECTIVE  -> securityGate.isolatedExecution().
+// Exécuter du code arbitraire (le bridge Python) est une opération SENSIBLE qui
+// REQUIERT une isolation effective. Ce Security Gate n'en fournit AUCUNE.
+//
+// Comportement par défaut : REFUS (fail-closed). Le seul contournement est un
+// opt-in EXPLICITE et documenté via la variable d'environnement
+// `ALLOW_UNSANDBOXED_EXECUTION=1`, qui reconnaît l'absence d'isolation au lieu
+// de la feindre. Un sous-processus lancé dans ce cas est NOTÉ "unsandboxed".
+//
+// RISQUE RÉSIDUEL (finalement non isolé) : si ALLOW_UNSANDBOXED_EXECUTION=1,
+// le bridge Python s'exécute DANS LE MÊME hôte, sans sandbox. Ce n'est PAS un
+// environnement sûr : c'est un contournement assumé, visible dans l'audit.
+
+type ExecutionEntitlement =
+  | { allowed: true; isolated: true; reason: string }
+  | { allowed: true; isolated: false; reason: string }
+  | { allowed: false; isolated: false; reason: string };
+
+const ALLOW_UNSANDBOXED_EXECUTION = 'ALLOW_UNSANDBOXED_EXECUTION';
+
+export function resolveExecutionEntitlement(): ExecutionEntitlement {
+  if (securityGate.isolatedExecution()) {
+    return { allowed: true, isolated: true, reason: 'effective isolation' };
+  }
+  if (process.env[ALLOW_UNSANDBOXED_EXECUTION] === '1') {
+    return {
+      allowed: true,
+      isolated: false,
+      reason: 'explicit unsandboxed opt-in (ALLOW_UNSANDBOXED_EXECUTION=1) — NO OS isolation; do not treat as safe',
+    };
+  }
+  return {
+    allowed: false,
+    isolated: false,
+    reason: 'ISOLATION_REQUIRED: security gate provides no effective isolation; refusing to execute arbitrary code. Set ALLOW_UNSANDBOXED_EXECUTION=1 ONLY to run with NO isolation (explicit, documented risk).',
+  };
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -74,7 +116,25 @@ function ensureRunsDir(): void {
   }
 }
 
-function startPiTask(task: CodeLabTask): void {
+function startPiTask(task: CodeLabTask): { ok: boolean; isolated: boolean; reason: string } {
+  // GARDE D'ISOLATION : on ne lance JAMAIS le bridge Python (code arbitraire)
+  // tant qu'aucune isolation effective n'est fournie (ou un opt-in explicite).
+  const entitlement = resolveExecutionEntitlement();
+  if (!entitlement.allowed) {
+    results.set(task.task_id, {
+      task_id: task.task_id,
+      status: 'blocked_isolation_required',
+      files_modified: [],
+      diff: '',
+      tests_passed: false,
+      commands_executed: [],
+      errors: [entitlement.reason],
+      duration_seconds: 0,
+      audit_trail: [{ event: 'EXECUTION_BLOCKED', isolated: false, reason: entitlement.reason }],
+    });
+    return { ok: false, isolated: false, reason: entitlement.reason };
+  }
+
   ensureRunsDir();
 
   const runDir = join(RUNS_DIR, task.task_id);
@@ -104,7 +164,7 @@ function startPiTask(task: CodeLabTask): void {
     }).unref();
   }
 
-  // Marquer comme running
+  // Marquer comme running (isolation status conservé dans l'audit_trail)
   results.set(task.task_id, {
     task_id: task.task_id,
     status: 'running',
@@ -114,8 +174,10 @@ function startPiTask(task: CodeLabTask): void {
     commands_executed: [],
     errors: [],
     duration_seconds: 0,
-    audit_trail: [],
+    audit_trail: [{ event: 'EXECUTION_STARTED', isolated: entitlement.isolated, mode: entitlement.isolated ? 'isolated' : 'unsandboxed' }],
   });
+
+  return { ok: true, isolated: entitlement.isolated, reason: entitlement.reason };
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -246,12 +308,22 @@ codelabRouter.post('/task', async (req: AuthRequest, res: Response) => {
   }
 
   Audit.taskSubmitted(task.task_id, task.workspace_id, task.mode);
-  startPiTask(task);
+  const launch = startPiTask(task);
+
+  if (!launch.ok) {
+    Audit.taskBlocked(task.task_id, req.auth?.token?.sub || 'unknown', launch.reason);
+    return res.status(403).json({
+      error: `Task registered but execution blocked: ${launch.reason}`,
+      code: 'ISOLATION_REQUIRED',
+      task_id: task.task_id,
+    });
+  }
 
   return res.status(201).json({
-    message: 'Task submitted',
+    message: launch.isolated ? 'Task submitted' : 'Task submitted (UNSANDBOXED: no OS isolation — explicit override)',
     task_id: task.task_id,
     mode: task.mode,
+    execution: launch.isolated ? 'isolated' : 'unsandboxed',
   });
 });
 
@@ -354,12 +426,27 @@ codelabRouter.post('/approve/:id', async (req: AuthRequest, res: Response) => {
 
   Audit.taskApproved(taskId, req.auth?.token?.sub || 'unknown');
 
-  // Lancer la tâche maintenant qu'elle est approuvée
-  startPiTask(task);
+  // Lancer la tâche maintenant qu'elle est approuvée — SAUF si aucune isolation.
+  const launch = startPiTask(task);
+
+  if (!launch.ok) {
+    Audit.taskBlocked(taskId, req.auth?.token?.sub || 'unknown', launch.reason);
+    return res.json({
+      message: `Task ${taskId} approved but execution blocked (no effective isolation)`,
+      task_id: taskId,
+      approved: true,
+      execution: 'blocked_isolation_required',
+      reason: launch.reason,
+    });
+  }
 
   return res.json({
-    message: `Task ${taskId} approved and started`,
+    message: launch.isolated
+      ? `Task ${taskId} approved and started`
+      : `Task ${taskId} approved and started (UNSANDBOXED: no OS isolation — explicit override)`,
     task_id: taskId,
+    approved: true,
+    execution: launch.isolated ? 'isolated' : 'unsandboxed',
   });
 });
 

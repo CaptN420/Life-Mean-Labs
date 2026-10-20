@@ -76,9 +76,26 @@ export class SecurityGateAdapter {
 
   /**
    * Vérifie si le Security Gate est disponible.
+   * NB: `AVAILABLE` indique seulement que cette implémentation en mémoire est
+   * prête à rendre des décisions d'AUTORISATION MÉTIER. Il ne garantit JAMAS
+   * une isolation du système d'exploitation.
    */
   getStatus(): GateStatus {
     return this.status;
+  }
+
+  /**
+   * Capability d'isolation effective. Ce SecurityGateAdapter ne fournit AUCUNE
+   * isolation OS (pas de sandbox, pas de séparation de processus sécurisée).
+   * Retourne TOUJOURS `false` — honnêtement.
+   *
+   * Ne jamais interpréter `getStatus() === 'AVAILABLE'` ni un `ALLOW` de
+   * `checkSecurity()` comme une preuve d'isolation. Toute opération sensible
+   * (exécuter du code arbitraire) doit consulter CETTE méthode et être refusée
+   * lorsqu'elle retourne `false` (sauf contournement explicite et documenté).
+   */
+  isolatedExecution(): boolean {
+    return false;
   }
 
   /**

@@ -8,6 +8,8 @@ import { describe, it, expect } from '@jest/globals';
 import { generateToken, validateToken, revokeToken, UserRole } from '../src/middleware/auth';
 import { validateTaskRequest, isValidTaskId, sanitizeWorkspacePath } from '../src/middleware/validation';
 
+process.env.AUTH_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
+
 // ── RBAC Tests ───────────────────────────────────────────────────────────────
 
 describe('RBAC - Role-Based Access Control', () => {

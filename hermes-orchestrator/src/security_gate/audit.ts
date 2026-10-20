@@ -26,6 +26,7 @@ export type AuditEventType =
   | 'TASK_APPROVED'
   | 'TASK_REJECTED'
   | 'TASK_ABORTED'
+  | 'TASK_BLOCKED'
   | 'TASK_EXPIRED'
   | 'ATTEMPT_BYPASS'
   | 'ERROR';
@@ -331,6 +332,24 @@ export const Audit = {
       decision: 'DENY',
       component: 'AuditLogger',
       reason: 'Task approval expired',
+    });
+  },
+
+  /**
+   * Exécution bloquée par absence d'isolation effective.
+   * DISTINCT de taskRejected : l'opération est métier-autorisée mais ne sera
+   * PAS lancée car aucune isolation effective n'est fournie (ou pas de
+   * contournement explicite). Jamais présenté comme une exécution sûre.
+   */
+  taskBlocked(taskId: string, blockedBy: string, reason: string): AuditEvent {
+    return logEvent({
+      event_type: 'TASK_BLOCKED',
+      task_id: taskId,
+      operation: 'EXECUTE',
+      decision: 'DENY',
+      component: 'AuditLogger',
+      reason,
+      details: { blocked_by: blockedBy },
     });
   },
 

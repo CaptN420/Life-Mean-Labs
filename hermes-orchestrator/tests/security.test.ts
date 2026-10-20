@@ -15,13 +15,18 @@ import {
 import { validateTaskRequest, isValidTaskId, sanitizeWorkspacePath } from '../src/middleware/validation';
 import { corsMiddleware } from '../src/middleware/cors';
 
+// Provide a stable signing secret so tests are deterministic and never write
+// a real `.auth-secret` key file during the suite.
+process.env.AUTH_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
+
 describe('Authentication', () => {
   describe('generateToken', () => {
     it('should generate a valid token', () => {
       const token = generateToken('test-client', 'OBSERVER');
       expect(token).toBeDefined();
+      expect(token).not.toBeNull();
       expect(typeof token).toBe('string');
-      expect(token.length).toBeGreaterThan(0);
+      expect(token!.length).toBeGreaterThan(0);
     });
 
     it('should generate unique tokens', () => {
@@ -77,6 +82,77 @@ describe('Authentication', () => {
       const token = generateToken('test-client', 'OBSERVER');
       revokeToken(token);
       expect(validateToken(token)).toBeNull();
+    });
+  });
+
+  describe('Token integrity & forge protection', () => {
+    const GOOD = 'test-secret-0123456789abcdef0123456789abcdef';
+    const ATTACKER = 'attacker-secret-9876543210fedcba9876543210fedcba';
+
+    it('rejects a token signed with the wrong secret', () => {
+      const token = generateToken('client', 'ADMIN', GOOD);
+      expect(token).not.toBeNull();
+      expect(validateToken(token!, ATTACKER)).toBeNull();
+      expect(validateToken(token!, GOOD)?.role).toBe('ADMIN');
+    });
+
+    it('rejects a forged ADMIN token (signed by an attacker secret)', () => {
+      // Attacker mints role=ADMIN but signs with the attacker secret, not ours.
+      const forged = generateToken('attacker', 'ADMIN', ATTACKER);
+      expect(validateToken(forged!, GOOD)).toBeNull();
+    });
+
+    it('rejects a tampered payload whose signature is not recomputed', () => {
+      const token = generateToken('client', 'OBSERVER', GOOD)!;
+      const [payload] = token.split('.');
+      // Decode, bump role to ADMIN, re-encode — but keep the ORIGINAL signature.
+      const obj = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
+      obj.role = 'ADMIN';
+      const tamperedPayload = Buffer.from(JSON.stringify(obj)).toString('base64url');
+      const sig = token.split('.')[1];
+      expect(validateToken(`${tamperedPayload}.${sig}`, GOOD)).toBeNull();
+    });
+
+    it('rejects a token missing its signature part', () => {
+      const token = generateToken('client', 'ADMIN', GOOD)!;
+      const [payload] = token.split('.');
+      expect(validateToken(payload, GOOD)).toBeNull();
+    });
+
+    it('rejects an expired token even when correctly signed', () => {
+      const now = Date.now();
+      const payload = Buffer.from(JSON.stringify({
+        sub: 'client', role: 'OBSERVER',
+        iat: now - 100000, exp: now - 10000, jti: 'jti',
+      })).toString('base64url');
+      const { createHmac } = require('node:crypto');
+      const sig = createHmac('sha256', GOOD).update(payload).digest('hex');
+      expect(validateToken(`${payload}.${sig}`, GOOD)).toBeNull();
+    });
+
+    it('rejects a role outside the whitelist even when signed', () => {
+      const now = Date.now();
+      const payload = Buffer.from(JSON.stringify({
+        sub: 'client', role: 'SUPERUSER',
+        iat: now, exp: now + 100000, jti: 'jti',
+      })).toString('base64url');
+      const { createHmac } = require('node:crypto');
+      const sig = createHmac('sha256', GOOD).update(payload).digest('hex');
+      expect(validateToken(`${payload}.${sig}`, GOOD)).toBeNull();
+    });
+
+    it('fails closed when no signing secret is available', () => {
+      // Empty secret -> generateToken returns null (fail-closed, no bounce).
+      expect(generateToken('client', 'OBSERVER', '')).toBeNull();
+    });
+
+    it('secureCompare returns false (not throw) on unequal-length inputs', () => {
+      const { secureCompare } = require('../src/middleware/auth');
+      expect(secureCompare('a', 'bb')).toBe(false);
+      expect(secureCompare('abc', 'abc')).toBe(true);
+      expect(secureCompare('abc', 'abcd')).toBe(false);
+      expect(secureCompare('abc' as any, 42 as any)).toBe(false);
+      expect(secureCompare(null as any, '' as any)).toBe(false);
     });
   });
 });

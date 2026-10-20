@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { securityGate, SecurityGateAdapter, SecurityContext } from '../src/security_gate/adapter';
 import { Audit, auditLogger } from '../src/security_gate/audit';
+import { resolveExecutionEntitlement } from '../src/codelab_adapter';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -436,9 +437,85 @@ describe('Negative Tests - Attack Prevention', () => {
   it('Existing protections should remain functional', () => {
     // Verify D and D.1 protections still work
     const { generateToken, validateToken } = require('../src/middleware/auth');
+    process.env.AUTH_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
     
     const token = generateToken('test', 'RUNNER');
     expect(validateToken(token)).not.toBeNull();
+  });
+});
+
+// ── Isolation decoupling (Phase 0.5) ─────────────────────────────────────────
+
+describe('Isolation decoupling (Phase 0.5)', () => {
+  const UNSANDBOXED_ENV = 'ALLOW_UNSANDBOXED_EXECUTION';
+
+  afterEach(() => {
+    // Le contournement expérimental ne doit jamais fuir entre les tests.
+    delete process.env[UNSANDBOXED_ENV];
+  });
+
+  it('isolatedExecution() is HONEST: returns false (no OS isolation provided)', () => {
+    const adapter = new SecurityGateAdapter();
+    expect(adapter.getStatus()).toBe('AVAILABLE'); // business gate is "up"
+    expect(adapter.isolatedExecution()).toBe(false); // ...but NOT isolated
+  });
+
+  it('never treats AVAILABLE / business ALLOW as proof of isolation', () => {
+    // An explicitly "AVAILABLE" gate that permits a DEV task still does NOT
+    // grant execution: the isolation entitlement must gate the launch.
+    const adapter = new SecurityGateAdapter();
+    adapter.registerPermission({
+      task_id: 'task_iso_probe', origin: 'hermes', request_id: 'r',
+      mode: 'DEV', workspace_id: 'ws',
+    });
+    // Business decision is ALLOW...
+    expect(adapter.isolatedExecution()).toBe(false);
+    // ...so a task that would execute arbitrary code is refused by default.
+    expect(resolveExecutionEntitlement().allowed).toBe(false);
+    expect(resolveExecutionEntitlement().isolated).toBe(false);
+  });
+
+  it('negative: arbitrary-code execution is REFUSED by default (fail-closed)', () => {
+    expect(resolveExecutionEntitlement()).toEqual({
+      allowed: false,
+      isolated: false,
+      reason: expect.stringContaining('ISOLATION_REQUIRED'),
+    } as any);
+  });
+
+  it('positive: explicit unsandboxed opt-in allows launch but marks it NOT isolated', () => {
+    process.env[UNSANDBOXED_ENV] = '1';
+    const ent = resolveExecutionEntitlement();
+    expect(ent.allowed).toBe(true);
+    expect(ent.isolated).toBe(false); // NEVER claimed as isolated
+    expect(ent.reason).toContain('unsandboxed');
+    expect(ent.reason.toLowerCase()).toContain('no oS isolation'.toLowerCase());
+  });
+
+  it('positive: isolated entitlement path is exercised when the gate reports isolation', () => {
+    const spy = jest.spyOn(securityGate, 'isolatedExecution').mockReturnValue(true);
+    try {
+      const ent = resolveExecutionEntitlement();
+      expect(ent.allowed).toBe(true);
+      expect(ent.isolated).toBe(true);
+      expect(ent.reason).toContain('effective isolation');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('audit: taskBlocked logs TASK_BLOCKED with decision DENY (distinct from rejected)', () => {
+    const evt = Audit.taskBlocked('task_blocked_1', 'reviewer', 'ISOLATION_REQUIRED: no effective isolation');
+    expect(evt.event_type).toBe('TASK_BLOCKED');
+    expect(evt.decision).toBe('DENY');
+    expect(evt.reason).toContain('ISOLATION_REQUIRED');
+    expect(evt.operation).toBe('EXECUTE');
+  });
+
+  it('security gate status AVAILABLE does not equal isolatedExecution()', () => {
+    const adapter = new SecurityGateAdapter();
+    expect(adapter.getStatus()).toBe('AVAILABLE');
+    expect(adapter.isolatedExecution()).toBe(false);
   });
 });
 
