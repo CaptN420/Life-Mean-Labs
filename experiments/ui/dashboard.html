@@ -601,6 +601,7 @@
             <button class="tab-btn" data-tab="code-lab" onclick="switchTab('code-lab', this)">Code Lab</button>
             <button class="tab-btn" data-tab="settings" onclick="switchTab('settings', this)">Settings</button>
             <button class="tab-btn" data-tab="compare" onclick="switchTab('compare', this)">Compare</button>
+            <button class="tab-btn" data-tab="clustertree" onclick="switchTab('clustertree', this)">Cluster Tree</button>
             <button class="tab-btn" data-tab="experimental" onclick="switchTab('experimental', this)">Experimental</button>
         </nav>
 
@@ -977,6 +978,25 @@
 
     </div>
 
+    <!-- ── Cluster Tree tab — experiments grouped by subject + run explorer ── -->
+    <div id="panel-clustertree" class="tab-panel">
+        <div class="card">
+            <h2>Cluster Tree</h2>
+            <p class="subtitle">Hiérarchie du lab : les expériences regroupées par sujet (arbre de sujets), et l'explorateur des répertoires de runs <code>code_lab_runs/</code> / <code>debate_lab_runs/</code>.</p>
+            <button class="btn-sm" onclick="loadClusterTree()" style="margin-bottom:0.75rem;">↻ Refresh</button>
+            <div style="display:grid;grid-template-columns:minmax(280px,42%) 1fr;gap:1rem;align-items:start;">
+                <div class="compare-col">
+                    <h3 style="margin:0 0 0.5rem;">📁 Sujets → expériences</h3>
+                    <div id="ct-subject" class="empty-state">Chargement…</div>
+                </div>
+                <div class="compare-col">
+                    <h3 style="margin:0 0 0.5rem;">🗂 Runs (répertoires)</h3>
+                    <div id="ct-runs" class="empty-state">Chargement…</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <button class="refresh-btn" onclick="loadExperiments()" title="Refresh">↻</button>
 
     <!-- ── Experimental tab — OPT-IN sandbox; the stable core does not depend on it ── -->
@@ -1056,7 +1076,64 @@
             if (name === 'debate') { loadDebateLab(); loadDebateTemplates(); loadDebateModelPool(); }
             if (name === 'settings') loadSettings();
             if (name === 'compare') { loadCompare(); }
+            if (name === 'clustertree') { loadClusterTree(); }
             if (name === 'experimental') { loadExperimental(); }
+        }
+
+        // ── Cluster Tree ── experiments by subject + run-directory explorer ──
+        async function loadClusterTree() {
+            const sEl = document.getElementById('ct-subject');
+            const rEl = document.getElementById('ct-runs');
+            if (sEl) sEl.textContent = 'Chargement…';
+            if (rEl) rEl.textContent = 'Chargement…';
+            try {
+                const resp = await fetch(`${API_BASE}/cluster/tree`);
+                const data = await resp.json();
+                if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                if (sEl) sEl.innerHTML = renderSubjectNode((data.subject_tree && data.subject_tree.tree) || {}, 0);
+                if (rEl) rEl.innerHTML = renderRunsNode(data.runs || {});
+            } catch (err) {
+                if (sEl) sEl.textContent = 'Erreur: ' + err.message;
+                if (rEl) rEl.textContent = 'Erreur: ' + err.message;
+                console.error('cluster tree:', err);
+            }
+        }
+        function renderSubjectNode(node, depth) {
+            const subjects = (node && node.subjects) || {};
+            const exps = (node && node.experiments) || [];
+            let html = '';
+            for (const k of Object.keys(subjects)) {
+                html += `<details ${depth === 0 ? 'open' : ''}><summary>📁 ${escapeHtml(k)}</summary>`
+                      + renderSubjectNode(subjects[k], depth + 1) + `</details>`;
+            }
+            if (exps.length) {
+                html += `<ul class="ct-list" style="margin:0.2rem 0 0.4rem 1rem;">`
+                      + exps.map(e => `<li>🟦 ${escapeHtml(e)}</li>`).join('') + `</ul>`;
+            }
+            if (depth === 0 && !Object.keys(subjects).length && !exps.length) html = '<em>Aucun sujet enregistré.</em>';
+            return html;
+        }
+        function renderRunsNode(runs) {
+            let html = '';
+            for (const [key, val] of Object.entries(runs || {})) {
+                html += `<details open><summary>🗂 ${escapeHtml(key)}</summary>${renderDirNode(val)}</details>`;
+            }
+            if (!Object.keys(runs || {}).length) html = '<em>Aucun run.</em>';
+            return html;
+        }
+        function renderDirNode(node) {
+            const dirs = (node && node.dirs) || {};
+            const files = (node && node.files) || [];
+            let html = '';
+            for (const d of Object.keys(dirs)) {
+                html += `<details><summary>📂 ${escapeHtml(d)}</summary>${renderDirNode(dirs[d])}</details>`;
+            }
+            if (files.length) {
+                html += `<ul class="ct-list" style="margin:0.2rem 0 0.4rem 1rem;">`
+                      + files.map(f => `<li>📄 ${escapeHtml(f)}</li>`).join('') + `</ul>`;
+            }
+            if (!Object.keys(dirs).length && !files.length) html = '<em>—</em>';
+            return html;
         }
 
         // ── Compare ───────────── browse / inspect / select / compare ──

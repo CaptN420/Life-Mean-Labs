@@ -114,6 +114,8 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._compare_browser(refresh=True)
         elif _id_match := re.match(r"^/api/compare/run/([^/]+)$", parsed.path):
             self._compare_run(_id_match.group(1))
+        elif parsed.path == "/api/cluster/tree":
+            self._cluster_tree()
         elif parsed.path == "/dashboard":
             self._serve_dashboard()
         else:
@@ -627,6 +629,54 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._send_json(result)
         except ValueError as e:
             self._send_error(400, str(e), code="invalid_settings")
+
+    def _cluster_tree(self) -> None:
+        """GET /api/cluster/tree — hierarchical 'cluster tree' of the lab:
+        experiments grouped by subject (topic tree) + a run-directory explorer
+        over the on-disk run workspaces. Read-only, bounded walk, no secrets.
+        """
+        import os as _os
+        from pathlib import Path as _P
+
+        try:
+            subjects = self._subjects()
+            subject_tree = {
+                "tree": subjects.tree(),
+                "topics": subjects.topics(),
+                "root": str(subjects.root),
+            }
+        except Exception as exc:  # pragma: no cover - honest degradation
+            subject_tree = {"tree": {}, "topics": [], "root": "",
+                            "error": str(exc)[:120]}
+
+        def _walk(base, max_entries=200):
+            if not base.is_dir():
+                return {"dirs": {}, "files": []}
+            node = {"dirs": {}, "files": []}
+            try:
+                entries = sorted(_os.listdir(base))
+            except OSError:
+                return node
+            for name in entries:
+                if len(node["dirs"]) + len(node["files"]) >= max_entries:
+                    node["files"].append("… (truncated)")
+                    break
+                p = base / name
+                try:
+                    if p.is_dir():
+                        node["dirs"][name] = _walk(p, max_entries)
+                    else:
+                        node["files"].append(name)
+                except OSError:  # pragma: no cover - unreadable entry
+                    continue
+            return node
+
+        cwd = _P.cwd()
+        runs = {
+            "code_lab_runs": _walk(cwd / "code_lab_runs"),
+            "debate_lab_runs": _walk(cwd / "debate_lab_runs"),
+        }
+        self._send_json({"subject_tree": subject_tree, "runs": runs})
 
     def _serve_dashboard(self) -> None:
         """Serve the dashboard HTML from package resources.
