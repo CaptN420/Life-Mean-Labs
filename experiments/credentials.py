@@ -24,12 +24,19 @@ Nothing here prints or persists a key beyond the git-ignored override file.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Tuple
 
 ENV_BASE_URL = "LIFE_MEAN_LLM_BASE_URL"
 ENV_API_KEY = "LIFE_MEAN_LLM_API_KEY"
+ENV_OPENROUTER_BASE_URL = "OPENROUTER_BASE_URL"
+ENV_OPENROUTER_API_KEY = "OPENROUTER_API_KEY"
+OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+PROVIDER_LM_STUDIO = "lm_studio"
+PROVIDER_OPENROUTER = "openrouter"
+_PROVIDERS = (PROVIDER_LM_STUDIO, PROVIDER_OPENROUTER)
 _OVERRIDES_FILE_ENV = "LIFE_MEAN_OVERRIDES_FILE"
 
 
@@ -39,6 +46,37 @@ def overrides_dir() -> Path:
     if env:
         return Path(env).parent
     return Path.cwd() / "overrides"
+
+
+def _overrides_settings_path() -> Path:
+    """Path of the Settings runtime override JSON (may not exist)."""
+    env = os.environ.get(_OVERRIDES_FILE_ENV)
+    if env:
+        return Path(env)
+    return Path.cwd() / "overrides" / "settings.json"
+
+
+def selected_provider() -> str:
+    """Return the dashboard-selected provider (``lm_studio`` | ``openrouter``).
+
+    Read from the Settings override file (persisted by the dashboard). Defaults
+    to ``lm_studio`` if unset, corrupt, or unknown. Never raises.
+    """
+    try:
+        p = _overrides_settings_path()
+        if p.exists():
+            data = json.loads(p.read_text(encoding="utf-8"))
+            v = data.get("provider")
+            if v in _PROVIDERS:
+                return v
+    except Exception:  # corrupt override file -> safe default
+        pass
+    return PROVIDER_LM_STUDIO
+
+
+def provider_label(provider: str) -> str:
+    """Human label for a provider id (fallback: the id itself)."""
+    return {"lm_studio": "LM Studio", "openrouter": "OpenRouter"}.get(provider, provider)
 
 
 def settings_llm_env_path() -> Path:
@@ -79,9 +117,17 @@ def resolve_llm_credentials(base_url: str = "", api_key: str = "") -> Tuple[str,
     """Return the effective (base_url, api_key) under the canonical precedence.
 
     ``base_url``/``api_key`` are optional call-provided fallbacks — a live env /
-    override value always wins. Never raises; returns empty strings if nothing
-    is configured.
+    override value always wins. When the dashboard has selected OpenRouter AND
+    an OpenRouter key is available, the runtime talks to OpenRouter; otherwise
+    it falls back to the LM Studio resolution (so an unset OpenRouter key
+    degrades honestly to LM Studio rather than returning empty credentials).
+    Never raises; returns empty strings if nothing is configured.
     """
+    if selected_provider() == PROVIDER_OPENROUTER:
+        obu = os.environ.get(ENV_OPENROUTER_BASE_URL, "") or OPENROUTER_DEFAULT_BASE_URL
+        okey = os.environ.get(ENV_OPENROUTER_API_KEY, "") or api_key
+        if okey:
+            return obu, okey
     bu = os.environ.get(ENV_BASE_URL, "") or base_url
     key = os.environ.get(ENV_API_KEY, "") or api_key
     if not bu or not key:

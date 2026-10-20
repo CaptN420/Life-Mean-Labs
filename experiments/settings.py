@@ -356,6 +356,54 @@ def build_settings_snapshot() -> Dict[str, Any]:
         },
     }
 
+
+def _provider_credentials(provider: str) -> Tuple[str, str]:
+    """Resolve the (base_url, api_key) for ONE provider, ignoring the active
+    toggle — used to probe and list BOTH providers' model pools side by side.
+    Never returns a key to callers that log; only the configured flag is safe.
+    """
+    from experiments.credentials import (
+        ENV_BASE_URL, ENV_API_KEY,
+        ENV_OPENROUTER_BASE_URL, ENV_OPENROUTER_API_KEY,
+        OPENROUTER_DEFAULT_BASE_URL,
+    )
+    if provider == "openrouter":
+        bu = os.environ.get(ENV_OPENROUTER_BASE_URL, "") or OPENROUTER_DEFAULT_BASE_URL
+        key = os.environ.get(ENV_OPENROUTER_API_KEY, "") or ""
+    else:
+        bu = os.environ.get(ENV_BASE_URL, "") or "http://localhost:1234/v1"
+        key = os.environ.get(ENV_API_KEY, "") or ""
+    return bu, key
+
+
+def _provider_model_pools() -> list:
+    """Probe BOTH providers and return their model lists grouped by provider.
+
+    Each group: {provider, label, base_url, key_configured, models, error}.
+    A provider with no configured key is reported harmlessly (no network probe);
+    a down backend surfaces its error honestly instead of an empty list.
+    """
+    from experiments.credentials import provider_label
+    groups = []
+    for pid in ("lm_studio", "openrouter"):
+        bu, key = _provider_credentials(pid)
+        if not key:
+            groups.append({
+                "provider": pid, "label": provider_label(pid),
+                "base_url": bu, "key_configured": False,
+                "models": [], "error": "no_api_key",
+            })
+            continue
+        bm = _backend_models(bu, key)
+        groups.append({
+            "provider": pid, "label": provider_label(pid),
+            "base_url": bu, "key_configured": True,
+            "models": sorted(bm.get("models") or []),
+            "error": bm.get("error_code"),
+        })
+    return groups
+
+
 def get_settings() -> Dict[str, Any]:
     """Return sanitized current settings. NEVER returns secret values."""
     try:
@@ -403,6 +451,13 @@ def get_settings() -> Dict[str, Any]:
     backend_reachable = bool(_md.get("reachable"))
     authenticated = bool(_md.get("authenticated"))
 
+    # Provider selector state + BOTH providers' model pools, grouped. The
+    # active provider drives credentials; the groups surface both lists.
+    from experiments.credentials import selected_provider
+    provider = selected_provider()
+    openrouter_key_configured = bool(os.environ.get("OPENROUTER_API_KEY", ""))
+    provider_models = _provider_model_pools()
+
     debate = cfg.get("debate", {})
     router = cfg.get("router", {})
     models = cfg.get("models", {})
@@ -417,6 +472,8 @@ def get_settings() -> Dict[str, Any]:
         },
         "inference": {
             "base_url": live_bu,
+            # Active provider driving the runtime backend.
+            "provider": provider,
             # NEVER the secret itself — only the configured flag.
             "api_key_configured": bool(live_key),
             # Hostile-free, truthful backend status (§6 of runtime pass).
@@ -456,6 +513,13 @@ def get_settings() -> Dict[str, Any]:
         "model_pools": model_pools(),
         "model_domains": list(_DOMAIN_MODEL_ROLES),
         "available_models": avail,
+        # Provider selector: options + both providers' model pools grouped.
+        "provider_options": [
+            {"id": "lm_studio", "label": "LM Studio"},
+            {"id": "openrouter", "label": "OpenRouter"},
+        ],
+        "provider_models": provider_models,
+        "openrouter_key_configured": openrouter_key_configured,
         "personas": _current_personas(cfg.get("personas", {})),
         "role_templates": _role_templates_view(cfg.get("role_templates", {})),
         "router": {
@@ -630,6 +694,15 @@ def update_settings(patch: Dict[str, Any]) -> Dict[str, Any]:
                     _merged.update(_prior)
                 _merged.update(clean)
                 overrides["personas"] = _merged
+            continue
+        if key == "provider":
+            # Dashboard provider selector — whitelist validated here (the
+            # controlled internal API), never forwarded to the debate config.
+            from experiments.credentials import _PROVIDERS
+            if value not in _PROVIDERS:
+                errors[key] = f"'provider' must be one of {list(_PROVIDERS)}"
+            else:
+                overrides["provider"] = value
             continue
         err = _validate(key, value)
         if err:

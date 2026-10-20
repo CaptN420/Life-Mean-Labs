@@ -3040,7 +3040,20 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                 ['max_consecutive_same_speaker (editable)', r.max_consecutive_same_speaker],
             ];
 
-            bodyEl.innerHTML = cat('Inference', inferenceRows)
+            bodyEl.innerHTML = (() => {
+                const curProv = (s.inference && s.inference.provider) || 'lm_studio';
+                const opts = (s.provider_options || []).map(o =>
+                    `<option value="${escapeHtml(o.id)}" ${o.id === curProv ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+                return `<div class="card" style="margin-top:1rem;">
+                    <h2>Provider</h2>
+                    <p class="subtitle">Choose the LLM backend the Lab uses. The model pool below lists <strong>both</strong> providers' models, grouped.</p>
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                        <select id="provider-select">${opts}</select>
+                        <button class="btn-sm" id="provider-save">Apply provider</button>
+                        <span id="provider-msg"></span>
+                    </div>
+                </div>` + cat('Inference', inferenceRows);
+            })()
                 + `<div class="card" style="margin-top:1rem;">
                     <h2>LLM Backend (LM Studio) — configure API credentials</h2>
                     <p class="subtitle">Set the LM Studio <code>base_url</code> and API key. The key is stored server-side in a
@@ -3091,6 +3104,27 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                 } catch (err) {
                     if (msg) { msg.style.color = '#b00'; msg.textContent = 'Save failed — ' + err.message; }
                     console.error('cred save:', err);
+                }
+            });
+
+            // ── Provider selector — apply via the controlled internal API ──
+            const provSave = document.getElementById('provider-save');
+            if (provSave) provSave.addEventListener('click', async () => {
+                const sel = document.getElementById('provider-select').value;
+                const msg = document.getElementById('provider-msg');
+                try {
+                    const resp = await fetch(`${API_BASE}/settings`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ provider: sel }),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+                    if (msg) { msg.style.color = '#0a0'; msg.textContent = 'Provider applied: ' + sel; }
+                    loadSettings();
+                } catch (err) {
+                    if (msg) { msg.style.color = '#b00'; msg.textContent = 'Save failed — ' + err.message; }
+                    console.error('provider save:', err);
                 }
             });
 
