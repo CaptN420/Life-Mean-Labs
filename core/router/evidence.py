@@ -227,8 +227,8 @@ class EvidenceValidator:
                         collector.add_error(f"Validator error: {exc}")
                         all_passed = False
 
-        # Determine final status
-        if all_passed and len(self._evidence) > 0:
+        # Determine final status based on collected evidence
+        if all_passed and len(collector._evidence) > 0:
             return EvidenceStatus.VERIFIED
         elif any(e.passed for e in collector._evidence):
             return EvidenceStatus.PARTIAL
@@ -236,11 +236,6 @@ class EvidenceValidator:
             return EvidenceStatus.INVALID
         else:
             return EvidenceStatus.UNVERIFIED
-
-    @property
-    def _evidence(self) -> List[EvidenceItem]:
-        # Helper to access evidence from collector
-        return []
 
 
 # ── Benchmark Engine ─────────────────────────────────────────────────────────
