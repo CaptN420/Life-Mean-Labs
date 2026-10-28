@@ -1,0 +1,12 @@
+{
+    "version": "v1.0.b",
+    "timestamp": "2026-10-20T16:37:10.081053",
+    "data": {
+        "acquis": []
+    },
+    "build_notes": [
+        "Traitement de l'erreur : Le Routeur de D\u00e9cision est compris.",
+        "Traitement de l'erreur : Test de validation de la version v1.0a r\u00e9ussi.",
+        "Traitement de l'erreur : Tentative d'acc\u00e8s non autoris\u00e9e bloqu\u00e9e par le Gatekeeper."
+    ]
+}

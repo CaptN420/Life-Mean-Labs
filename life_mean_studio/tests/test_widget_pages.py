@@ -64,19 +64,19 @@ def test_pages_exist(studio_app):
 
 def test_quick_run_widgets(studio_app):
     """Test Quick Run section has expected widgets."""
-    # Check workflow combo exists and is disabled
+    # Workflow combo exists and is enabled (drives the real run)
     assert studio_app.workflow_combo is not None
-    assert not studio_app.workflow_combo.isEnabled()
+    assert studio_app.workflow_combo.isEnabled()
 
-    # Check model combo exists and is disabled
+    # Model combo exists and is enabled (live readout of available models)
     assert studio_app.model_combo is not None
-    assert not studio_app.model_combo.isEnabled()
+    assert studio_app.model_combo.isEnabled()
 
-    # Check RUN button exists and is disabled
+    # RUN button exists and is enabled (starts the real engine)
     assert studio_app.run_btn is not None
-    assert not studio_app.run_btn.isEnabled()
+    assert studio_app.run_btn.isEnabled()
 
-    # Check STOP button exists and is disabled
+    # STOP button exists, but starts disabled (no active run yet)
     assert studio_app.stop_btn is not None
     assert not studio_app.stop_btn.isEnabled()
 

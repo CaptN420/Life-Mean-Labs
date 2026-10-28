@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life_mean — Workspace</title>
+    <link rel="stylesheet" href="workspace.css">
+</head>
+<body>
+    <!-- Top Bar -->
+    <header class="topbar" data-tool="topbar">
+        <div class="topbar-brand">
+            <span class="brand-icon">⚡</span>
+            <span class="brand-name">Life_mean Workspace</span>
+        </div>
+        <nav class="topbar-nav" data-tool="navigation">
+            <button class="nav-btn active" data-view="editor" data-action="switch_view">Éditeur</button>
+            <button class="nav-btn" data-view="workflow" data-action="switch_view">Workflow</button>
+            <button class="nav-btn" data-view="history" data-action="switch_view">Historique</button>
+            <button class="nav-btn" data-view="settings" data-action="switch_view">Paramètres</button>
+        </nav>
+        <div class="topbar-actions" data-tool="actions">
+            <select id="modelSelect" data-tool="model-selector" data-action="change_model">
+                <option value="">Sélectionner un modèle...</option>
+            </select>
+            <select id="workflowSelect" data-tool="workflow-selector" data-action="change_workflow">
+                <option value="">Sélectionner un workflow...</option>
+            </select>
+            <button id="runBtn" class="btn btn-run" data-tool="run-button" data-action="start_run">▶ Run</button>
+            <button id="stopBtn" class="btn btn-stop" data-tool="stop-button" data-action="stop_run" disabled>■ Stop</button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <main class="workspace-layout" data-tool="main-layout">
+        <!-- Left Panel: Tools -->
+        <aside class="left-panel" data-tool="left-panel" data-state="collapsed">
+            <div class="panel-header">
+                <span>Outils</span>
+                <button class="collapse-btn" data-action="toggle_panel">×</button>
+            </div>
+            <div class="tool-list" data-tool="tool-list">
+                <div class="tool-item" data-tool-id="file-explorer" data-action="open_tool">
+                    <span class="tool-icon">📁</span>
+                    <span>Fichiers</span>
+                </div>
+                <div class="tool-item" data-tool-id="code-editor" data-action="open_tool">
+                    <span class="tool-icon">✏️</span>
+                    <span>Éditeur</span>
+                </div>
+                <div class="tool-item" data-tool-id="prompt-zone" data-action="open_tool">
+                    <span class="tool-icon">💬</span>
+                    <span>Prompt</span>
+                </div>
+                <div class="tool-item" data-tool-id="json-viewer" data-action="open_tool">
+                    <span class="tool-icon">📋</span>
+                    <span>JSON</span>
+                </div>
+                <div class="tool-item" data-tool-id="params-editor" data-action="open_tool">
+                    <span class="tool-icon">⚙️</span>
+                    <span>Paramètres</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Panel: Main Workspace -->
+        <section class="center-panel" data-tool="center-panel">
+            <!-- Editor View -->
+            <div class="view-panel active" data-view-id="editor">
+                <div class="panel-toolbar" data-tool="toolbar">
+                    <button class="toolbar-btn" data-action="new_file" title="Nouveau fichier">+ Nouveau</button>
+                    <button class="toolbar-btn" data-action="save_file" title="Sauvegarder">💾 Sauver</button>
+                    <button class="toolbar-btn" data-action="run_code" title="Exécuter le code">▶ Exécuter</button>
+                    <div class="file-path-display" data-tool="current-file" data-state="">Aucun fichier ouvert</div>
+                </div>
+                <div class="editor-container" data-tool="editor-container">
+                    <textarea id="codeEditor" class="code-editor" data-tool="code-editor" placeholder="# Écrivez votre code ici...
+def hello():
+    print('Hello from Life_mean Workspace!')
+
+hello()"></textarea>
+                </div>
+            </div>
+
+            <!-- Workflow View -->
+            <div class="view-panel" data-view-id="workflow">
+                <div class="workflow-config" data-tool="workflow-config">
+                    <h3>Configuration du Workflow</h3>
+                    <div class="config-form" data-tool="config-form">
+                        <div class="form-group">
+                            <label for="workflowName">Nom:</label>
+                            <input type="text" id="workflowName" data-tool="workflow-name" placeholder="Mon workflow">
+                        </div>
+                        <div class="form-group">
+                            <label for="domain">Domaine:</label>
+                            <input type="text" id="domain" data-tool="domain" placeholder="coding, research, ...">
+                        </div>
+                        <div class="form-group">
+                            <label for="numTasks">Nombre de tâches:</label>
+                            <input type="number" id="numTasks" data-tool="num-tasks" value="10" min="1" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label for="seed">Graine (seed):</label>
+                            <input type="number" id="seed" data-tool="seed" value="42" min="0">
+                        </div>
+                        <button class="btn btn-primary" data-action="apply_workflow" title="Appliquer la configuration">Appliquer</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History View -->
+            <div class="view-panel" data-view-id="history">
+                <div class="history-list" data-tool="history-list">
+                    <h3>Historique des Actions</h3>
+                    <ul id="actionHistory" data-tool="history-items"></ul>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div class="view-panel" data-view-id="settings">
+                <div class="settings-panel" data-tool="settings-panel">
+                    <h3>Paramètres</h3>
+                    <div class="settings-form" data-tool="settings-form">
+                        <div class="form-group">
+                            <label for="settingApiKey">Clé API:</label>
+                            <input type="password" id="settingApiKey" data-tool="api-key" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingBaseUrl">Base URL:</label>
+                            <input type="text" id="settingBaseUrl" data-tool="base-url" value="http://localhost:1234/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingModel">Modèle par défaut:</label>
+                            <input type="text" id="settingModel" data-tool="default-model" placeholder="kwaipilot_kat-coder-v2.5-dev">
+                        </div>
+                        <button class="btn btn-primary" data-action="save_settings" title="Sauvegarder les paramètres">Sauvegarder</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Context/State -->
+        <aside class="right-panel" data-tool="right-panel" data-state="expanded">
+            <div class="panel-header">
+                <span>Contexte</span>
+                <button class="collapse-btn" data-action="toggle_panel">×</button>
+            </div>
+            <div class="context-content" data-tool="context-content">
+                <div class="state-section" data-tool="current-state">
+                    <h4>État actuel</h4>
+                    <pre id="stateDisplay" data-tool="state-display">{}</pre>
+                </div>
+                <div class="params-section" data-tool="params-editor">
+                    <h4>Paramètres Clé/Valeur</h4>
+                    <table class="params-table" data-tool="params-table">
+                        <thead>
+                            <tr>
+                                <th>Clé</th>
+                                <th>Valeur</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paramsBody" data-tool="params-body"></tbody>
+                    </table>
+                    <button class="btn btn-small" data-action="add_param" title="Ajouter un paramètre">+ Ajouter</button>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Panel: Console/Output -->
+    <footer class="bottom-panel" data-tool="bottom-panel">
+        <div class="panel-header">
+            <span>Console / Sortie</span>
+            <button class="clear-btn" data-action="clear_console" title="Effacer la console">Effacer</button>
+        </div>
+        <div class="console-output" data-tool="console-output">
+            <pre id="consoleOutput" data-tool="console-pre"></pre>
+        </div>
+        <div class="console-input" data-tool="console-input">
+            <span class="prompt">❯</span>
+            <input type="text" id="consoleInput" data-tool="console-input-field" placeholder="Commande ou prompt...">
+        </div>
+    </footer>
+
+    <script src="workspace.js"></script>
+</body>
+</html>

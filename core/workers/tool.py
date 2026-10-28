@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from core.cache import get_tool_cache, hash_inputs
 from core.events.message import Message
 from core.runtime.worker import Worker
 from library.tools.detection import TOOL_DETECTION, detect_tool
@@ -28,8 +29,14 @@ _TOOL_DOMAINS = {
 
 
 def _execute_tool(tool_name: str, **kwargs) -> Dict[str, Any]:
-    """Execute a tool by name, routing to the correct domain registry."""
-    # Try direct match first (e.g. "math_gcd" → math domain, gcd function)
+    """Execute a tool by name, routing to the correct domain registry.
+
+    Implements fallback chain:
+      1. Direct match (math_gcd -> math domain, gcd function)
+      2. Fallback: bare name search across all domains
+      3. Final: return error if nothing found
+    """
+    # Attempt 1: Direct match with domain prefix
     parts = tool_name.split("_", 1)
     if len(parts) == 2:
         domain_prefix, fn_name = parts
@@ -43,9 +50,9 @@ def _execute_tool(tool_name: str, **kwargs) -> Dict[str, Any]:
                         result = registry[fn_name]["fn"](**kwargs)
                         return {"valid": True, "tool": tool_name, "result": result}
                 except Exception as e:
-                    return {"valid": False, "error": f"Tool execution error: {e}"}
+                    logger.warning("Direct match failed for %s: %s", tool_name, e)
 
-    # Fallback: try all domains for the bare function name
+    # Attempt 2: Fallback - try all domains for bare function name
     for domain, (mod_path, attr_name) in _TOOL_DOMAINS.items():
         try:
             import importlib
@@ -57,6 +64,7 @@ def _execute_tool(tool_name: str, **kwargs) -> Dict[str, Any]:
         except Exception:
             continue
 
+    # Attempt 3: All fallbacks exhausted
     return {"valid": False, "error": f"Unknown tool: {tool_name}"}
 
 
@@ -72,6 +80,7 @@ class ToolWorker(Worker):
     def __init__(self, bus=None):
         super().__init__(bus)
         self._tool_cache: Dict[str, Dict[str, str]] = {}
+        self._result_cache = get_tool_cache()
         self._load_tool_cache()
 
     def _load_tool_cache(self) -> None:
@@ -144,8 +153,15 @@ class ToolWorker(Worker):
 
         logger.info(f"[{self.name}] Running tool: {tool_name} with kwargs={kwargs}")
 
-        # Execute the tool via domain registry
-        result = _execute_tool(tool_name, **kwargs)
+        # Execute the tool via domain registry (with cache)
+        cache_key = f"{tool_name}:{hash_inputs(**kwargs)}"
+        result = self._result_cache.get_or_compute(
+            cache_key,
+            _execute_tool,
+            ttl=600.0,  # 10 min TTL for tool results
+            tool_name=tool_name,
+            **kwargs,
+        )
         self._respond(message, result, task_id)
 
     def _respond(self, original_msg: Message, result: Dict[str, Any], task_id: str) -> None:
@@ -171,3 +187,11 @@ class ToolWorker(Worker):
     def get_tool_count(self) -> int:
         """Get the number of cached tools."""
         return len(self._tool_cache)
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get result cache statistics."""
+        return self._result_cache.stats
+
+    def clear_cache(self) -> int:
+        """Clear the result cache. Returns entries cleared."""
+        return self._result_cache.clear()

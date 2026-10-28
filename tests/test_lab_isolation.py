@@ -13,7 +13,7 @@ from unittest import TestCase, main
 from life_mean_lab.sandbox import SandboxWorkspace, SandboxError
 from life_mean_lab.resource_limits import ResourceLimits, ProcessMonitor
 from life_mean_lab.abort_mechanism import AbortRegistry
-from life_mean_lab.orchestrator import LabOrchestrator
+from life_mean_lab.lab_orchestrator import LabOrchestrator
 
 
 class TestSandboxWorkspace(TestCase):

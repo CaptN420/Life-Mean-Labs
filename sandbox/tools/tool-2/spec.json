@@ -1,0 +1,15 @@
+{
+  "id": "tool-2",
+  "description": "New tool",
+  "input_schema": {},
+  "output_schema": {},
+  "source_code": "# Auto-generated tool from capability need: need-2\n# Description: New tool\n# WARNING: This code has NOT been approved for production use.\n\ndef execute(**kwargs):\n    \"\"\"Stub implementation \u2014 replace with real logic.\"\"\"\n    return {\n        \"valid\": False,\n        \"error\": \"Tool not yet implemented (needs approval)\",\n        \"raw_input\": kwargs,\n    }\n",
+  "dependencies": [],
+  "tests": [],
+  "status": "proposed",
+  "version": "0.0.0",
+  "created_at": 1793108708.223956,
+  "approved_by": null,
+  "approval_note": "",
+  "sandbox_path": null
+}

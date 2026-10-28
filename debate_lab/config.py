@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 REAL_MODEL_ROUTING_METHODS = ("context_aware", "round_robin", "weighted", "random")
 # Speaker-selection modes that are genuinely implemented (moderator-driven).
 REAL_SPEAKER_SELECTION_MODES = ("moderator_llm",)
-MAX_TURNS_CEILING = 10000
+MAX_TURNS_CEILING = 1500
 
 
 class DebateLabConfigError(ValueError):
@@ -49,6 +49,12 @@ class DebateLabConfig:
 
     # Execution budget
     max_turns: int = 20
+
+    # Context management (compression)
+    context_compression_enabled: bool = False
+    context_compression_strategy: str = "structured"
+    context_compression_interval_turns: int = 20
+    context_compression_retain_recent_turns: int = 20
 
     # Inference
     temperature: float = 0.8
@@ -90,6 +96,18 @@ class DebateLabConfig:
         if self.max_turns > MAX_TURNS_CEILING:
             raise DebateLabConfigError(
                 f"INVALID_MAX_TURNS: max_turns must be <= {MAX_TURNS_CEILING}")
+        # Validate compression config if enabled
+        if self.context_compression_enabled:
+            if self.context_compression_strategy not in ("structured", "llm_summary"):
+                raise DebateLabConfigError(
+                    f"INVALID_COMPRESSION_STRATEGY: '{self.context_compression_strategy}' "
+                    f"not in ('structured', 'llm_summary')")
+            if self.context_compression_interval_turns < 1:
+                raise DebateLabConfigError(
+                    "INVALID_COMPRESSION_INTERVAL: must be >= 1")
+            if self.context_compression_retain_recent_turns < 1:
+                raise DebateLabConfigError(
+                    "INVALID_COMPRESSION_RETAIN: must be >= 1")
         if not (0.0 <= float(self.temperature) <= 2.0):
             raise DebateLabConfigError("INVALID_TEMPERATURE: temperature must be in [0, 2]")
         if self.model_routing_method not in REAL_MODEL_ROUTING_METHODS:
@@ -112,6 +130,10 @@ class DebateLabConfig:
             "template_id": self.template_id,
             "role_models": dict(self.role_models),
             "max_turns": self.max_turns,
+            "context_compression_enabled": self.context_compression_enabled,
+            "context_compression_strategy": self.context_compression_strategy,
+            "context_compression_interval_turns": self.context_compression_interval_turns,
+            "context_compression_retain_recent_turns": self.context_compression_retain_recent_turns,
             "temperature": self.temperature,
             "moderator_max_tokens": self.moderator_max_tokens,
             "participant_max_tokens": self.participant_max_tokens,
@@ -135,6 +157,10 @@ class DebateLabConfig:
             template_id=str(data.get("template_id", "philosophical-debate")),
             role_models=dict(data.get("role_models", {}) or {}),
             max_turns=int(data.get("max_turns", 20)),
+            context_compression_enabled=bool(data.get("context_compression_enabled", False)),
+            context_compression_strategy=str(data.get("context_compression_strategy", "structured")),
+            context_compression_interval_turns=int(data.get("context_compression_interval_turns", 20)),
+            context_compression_retain_recent_turns=int(data.get("context_compression_retain_recent_turns", 20)),
             temperature=float(data.get("temperature", 0.8)),
             moderator_max_tokens=int(data.get("moderator_max_tokens", 1000)),
             participant_max_tokens=int(data.get("participant_max_tokens", 2000)),

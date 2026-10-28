@@ -522,3 +522,34 @@ def build_cached(rows: Sequence[Dict[str, Any]],
     if cache_path is not None:
         save_graph(graph, cache_path)
     return graph
+
+
+def build_graph_payload(rows: Sequence[Dict[str, Any]],
+                        subjects: SubjectTree,
+                        conditions: Optional[Dict[str, Dict[str, Any]]] = None,
+                        cache_path: Optional[Path] = None,
+                        force: bool = False,
+                        thresholds: Optional[Dict[str, float]] = None,
+                        version: str = GRAPH_VERSION,
+                        algorithm: str = ALGORITHM) -> Dict[str, Any]:
+    """Serializable cluster-graph payload for an API endpoint (testable, no HTTP).
+
+    Wraps ``build_cached`` and adds ISO metadata (counts, cache fingerprints).
+    Read-only over RAW: conditions are supplied by the caller.
+    """
+    gr = build_cached(rows, subjects, conditions, cache_path=cache_path,
+                      version=version, algorithm=algorithm,
+                      thresholds=thresholds, force=force)
+    payload = gr.to_dict()
+    payload["counts"] = {
+        "nodes": len(payload["nodes"]),
+        "edges": len(payload["edges"]),
+        "clusters": len(payload["clusters"]),
+    }
+    payload["cache"] = {
+        "path": str(cache_path) if cache_path is not None else None,
+        "source_fingerprint": gr.source_fingerprint,
+        "params_fingerprint": gr.params_fingerprint,
+        "version": gr.version,
+    }
+    return payload

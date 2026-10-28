@@ -37,6 +37,7 @@ logger = logging.getLogger("ExperimentDashboard")
 
 from experimental.api import ExperimentalApiMixin
 from compare.api import CompareApiMixin
+from life_mean_extensions.api import ExtensionsApiMixin
 
 
 def _experimental_id_from_path(path: str, suffix: str):
@@ -49,12 +50,13 @@ def _experimental_id_from_path(path: str, suffix: str):
     return core.split("/")[-1] if core else None
 
 
-class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHandler):
+class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin, BaseHTTPRequestHandler):
     """HTTP request handler for the experiment dashboard."""
 
     ui_controller: ExperimentUIController = None  # Set by server
     code_lab_controller: Any = None  # Set by server (from code_lab)
     debate_lab_controller: Any = None  # Set by server (from debate_lab)
+    extension_layer: Dict[str, Any] = None  # Set by server (from life_mean_extensions)
 
     def do_GET(self) -> None:
         """Handle GET requests."""
@@ -114,8 +116,26 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
             self._compare_browser(refresh=True)
         elif _id_match := re.match(r"^/api/compare/run/([^/]+)$", parsed.path):
             self._compare_run(_id_match.group(1))
+        # ── Extensions API (modular self-extension layer) ────────────────────
+        elif parsed.path == "/api/extensions/skills":
+            self._extensions_skills_list()
+        elif _ext_id := self.match_extension_id(parsed.path):
+            if _ext_id[0] == "skills":
+                self._extensions_skill_get(_ext_id[1])
+            elif _ext_id[0] == "tools":
+                self._extensions_tool_get(_ext_id[1])
+            else:
+                self._send_error(404, "Not found")
+        elif parsed.path == "/api/extensions/tools":
+            self._extensions_tools_list()
+        elif parsed.path == "/api/extensions/capabilities":
+            self._extensions_capabilities_list()
+        elif parsed.path == "/api/extensions/pipeline":
+            self._extensions_pipeline_list()
         elif parsed.path == "/api/cluster/tree":
             self._cluster_tree()
+        elif parsed.path == "/api/cluster/graph":
+            self._cluster_graph()
         elif parsed.path == "/dashboard":
             self._serve_dashboard()
         else:
@@ -193,6 +213,48 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
                 self._experimental_design_run(_id)
             else:
                 self._send_error(404, "Not found")
+        # ── Extensions API (modular self-extension layer) ────────────────────
+        elif parsed.path == "/api/extensions/skills":
+            self._extensions_skill_create(data)
+        elif parsed.path == "/api/extensions/tools":
+            self._extensions_tool_create(data)
+        elif parsed.path == "/api/extensions/capabilities/analyze":
+            self._extensions_capabilities_analyze(data)
+        elif _ext_id := self.match_extension_id(parsed.path):
+            if _ext_id[0] == "skills":
+                # Match /approve, /activate, /disable, /delete
+                sub = parsed.path.split("/")[-1]
+                if sub == "approve":
+                    self._extensions_skill_approve(_ext_id[1], data)
+                elif sub == "activate":
+                    self._extensions_skill_activate(_ext_id[1])
+                elif sub == "disable":
+                    self._extensions_skill_disable(_ext_id[1])
+                else:
+                    self._send_error(404, "Not found")
+            elif _ext_id[0] == "tools":
+                sub = parsed.path.split("/")[-1]
+                if sub == "approve":
+                    self._extensions_tool_approve(_ext_id[1], data)
+                elif sub == "activate":
+                    self._extensions_tool_activate(_ext_id[1])
+                elif sub == "disable":
+                    self._extensions_tool_disable(_ext_id[1])
+                else:
+                    self._send_error(404, "Not found")
+            else:
+                self._send_error(404, "Not found")
+        elif _pipe_id := self.match_pipeline_id(parsed.path):
+            sub = parsed.path.split("/")[-1]
+            if sub == "approve":
+                self._extensions_pipeline_approve(_pipe_id, data)
+            elif sub == "activate":
+                self._extensions_pipeline_activate(_pipe_id)
+            else:
+                self._send_error(404, "Not found")
+        elif parsed.path.startswith("/api/extensions/capabilities/") and parsed.path.endswith("/resolve"):
+            need_id = parsed.path.split("/")[-2]
+            self._extensions_capabilities_resolve(need_id, data)
         else:
             self._send_error(404, "Not found")
 
@@ -506,77 +568,78 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
         self._send_json({"status": "recorded", "run_id": run_id,
                          "type": "RESEARCHER_INTERVENTION"})
 
+    def _validate_experiment_input(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Enforce whitelist and strict type conversion for experiment creation."""
+        known_keys = {"num_tasks", "seed", "deterministic", "debate", "difficulty_range", "mode"}
+        validated = {}
+        
+        for key in known_keys:
+            if key not in data:
+                continue
+            
+            val = data[key]
+            if key == "num_tasks":
+                try:
+                    validated[key] = int(val)
+                except (ValueError, TypeError):
+                    raise ValueError("Number of tasks must be a positive integer")
+            elif key == "seed":
+                try:
+                    validated[key] = int(val)
+                except (ValueError, TypeError):
+                    raise ValueError("Seed must be an integer")
+            elif key in ("deterministic", "debate"):
+                validated[key] = str(val).lower() in ("true", "1", "on")
+            elif key == "difficulty_range":
+                if isinstance(val, str):
+                    try:
+                        parsed = json.loads(val)
+                    except json.JSONDecodeError:
+                        raise ValueError("Difficulty range must be two numbers like [1, 5]")
+                    parsed = parsed
+                else:
+                    parsed = val
+                
+                if not isinstance(parsed, (list, tuple)) or len(parsed) != 2:
+                    raise ValueError("Difficulty range must contain exactly two values")
+                validated[key] = tuple(parsed)
+            elif key == "mode":
+                m = str(val).lower()
+                if m in ("debate", "debate_multi", "multi_agent"):
+                    validated["deterministic"] = False
+                    validated["debate"] = True
+                elif m in ("deterministic", "deterministic_only", "manual"):
+                    validated["deterministic"] = True
+                    validated["debate"] = False
+            else:
+                validated[key] = val
+
+        from dataclasses import fields as _dc_fields
+        config_fields = {f.name for f in _dc_fields(ExperimentConfig)}
+        
+        for k, v in data.items():
+            if k in config_fields and k not in validated:
+                validated[k] = v
+
+        if "difficulty_range" in validated and validated["difficulty_range"]:
+            dr = validated["difficulty_range"]
+            if not all(isinstance(x, (int, float)) for x in dr):
+                raise ValueError("Difficulty range values must be numbers")
+            if int(dr[0]) > int(dr[1]):
+                raise ValueError(
+                    f"Difficulty range must be ascending (min <= max), got {dr[0]} > {dr[1]}"
+                )
+
+        nt = validated.get("num_tasks", 100)
+        if not isinstance(nt, int) or nt <= 0:
+            raise ValueError("Number of tasks must be a positive integer")
+
+        return validated
+
     def _create_experiment(self, data: Dict[str, Any]) -> None:
         """Create a new experiment."""
         try:
-            # Parse difficulty_range from string or array to tuple
-            if "difficulty_range" in data:
-                dr = data["difficulty_range"]
-                if isinstance(dr, str):
-                    try:
-                        parsed = json.loads(dr)
-                    except json.JSONDecodeError:
-                        raise ValueError("Difficulty range must be two numbers like [1, 5]")
-                    if not isinstance(parsed, (list, tuple)) or len(parsed) != 2:
-                        raise ValueError("Difficulty range must contain exactly two values")
-                    data["difficulty_range"] = tuple(parsed)
-                elif isinstance(dr, list):
-                    data["difficulty_range"] = tuple(dr)
-
-            # Parse numeric fields
-            if "num_tasks" in data:
-                try:
-                    data["num_tasks"] = int(data["num_tasks"])
-                except (ValueError, TypeError):
-                    raise ValueError("Number of tasks must be a positive integer")
-            if "seed" in data:
-                try:
-                    data["seed"] = int(data["seed"])
-                except (ValueError, TypeError):
-                    raise ValueError("Seed must be an integer")
-
-            # Parse boolean fields
-            if "deterministic" in data:
-                data["deterministic"] = str(data["deterministic"]).lower() in ("true", "1", "on")
-            if "debate" in data:
-                data["debate"] = str(data["debate"]).lower() in ("true", "1", "on")
-            # "mode" is a UI convenience: map to the backing flags so the UI
-            # selector is the single source of truth (GOAL 8/13).
-            mode = data.pop("mode", None)
-            if mode is not None:
-                m = str(mode).lower()
-                if m in ("debate", "debate_multi", "multi_agent"):
-                    data["deterministic"] = False
-                    data["debate"] = True
-                elif m in ("deterministic", "deterministic_only", "manual"):
-                    data["deterministic"] = True
-                    data["debate"] = False
-                # unknown mode -> ignore (falls through to existing flags)
-
-            # Validate inputs with clear messages instead of raw tracebacks.
-            num_tasks = data.get("num_tasks", 100)
-            if not isinstance(num_tasks, int) or num_tasks <= 0:
-                raise ValueError("Number of tasks must be a positive integer")
-
-            if "difficulty_range" in data and data["difficulty_range"]:
-                dr = tuple(data["difficulty_range"])
-                if len(dr) != 2:
-                    raise ValueError("Difficulty range must contain exactly two values")
-                if not all(isinstance(x, (int, float)) for x in dr):
-                    raise ValueError("Difficulty range values must be numbers")
-                if int(dr[0]) > int(dr[1]):
-                    raise ValueError(
-                        f"Difficulty range must be ascending (min <= max), got {dr[0]} > {dr[1]}"
-                    )
-
-            # Keep only fields ExperimentConfig actually accepts: a stray UI or
-            # legacy key (e.g. a checkbox forwarded as `_deterministic_force`)
-            # must NEVER become an opaque 500. Unknown keys are ignored so the
-            # selectors already mapped above (mode -> deterministic/debate) stay
-            # the single source of truth.
-            from dataclasses import fields as _dc_fields
-            known = {f.name for f in _dc_fields(ExperimentConfig)}
-            data = {k: v for k, v in data.items() if k in known}
+            data = self._validate_experiment_input(data)
 
             config = ExperimentConfig(**data)
             exp_id = config.experiment_id
@@ -585,7 +648,6 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
         except (ValueError, json.JSONDecodeError, TypeError) as e:
             self._send_error(400, str(e), code="invalid")
         except Exception:
-            # Never surface internal state (paths/traces) to the browser.
             self._send_error(500, "Failed to create experiment", code="server")
 
     def _role_templates_get(self) -> None:
@@ -678,6 +740,45 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, BaseHTTPRequestHan
         }
         self._send_json({"subject_tree": subject_tree, "runs": runs})
 
+    def _cluster_graph(self) -> None:
+        """GET /api/cluster/graph — deterministic cluster graph (CG1+CG2).
+
+        Reuses the CG1 model: runs from the compare index, conditions from RAW
+        (read-only), a SubjectTree, and the fingerprint-keyed cache. Returns
+        nodes/edges/clusters + counts. No LLM, no RAW writes.
+        """
+        from pathlib import Path as _P
+        try:
+            from compare.index import load_index
+            from compare.conditions_index import load_conditions_index
+            from compare.graph import build_graph_payload
+        except Exception as exc:  # pragma: no cover - import hardening
+            self._send_error(500, f"cluster graph unavailable: {exc}",
+                             code="cluster_graph_unavailable")
+            return
+        try:
+            index = load_index()
+            rows = index.get("experiments", [])
+            try:
+                subjects = self._subjects()
+            except Exception:
+                subjects = None
+            # Use cached conditions index instead of re-reading every RAW file.
+            conditions = load_conditions_index()
+            payload = build_graph_payload(
+                rows, subjects, conditions,
+                cache_path=_P("data/cluster_graph.json"))
+            payload["sources"] = {
+                "index": index.get("generated_at") or "cached",
+                "runs_considered": len(rows),
+                "conditions_loaded": sum(1 for c in conditions.values() if c),
+            }
+        except Exception as exc:  # pragma: no cover - honest degradation
+            self._send_error(500, f"cluster graph failed: {exc}",
+                             code="cluster_graph_error")
+            return
+        self._send_json(payload)
+
     def _serve_dashboard(self) -> None:
         """Serve the dashboard HTML from package resources.
 
@@ -759,6 +860,14 @@ def start_dashboard(
     if debate_lab_controller is None and _DEBATE_LAB_AVAILABLE:
         debate_lab_controller = DebateLabController()
     DashboardHandler.debate_lab_controller = debate_lab_controller
+    # Wire up the modular self-extension layer
+    try:
+        from life_mean_extensions.pipeline import create_extension_layer
+        DashboardHandler.extension_layer = create_extension_layer()
+        logger.info("Extensions layer initialized")
+    except Exception as exc:  # pragma: no cover - graceful degradation
+        logger.warning("Extensions layer unavailable: %s", exc)
+        DashboardHandler.extension_layer = None
 
     server = HTTPServer((host, port), DashboardHandler)
     logger.info(f"Starting dashboard on http://{host}:{port}")

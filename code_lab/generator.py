@@ -41,6 +41,8 @@ def detect_plan(prompt: str) -> Tuple[str, Dict[str, Any]]:
         return "palindrome", {}
     if "reverse" in p and "string" in p:
         return "reverse_string", {}
+    if "merge sort" in p or "mergesort" in p:
+        return "merge_sort", {}
     return "generic", {}
 
 
@@ -50,6 +52,7 @@ PLANS = {
     "is_prime": ("is_prime.py", "test_is_prime.py"),
     "palindrome": ("palindrome.py", "test_palindrome.py"),
     "reverse_string": ("reverse_string.py", "test_reverse_string.py"),
+    "merge_sort": ("merge_sort.py", "test_merge_sort.py"),
     "generic": ("main.py", "test_main.py"),
 }
 
@@ -122,6 +125,33 @@ def reverse_string(s: str) -> str:
     if s is None:
         raise TypeError("s must be a string")
     return s[::-1]
+''',
+    "merge_sort": '''"""Merge sort implementation (deterministic, V1)."""
+
+
+def merge_sort(arr: list[int]) -> list[int]:
+    """Return a new sorted list using the merge sort algorithm."""
+    if len(arr) <= 1:
+        return list(arr)
+    mid = len(arr) // 2
+    left = merge_sort(arr[:mid])
+    right = merge_sort(arr[mid:])
+    return _merge(left, right)
+
+
+def _merge(left: list[int], right: list[int]) -> list[int]:
+    result = []
+    i = j = 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            result.append(left[i])
+            i += 1
+        else:
+            result.append(right[j])
+            j += 1
+    result.extend(left[i:])
+    result.extend(right[j:])
+    return result
 ''',
     "generic": '''"""Generic module scaffold (V1)."""
 
@@ -256,6 +286,51 @@ def test_reverse_none_raises():
     import pytest
     with pytest.raises(TypeError):
         reverse_string(None)
+''',
+    "merge_sort": '''from merge_sort import merge_sort
+
+
+def test_merge_sort_empty():
+    assert merge_sort([]) == []
+
+
+def test_merge_sort_single():
+    assert merge_sort([42]) == [42]
+
+
+def test_merge_sort_already_sorted():
+    assert merge_sort([1, 2, 3, 4]) == [1, 2, 3, 4]
+
+
+def test_merge_sort_reverse_sorted():
+    assert merge_sort([4, 3, 2, 1]) == [1, 2, 3, 4]
+
+
+def test_merge_sort_unsorted():
+    assert merge_sort([5, 2, 8, 1, 9, 3]) == [1, 2, 3, 5, 8, 9]
+
+
+def test_merge_sort_duplicates():
+    assert merge_sort([4, 1, 4, 2, 1, 3]) == [1, 1, 2, 3, 4, 4]
+
+
+def test_merge_sort_does_not_modify_input():
+    original = [3, 1, 2]
+    original_copy = list(original)
+    merge_sort(original)
+    assert original == original_copy
+
+
+def test_merge_sort_negative_numbers():
+    assert merge_sort([-1, 3, 0, -5, 2]) == [-5, -1, 0, 2, 3]
+
+
+def test_merge_sort_large_input():
+    import random
+    random.seed(42)
+    data = [random.randint(-1000, 1000) for _ in range(100)]
+    result = merge_sort(data)
+    assert result == sorted(data)
 ''',
     # Free-form ("generic") tasks get NO deterministic oracle: the run()->str
         # test was an invented contract that rejects valid arbitrary projects

@@ -2,8 +2,9 @@
 
 The Compare tab needs a *browse* view (list all experiments with a
 readable summary) without loading every full RAW file. This module builds /
-caches a small index from ``data/raw_debates/*.jsonl``. Each row is derived
-from RAW only:
+caches a small index from ``data/raw_debates/*.jsonl`` plus the Code Lab and
+Debate Lab RAW snapshots (``code_lab_runs/*/raw``, ``debate_lab_runs/*/raw``),
+each row tagged with its ``source``. Each row is derived from RAW only:
 
   experiment_id, run_id, subject (domain), created_at (min timestamp),
   num_tasks/passed/failed/no_verdict, success_rate, status, execution_mode,
@@ -132,6 +133,7 @@ def _scan_one(path: Path) -> Optional[Dict[str, Any]]:
     return {
         "experiment_id": exp_id,
         "run_id": run_id or None,
+        "source": "experiment",
         "subject": domain or None,
         "created_at": _iso(min_ts),
         "num_tasks": total,
@@ -154,18 +156,36 @@ def default_index_path() -> Path:
     return default_raw_dir().parent / INDEX_NAME
 
 
-def build_index(raw_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
-    """Scan every RAW file into index rows (sorted by created_at desc)."""
+def build_index(raw_dir: Optional[Path] = None,
+                include_lab_runs: Optional[bool] = None,
+                code_lab_root: Optional[Path] = None,
+                debate_lab_root: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Scan every RAW file into index rows (sorted by created_at desc).
+
+    When ``include_lab_runs`` is true (default), Code Lab and Debate Lab RAW
+    snapshots are appended as rows with ``source`` set to ``code_lab`` /
+    ``debate_lab`` so the Compare browser sees every run the lab produced.
+    """
+    explicit_dir = raw_dir is not None
     raw_dir = raw_dir or default_raw_dir()
+    if include_lab_runs is None:
+        # Production view (default RAW store) includes every lab run; an
+        # explicit raw_dir is treated as an isolated scan (tests).
+        include_lab_runs = not explicit_dir and code_lab_root is None and debate_lab_root is None
     rows: List[Dict[str, Any]] = []
-    if not raw_dir.is_dir():
-        return rows
-    for name in sorted(os.listdir(raw_dir)):
-        if not name.endswith(".jsonl"):
-            continue
-        row = _scan_one(raw_dir / name)
-        if row is not None:
-            rows.append(row)
+    if raw_dir.is_dir():
+        for name in sorted(os.listdir(raw_dir)):
+            if not name.endswith(".jsonl"):
+                continue
+            row = _scan_one(raw_dir / name)
+            if row is not None:
+                rows.append(row)
+    if include_lab_runs:
+        try:
+            from compare.lab_runs import list_lab_run_rows
+            rows.extend(list_lab_run_rows(code_lab_root, debate_lab_root))
+        except Exception:  # pragma: no cover - lab index must never break compare
+            pass
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return rows
 
@@ -210,14 +230,21 @@ def load_index(raw_dir: Optional[Path] = None,
     Returns ``{"experiments": [...], "count": n, "fresh": bool,
     "generated_at": str|None}``.
     """
+    explicit_dir = raw_dir is not None
     raw_dir = raw_dir or default_raw_dir()
     index_path = index_path or default_index_path()
     need_rebuild = refresh
     if not need_rebuild and index_path.exists():
-        if _raw_newest_mtime(raw_dir) > _index_mtime(index_path):
+        newest = _raw_newest_mtime(raw_dir)
+        try:
+            from compare.lab_runs import lab_runs_newest_mtime
+            newest = max(newest, lab_runs_newest_mtime())
+        except Exception:  # pragma: no cover - staleness check must never fail
+            pass
+        if newest > _index_mtime(index_path):
             need_rebuild = True
     if need_rebuild or not index_path.exists():
-        rows = build_index(raw_dir)
+        rows = build_index(raw_dir, include_lab_runs=not explicit_dir)
         write_index(rows, index_path)
         return {
             "experiments": rows,
@@ -228,7 +255,7 @@ def load_index(raw_dir: Optional[Path] = None,
     try:
         payload = json.loads(index_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        rows = build_index(raw_dir)
+        rows = build_index(raw_dir, include_lab_runs=not explicit_dir)
         write_index(rows, index_path)
         return {
             "experiments": rows,

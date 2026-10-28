@@ -193,6 +193,10 @@ class SubjectTree:
                 m = load_experiment(eid, raw_dir)
             except Exception:
                 continue
+            if m.condition.get("source") in ("code_lab", "debate_lab"):
+                # Lab runs have no experiment domain/difficulty; they are
+                # browsable in Compare but must not pollute the subject tree.
+                continue
             if m.num_tasks == 0 or (m.num_tasks and not m.has_verdicts):
                 skipped_no_evidence += 1
                 continue

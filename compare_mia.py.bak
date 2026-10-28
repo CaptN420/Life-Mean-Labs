@@ -1,0 +1,46 @@
+import os
+import sys
+
+# Find Mia directories in Hermes-Workspace
+workspace = r'C:\Users\celes\Documents\Hermes-Workspace'
+
+print("=== Searching for mia directories ===\n")
+mia_dirs = []
+for root, dirs, files in os.walk(workspace):
+    for d in dirs:
+        if 'mia' in d.lower():
+            full_path = os.path.join(root, d)
+            mia_dirs.append(full_path)
+            print(f"Found: {full_path}")
+
+if not mia_dirs:
+    print("No mia directories found.")
+    sys.exit(0)
+
+# Compare the two versions
+print("\n=== Comparing Mia versions ===\n")
+for i, dir_path in enumerate(mia_dirs):
+    print(f"\n--- Version {i+1}: {dir_path} ---")
+    
+    # Count .py files
+    py_files = []
+    for root, dirs, files in os.walk(dir_path):
+        for f in files:
+            if f.endswith('.py'):
+                py_files.append(os.path.join(root, f))
+    
+    print(f"  Python files: {len(py_files)}")
+    
+    # Search for key strings
+    key_strings = ['full-evolve', 'loop', 'lineages', 'auto-repair', 'create-new-session']
+    for s in key_strings:
+        count = 0
+        for pf in py_files:
+            try:
+                with open(pf, 'r', encoding='utf-8', errors='ignore') as fh:
+                    content = fh.read()
+                    count += content.count(s)
+            except:
+                pass
+        if count > 0:
+            print(f"  '{s}': {count} occurrences")

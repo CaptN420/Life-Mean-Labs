@@ -2,7 +2,7 @@
 Life_mean Studio - Main Application Window
 
 Main window with navigation between all modules.
-No execution of agents or services occurs at this point.
+RUN / STOP gear the real Life_mean experiment engine via the StudioRunner.
 """
 
 from PySide6.QtWidgets import (
@@ -14,15 +14,17 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QMenu, QProgressBar,
     QStatusBar, QToolButton, QSizePolicy, QDateEdit, QTimeEdit,
     QFileDialog, QInputDialog, QTreeWidget, QTreeWidgetItem, QDockWidget,
-    QLCDNumber, QGraphicsView, QGridLayout, QSlider
+    QLCDNumber, QGraphicsView, QGridLayout, QSlider, QListWidget as QListWidgetW
 )
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QRect, QSize, QPoint
 from PySide6.QtGui import QIcon, QPixmap, QFont, QColor, QPainter, QAction, QActionGroup
 
 from life_mean_studio.engine.storage import StudioStorage
+from life_mean_studio.engine.runner import StudioRunner, RunnerError
 from life_mean_studio.workflows.manager import WorkflowManager
 from life_mean_studio.workflows import WorkflowConfig, AgentConfig
 from life_mean_studio.prompts.collection import PromptCollection
+from life_mean_studio.engine.python_executor import get_executor, PythonEnvironment
 
 import json
 import os
@@ -51,6 +53,21 @@ class LifeMeanStudioApp(QMainWindow):
         self.workflow_manager = WorkflowManager(self.storage)
         self.prompt_collection = PromptCollection(self.storage)
         
+        # Real engine runner: wire RUN/STOP to the genuine Life_mean pipeline.
+        try:
+            self.runner = StudioRunner(self.storage)
+        except Exception as exc:  # pragma: no cover - engine import failure
+            self.runner = None
+            print(f"[Studio] engine runner unavailable: {exc}")
+        
+        # Seed default workflow templates so Quick Run always has a valid target.
+        if not _in_pytest():
+            try:
+                if not self.workflow_manager.list_all():
+                    self.workflow_manager.seed_defaults()
+            except Exception as exc:  # pragma: no cover - defensive
+                print(f"[Studio] could not seed workflows: {exc}")
+        
         # UI state
         self.current_mode = "simple"  # simple or dev
         self.preferences = self._load_preferences()
@@ -58,6 +75,12 @@ class LifeMeanStudioApp(QMainWindow):
         # Setup UI
         self._setup_ui()
         self._apply_theme()
+        
+        # Live runner poll (consumes engine events into the Console + buttons).
+        self._poll_timer = QTimer(self)
+        self._poll_timer.timeout.connect(self._poll_runner)
+        if not _in_pytest():
+            self._poll_timer.start(700)
         
     def _load_preferences(self):
         """Load saved preferences."""
@@ -127,7 +150,8 @@ class LifeMeanStudioApp(QMainWindow):
         self.dev_page = self._create_dev_page()
         self.packages_page = self._create_packages_page()
         self.settings_page = self._create_settings_page()
-        
+        self.code_playground_page = self._create_code_playground_page()
+
         # Add pages to stack
         self.central_widget.addWidget(self.home_page)
         self.central_widget.addWidget(self.services_page)
@@ -137,6 +161,7 @@ class LifeMeanStudioApp(QMainWindow):
         self.central_widget.addWidget(self.dev_page)
         self.central_widget.addWidget(self.packages_page)
         self.central_widget.addWidget(self.settings_page)
+        self.central_widget.addWidget(self.code_playground_page)
         
         # Setup toolbar
         self._setup_toolbar()
@@ -144,7 +169,7 @@ class LifeMeanStudioApp(QMainWindow):
         # Setup status bar
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
-        self.statusBar.showMessage("Life_mean Studio - Phase C: UI Only. No agent execution.")
+        self.statusBar.showMessage("Life_mean Studio — ready. RUN/STOP drive the real engine.")
         
     def _setup_toolbar(self):
         """Setup the main toolbar."""
@@ -163,15 +188,21 @@ class LifeMeanStudioApp(QMainWindow):
             ("Dev Studio", 5),
             ("Packages", 6),
             ("Settings", 7),
+            ("Code Playground", 8),
         ]
         
+        self._nav_actions = {}
         action_group = QActionGroup(self)
         for name, index in nav_actions:
             action = QAction(name, self)
             action.setCheckable(True)
-            action.triggered.connect(lambda idx=index: self._navigate_to(idx))
+            action.triggered.connect(lambda checked, idx=index: self._navigate_to(idx))
             action_group.addAction(action)
             toolbar.addAction(action)
+            self._nav_actions[index] = action
+        
+        # Set Home as active by default
+        self._navigate_to(0)
         
         # Mode toggle
         self.mode_action = QAction("DEV Mode", self)
@@ -184,11 +215,14 @@ class LifeMeanStudioApp(QMainWindow):
         dashboard_action = QAction("Open Dashboard", self)
         dashboard_action.triggered.connect(self._open_dashboard)
         toolbar.addAction(dashboard_action)
-        
+    
     def _navigate_to(self, index):
-        """Navigate to a page."""
+        """Navigate to a page and update active button."""
         self.central_widget.setCurrentIndex(index)
-        
+        # Update active button state
+        for idx, action in self._nav_actions.items():
+            action.setChecked(idx == index)
+
     def _toggle_mode(self, checked):
         """Toggle between simple and dev mode."""
         self.current_mode = "dev" if checked else "simple"
@@ -216,7 +250,7 @@ class LifeMeanStudioApp(QMainWindow):
         layout.addWidget(title)
         
         # Subtitle
-        subtitle = QLabel("Phase C: PySide6 Interface - No Agent Execution")
+        subtitle = QLabel("Life_mean Studio — contrôle du vrai moteur")
         subtitle.setAlignment(Qt.AlignCenter)
         layout.addWidget(subtitle)
         
@@ -225,10 +259,10 @@ class LifeMeanStudioApp(QMainWindow):
         layout.addWidget(quick_run)
         
         # Status
-        status = QLabel("Status: UI Only. RUN/STOP buttons are disabled.")
-        status.setAlignment(Qt.AlignCenter)
-        status.setStyleSheet("color: #ffaa00;")
-        layout.addWidget(status)
+        self.home_status_label = QLabel("Prêt. Sélectionnez un workflow puis RUN.")
+        self.home_status_label.setAlignment(Qt.AlignCenter)
+        self.home_status_label.setStyleSheet("color: #4caf50; font-weight: bold;")
+        layout.addWidget(self.home_status_label)
         
         return widget
     
@@ -237,40 +271,44 @@ class LifeMeanStudioApp(QMainWindow):
         group = QGroupBox("Quick Run")
         layout = QFormLayout(group)
         
-        # Workflow selector (disabled)
+        # Workflow selector (enabled — drives the real run)
         self.workflow_combo = QComboBox()
         self._load_workflows_to_combo()
-        self.workflow_combo.setEnabled(False)
+        self.workflow_combo.setEnabled(True)
         layout.addRow("Workflow:", self.workflow_combo)
         
-        # Model selector (disabled, but populated with real models when available)
+        # Model selector — informational: lists models available on the LLM
+        # backend. The engine resolves its own model from the configured
+        # credentials, so this is a live readout, not a mutated setting.
         self.model_combo = QComboBox()
         self.model_combo.addItem("(detecting models…)" if not _in_pytest() else "(models unavailable in tests)")
-        self.model_combo.setEnabled(False)
-        layout.addRow("Model:", self.model_combo)
+        self.model_combo.setEnabled(True)
+        layout.addRow("Modèles dispo:", self.model_combo)
         # Populate with real models from the LLM backend (best-effort, async)
         if not _in_pytest():
             QTimer.singleShot(0, self._load_real_models)
         
-        # Mode selector
+        # Execution mode selector — deterministic pipeline or multi-agent debate
         self.mode_select = QComboBox()
-        self.mode_select.addItems(["Python Only", "Python + Dashboard", "Dashboard Only", "Backend Only"])
-        layout.addRow("Launch Mode:", self.mode_select)
+        self.mode_select.addItems(["Deterministic", "Multi-Agent (Debate)"])
+        layout.addRow("Execution Mode:", self.mode_select)
         
-        # Compression toggle (disabled)
+        # Compression toggle (engine-level feature; kept read-only for now)
         self.compression_check = QCheckBox("Compression ON")
         self.compression_check.setEnabled(False)
         layout.addRow("Compression:", self.compression_check)
         
-        # RUN button (disabled)
+        # RUN button (enabled — starts a real engine run)
         self.run_btn = QPushButton("RUN")
-        self.run_btn.setEnabled(False)
-        self.run_btn.setStyleSheet("background-color: #cc0000; color: white; font-weight: bold;")
+        self.run_btn.setEnabled(True)
+        self.run_btn.setStyleSheet("background-color: #0e639c; color: white; font-weight: bold;")
+        self.run_btn.clicked.connect(self._on_run)
         layout.addRow("", self.run_btn)
         
-        # STOP button (disabled)
+        # STOP button (enabled once a run starts)
         self.stop_btn = QPushButton("STOP")
         self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self._on_stop)
         layout.addRow("", self.stop_btn)
         
         return group
@@ -305,6 +343,98 @@ class LifeMeanStudioApp(QMainWindow):
                 self.model_combo.setCurrentText(current)
         except RuntimeError:
             # Widget deleted (window closed before async callback fired)
+            pass
+    
+    # ------------------------------------------------------------------ runner
+    
+    def _build_run_config(self) -> dict:
+        """Compute the engine config from the current Quick Run selection."""
+        wf_id = self.workflow_combo.itemData(self.workflow_combo.currentIndex()) \
+            if self.workflow_combo.currentIndex() >= 0 else None
+        workflow = self.workflow_manager.get(wf_id) if wf_id else None
+        if workflow is None:
+            from life_mean_studio.workflows import WorkflowConfig
+            workflow = WorkflowConfig(name="Quick Run")
+        debate = self.mode_select.currentIndex() == 1  # "Multi-Agent (Debate)"
+        return StudioRunner.build_config(workflow, debate=debate), wf_id
+    
+    def _on_run(self):
+        """Start a real engine run via the StudioRunner."""
+        if self.runner is None:
+            self.home_status_label.setText("Runner indisponible (import moteur échoué).")
+            return
+        try:
+            if self.runner.is_active():
+                self._append_console("RUN ignoré : un run est déjà en cours.")
+                return
+            config, wf_id = self._build_run_config()
+            experiment_id = self.runner.start(config, workflow_id=wf_id)
+        except RunnerError as exc:
+            self.home_status_label.setText(f"Erreur : {exc}")
+            self._append_console(f"[RUN] {exc}")
+            return
+        except Exception as exc:
+            self.home_status_label.setText(f"Erreur : {exc}")
+            self._append_console(f"[RUN] erreur inattendue : {exc}")
+            return
+        self.run_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        mode = "deterministic" if not config.get("debate") else "debate"
+        self.home_status_label.setText(
+            f"Run {experiment_id} en cours ({mode} · {config.get('num_tasks')} tâches).")
+        self._append_console(f"[RUN] {experiment_id} · {mode} · {config.get('domain')} · "
+                             f"{config.get('num_tasks')} tâches — lancé.")
+        self._poll_runner()
+    
+    def _on_stop(self):
+        """Request a real cancellation of the running experiment."""
+        if self.runner is None or not self.runner.stop():
+            self._append_console("[STOP] aucun run actif à arrêter.")
+            return
+        self._append_console("[STOP] demande d'annulation envoyée…")
+    
+    def _poll_runner(self):
+        """Drain runner events into the Console and refresh control state."""
+        if getattr(self, "runner", None) is None:
+            return
+        try:
+            for item in self.runner.drain_events():
+                ev, data = item.get("event"), item.get("data", {})
+                exp = data.get("experiment_id", "?")
+                if ev == "started":
+                    self._append_console(f"[moteur] {exp} démarré.")
+                    self._refresh_run_buttons(True)
+                elif ev == "stop_requested":
+                    self._append_console(f"[moteur] arrêt demandé pour {exp}.")
+                elif ev == "finished":
+                    status = data.get("status")
+                    metrics = data.get("metrics", {})
+                    line = (f"[moteur] {exp} terminé — {status}"
+                            + (f" (valides {metrics.get('tasks_valid', 0)}/"
+                               f"{metrics.get('tasks_completed', 0)})"
+                               if metrics.get("tasks_completed") else ""))
+                    self._append_console(line)
+                    if status == "failed" and metrics.get("errors"):
+                        for err in metrics["errors"][-3:]:
+                            self._append_console(f"    erreur : {err}")
+                    self._refresh_run_buttons(False)
+                    self.home_status_label.setText(
+                        f"Run terminé — {status}."
+                        if status != "completed" else "Run terminé avec succès.")
+        except Exception as exc:  # pragma: no cover - defensive
+            self._append_console(f"[poll] {exc}")
+    
+    def _refresh_run_buttons(self, running: bool):
+        self.run_btn.setEnabled(not running)
+        self.stop_btn.setEnabled(running)
+    
+    def _append_console(self, text: str):
+        if getattr(self, "console_output", None) is None:
+            return
+        stamp = datetime.now().strftime("%H:%M:%S")
+        try:
+            self.console_output.append(f"[{stamp}] {text}")
+        except RuntimeError:
             pass
     
     def _create_services_page(self):
@@ -450,14 +580,33 @@ class LifeMeanStudioApp(QMainWindow):
         """Create a new workflow."""
         dialog = QDialog(self)
         dialog.setWindowTitle("Create Workflow")
+        dialog.resize(400, 350)
         layout = QFormLayout(dialog)
         
         name_edit = QLineEdit()
         layout.addRow("Name:", name_edit)
         
+        description_edit = QLineEdit()
+        description_edit.setPlaceholderText("Optional description...")
+        layout.addRow("Description:", description_edit)
+        
         mode_combo = QComboBox()
         mode_combo.addItems(["single", "multi"])
         layout.addRow("Mode:", mode_combo)
+        
+        domain_combo = QComboBox()
+        domain_combo.addItems(["math", "code", "science", "philosophy", "general"])
+        layout.addRow("Domain:", domain_combo)
+        
+        num_tasks_spin = QSpinBox()
+        num_tasks_spin.setRange(1, 100)
+        num_tasks_spin.setValue(10)
+        layout.addRow("Num Tasks:", num_tasks_spin)
+        
+        seed_spin = QSpinBox()
+        seed_spin.setRange(0, 999999)
+        seed_spin.setValue(42)
+        layout.addRow("Seed:", seed_spin)
         
         ok_btn = QPushButton("Create")
         cancel_btn = QPushButton("Cancel")
@@ -466,20 +615,29 @@ class LifeMeanStudioApp(QMainWindow):
         btn_layout.addWidget(cancel_btn)
         layout.addRow("", btn_layout)
         
-        ok_btn.clicked.connect(lambda: self._save_new_workflow(dialog, name_edit.text(), mode_combo.currentText()))
+        ok_btn.clicked.connect(lambda: self._save_new_workflow(
+            dialog, name_edit.text(), mode_combo.currentText(),
+            domain_combo.currentText(), num_tasks_spin.value(), seed_spin.value()))
         cancel_btn.clicked.connect(dialog.reject)
         
         dialog.exec()
-    
-    def _save_new_workflow(self, dialog, name, mode):
+
+    def _save_new_workflow(self, dialog, name, mode, domain="math", num_tasks=10, seed=42):
         """Save a new workflow."""
         if not name:
             QMessageBox.warning(self, "Error", "Name is required")
             return
         
-        config = {"mode": mode, "name": name}
         try:
-            wf_id = self.workflow_manager.create(WorkflowConfig(name=name, mode=mode))
+            config = WorkflowConfig(
+                name=name,
+                description="",
+                mode=mode,
+                domain=domain,
+                num_tasks=num_tasks,
+                seed=seed,
+            )
+            wf_id = self.workflow_manager.create(config)
             self._refresh_workflow_list()
             dialog.accept()
         except Exception as e:
@@ -507,9 +665,13 @@ class LifeMeanStudioApp(QMainWindow):
             return
         
         wf_id = item.data(Qt.UserRole)
-        # Navigate to home page with workflow selected
+        # Navigate to home page and select the workflow
         self._navigate_to(0)
-        # In a real app, we would set the combo box value here
+        # Set combo box to the selected workflow
+        for i in range(self.workflow_combo.count()):
+            if self.workflow_combo.itemData(i) == wf_id:
+                self.workflow_combo.setCurrentIndex(i)
+                break
     
     def _create_prompts_page(self):
         """Create the prompts page."""
@@ -617,9 +779,9 @@ class LifeMeanStudioApp(QMainWindow):
         layout.addWidget(title)
         
         # Status label
-        status_label = QLabel("No session connected")
-        status_label.setStyleSheet("color: #888888; font-style: italic;")
-        layout.addWidget(status_label)
+        self.console_status_label = QLabel("Aucune session en cours")
+        self.console_status_label.setStyleSheet("color: #888888; font-style: italic;")
+        layout.addWidget(self.console_status_label)
         
         # Message display
         self.console_output = QTextEdit()
@@ -695,7 +857,7 @@ Workflows: {len(self.workflow_manager.list_all())}
 Prompts: {len(self.prompt_collection.list_all())}
 Mode: {self.current_mode}
 
-Note: No agent execution is occurring.
+Note: RUN/STOP pilotent le vrai moteur (StudioRunner → ExperimentUIController).
 """)
         diag_layout.addWidget(diag_text)
         tabs.addTab(diag_tab, "Diagnostics")
@@ -760,7 +922,179 @@ Note: No agent execution is occurring.
         layout.addWidget(save_btn)
         
         return widget
-    
+
+    def _create_code_playground_page(self):
+        """Create the Code Playground page for executing Python code."""
+        from PySide6.QtWidgets import QSplitter, QLabel as QLabelW, QComboBox as QComboBoxW, \
+            QTextEdit as QTextEditW, QPushButton as QPushButtonW, QVBoxLayout as QVBoxLayoutW, \
+            QHBoxLayout as QHBoxLayoutW, QWidget as QWidgetW, QGroupBox as QGroupBoxW, \
+            QFormLayout as QFormLayoutW, QSpinBox as QSpinBoxW, QCheckBox as QCheckBoxW
+        
+        widget = QWidgetW()
+        layout = QVBoxLayoutW(widget)
+        
+        title = QLabelW("Code Playground")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        layout.addWidget(title)
+        
+        # Top section: environment selector and controls
+        controls = QHBoxLayoutW()
+        
+        # Environment selector
+        env_label = QLabelW("Environment:")
+        self.code_env_combo = QComboBoxW()
+        self._load_python_environments()
+        controls.addWidget(env_label)
+        controls.addWidget(self.code_env_combo)
+        
+        # Timeout
+        timeout_label = QLabelW("Timeout (s):")
+        self.code_timeout_spin = QSpinBoxW()
+        self.code_timeout_spin.setRange(1, 300)
+        self.code_timeout_spin.setValue(30)
+        controls.addWidget(timeout_label)
+        controls.addWidget(self.code_timeout_spin)
+        
+        # Run button
+        self.code_run_btn = QPushButtonW("▶ Run")
+        self.code_run_btn.setStyleSheet("background-color: #0e639c; color: white; font-weight: bold; padding: 8px 20px;")
+        self.code_run_btn.clicked.connect(self._run_code)
+        controls.addWidget(self.code_run_btn)
+        
+        # Clear button
+        clear_btn = QPushButtonW("Clear")
+        clear_btn.clicked.connect(self._clear_output)
+        controls.addWidget(clear_btn)
+        
+        layout.addLayout(controls)
+        
+        # Main splitter: editor | output
+        splitter = QSplitter(Qt.Horizontal)
+        
+        # Editor panel
+        editor_widget = QWidgetW()
+        editor_layout = QVBoxLayoutW(editor_widget)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.code_editor = QTextEditW()
+        self.code_editor.setFont(QFont("Consolas", 10))
+        self.code_editor.setPlaceholderText("# Write Python code here...\nprint('Hello from Code Playground!')")
+        editor_layout.addWidget(self.code_editor)
+        
+        splitter.addWidget(editor_widget)
+        
+        # Output panel
+        output_widget = QWidgetW()
+        output_layout = QVBoxLayoutW(output_widget)
+        output_layout.setContentsMargins(0, 0, 0, 0)
+        
+        output_label = QLabelW("Output:")
+        output_layout.addWidget(output_label)
+        
+        self.code_output = QTextEditW()
+        self.code_output.setReadOnly(True)
+        self.code_output.setFont(QFont("Consolas", 10))
+        self.code_output.setPlaceholderText("Execution output will appear here...")
+        output_layout.addWidget(self.code_output)
+        
+        splitter.addWidget(output_widget)
+        splitter.setSizes([500, 500])
+        
+        layout.addWidget(splitter)
+        
+        # History panel at bottom
+        history_label = QLabelW("Execution History:")
+        layout.addWidget(history_label)
+        
+        self.code_history_list = QListWidgetW()
+        self._refresh_execution_history()
+        layout.addWidget(self.code_history_list)
+        
+        return widget
+
+    def _load_python_environments(self):
+        """Load available Python environments into the combo box."""
+        try:
+            from life_mean_studio.engine.python_executor import get_executor
+            executor = get_executor()
+            envs = executor.list_environments()
+            self.code_env_combo.clear()
+            for env in envs:
+                self.code_env_combo.addItem(env["name"], env["path"])
+        except Exception as exc:
+            self.code_output.append(f"Warning: Could not load environments: {exc}")
+
+    def _run_code(self):
+        """Execute the code in the editor."""
+        code = self.code_editor.toPlainText()
+        if not code.strip():
+            self.code_output.append("// Error: No code to execute")
+            return
+        
+        env_name = self.code_env_combo.currentText()
+        timeout = self.code_timeout_spin.value()
+        
+        self.code_run_btn.setEnabled(False)
+        self.code_output.append(f"\n// Running with {env_name} (timeout: {timeout}s)...")
+        self.code_output.append("//" + "=" * 50)
+        
+        try:
+            from life_mean_studio.engine.python_executor import get_executor
+            executor = get_executor()
+            
+            result = executor.execute_code(
+                code,
+                timeout_seconds=timeout,
+                env_name=env_name if env_name != "System Python" else None
+            )
+            
+            if result.success:
+                self.code_output.append(f"// ✓ Success ({result.execution_time_ms:.1f}ms)")
+                if result.stdout:
+                    self.code_output.append(result.stdout)
+            else:
+                self.code_output.append(f"// ✗ Failed: {result.error_type or 'RuntimeError'}")
+                if result.stderr:
+                    self.code_output.append(result.stderr)
+            
+            # Add to history
+            self._add_to_history(env_name, code, result)
+            
+        except Exception as exc:
+            self.code_output.append(f"// ✗ Execution error: {exc}")
+        
+        self.code_run_btn.setEnabled(True)
+        self.code_output.append("//" + "=" * 50)
+
+    def _clear_output(self):
+        """Clear the output panel."""
+        self.code_output.clear()
+
+    def _add_to_history(self, env: str, code: str, result) -> None:
+        """Add execution to history list."""
+        from datetime import datetime
+        preview = code[:50].replace('\n', ' ') + '...' if len(code) > 50 else code.replace('\n', ' ')
+        status = "✓" if result.success else "✗"
+        time_str = datetime.now().strftime("%H:%M:%S")
+        item = QListWidgetItem(f"[{time_str}] {status} {env}: {preview}")
+        self.code_history_list.insertItem(0, item)
+
+    def _refresh_execution_history(self):
+        """Refresh the execution history list."""
+        try:
+            from life_mean_studio.engine.python_executor import get_executor
+            executor = get_executor()
+            history = executor.get_execution_history(limit=20)
+            self.code_history_list.clear()
+            for entry in reversed(history):
+                result = entry.get("result", {})
+                status = "✓" if result.get("success") else "✗"
+                time_str = datetime.fromtimestamp(entry["timestamp"]).strftime("%H:%M:%S")
+                item = QListWidgetItem(f"[{time_str}] {status} {entry['env']}: {entry['code_preview']}")
+                self.code_history_list.addItem(item)
+        except Exception:
+            pass
+
     def closeEvent(self, event):
         """Handle window close."""
         # Kill any pending health-check timer so it never fires after close.

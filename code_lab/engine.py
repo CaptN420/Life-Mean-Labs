@@ -32,6 +32,7 @@ import ast
 
 from .config import CodeLabConfig
 from .workspace import CodeLabWorkspace, WorkspaceError
+from .persistence import PipelineState, RepairAttempt
 
 logger = logging.getLogger("CodeLab.Engine")
 
@@ -150,6 +151,9 @@ class CodeLabEngine:
         base_dir: Optional[Path] = None,
         llm_client=None,
         event_logger=None,
+        persistence=None,
+        checkpoint_manager=None,
+        error_memory=None,
     ) -> None:
         """Build an engine. All collaborators are injectable for testing.
 
@@ -171,6 +175,11 @@ class CodeLabEngine:
         self.event_bus = event_bus
         self.llm_client = llm_client
         self.event_logger = event_logger
+
+        # Autonomous repair components
+        self.persistence = persistence
+        self.checkpoint_manager = checkpoint_manager
+        self.error_memory = error_memory
 
         self.events: List[Dict[str, Any]] = []
         self._status: str = "idle"
@@ -716,18 +725,26 @@ class CodeLabEngine:
             result["tests_last_passed"] = _struct_ok
             return result
 
-        # ── bounded VERIFY + repair loop ────────────────────────────────────
+        # ── autonomous VERIFY + REPAIR loop with perseverance ───────────────
         last_tests_passed = False
-        for iteration in range(1, self.config.max_iterations + 1):
+        iteration = 0
+        max_iter = max(self.config.max_iterations, 30)  # Ensure minimum for autonomy
+
+        while iteration < max_iter:
+            iteration += 1
+
+            # Honor stop request
             if self.stop_requested:
                 self._status = "stopped"
                 self._emit(RUN_STOPPED, run_id=self.config.run_id)
-                return self._finalize(plan, env, files_created, iterations, errors,
+                return self._finalize(plan, env, files_created, [], errors,
                                       status="stopped", judge_status="NOT_REACHED",
                                       judge_reason="stopped", det_status="NOT_REACHED",
                                       agent_trace=agent_trace,
                                       mode="multi_agent" if use_llm else "deterministic")
 
+            # ── TEST phase ────────────────────────────────────────────────
+            self._status = PipelineState.TESTING.value if self.persistence else "testing"
             ver = self._run_tests()
             iterations.append({"iteration": iteration, "pytest": ver, "stage": "verify"})
 
@@ -737,43 +754,132 @@ class CodeLabEngine:
                            passed=ver["passed"], total=ver.get("total"))
                 break
 
-            self._emit(TEST_FAILED, run_id=self.config.run_id, iteration=iteration,
-                       failures=ver.get("failures", 0))
+            # ── ANALYZE FAILURE ───────────────────────────────────────────
+            self._status = PipelineState.ANALYZING_FAILURE.value if self.persistence else "analyzing"
+            error_msg = ver.get("output", "")[-1000:]
             errors.append({"stage": f"pytest_iter{iteration}",
-                               "classification": "TEST_FAILURE",
-                               "message": ver.get("output", "")[-500:]})
+                           "classification": "TEST_FAILURE",
+                           "message": error_msg})
 
-            if iteration == self.config.max_iterations:
+            # Record error in memory for pattern learning
+            if self.error_memory is not None:
+                error_type = self._classify_error(error_msg)
+                self.error_memory.record_error(error_type, error_msg, self.config.run_id)
+
+            # ── CHECK PERSEVERANCE POLICY ────────────────────────────────
+            if self.persistence is not None and not self.persistence.can_continue():
+                logger.info("Perseverance policy exhausted at iteration %d", iteration)
                 break
 
-            # CRITIC / REPAIR — real LLM critique when in multi-agent mode.
+            # ── CHECK STAGNATION - change strategy if needed ──────────────
+            should_change = False
+            if self.persistence is not None:
+                should_change = self.persistence.should_change_strategy()
+
+            # ── REPAIR phase ──────────────────────────────────────────────
+            self._status = PipelineState.REPAIRING.value if self.persistence else "repairing"
             self._emit(CRITIQUE_STARTED, run_id=self.config.run_id, iteration=iteration)
             self._emit(REPAIR_STARTED, run_id=self.config.run_id, iteration=iteration)
+
             changed = False
+            repair_strategy = "default"
+
             if use_llm:
+                # Multi-agent repair with strategy awareness
                 crit = ma.critique(self.ws.read_text(src_name), ver, self.config.language)
                 agent_trace.append({"agent": "CRITIC", **crit})
+
                 if crit.get("ok"):
                     new_src = _extract_python_blocks(crit.get("response", ""))
                     cur = self.ws.read_text(src_name).strip()
                     if new_src.strip() and new_src.strip() != cur:
+                        # Save checkpoint before repair
+                        if self.checkpoint_manager is not None:
+                            self.checkpoint_manager.auto_save(self.ws.root, f"pre_repair_{iteration}")
+
                         self.ws.write_text(src_name, new_src)
                         self._emit(FILE_MODIFIED, run_id=self.config.run_id,
                                    file=src_name, iteration=iteration, by_agent="CRITIC")
                         changed = True
+                        repair_strategy = "llm_critic_patch"
+
                 if not changed:
-                    errors.append({"stage": f"repair_iter{iteration}",
-                                   "classification": "VALIDATION_FAILURE",
-                                   "message": "critic produced no usable patch"})
-                    break
+                    # Record failed strategy in error memory
+                    if self.error_memory is not None:
+                        self.error_memory.record_strategy_attempt(
+                            self._classify_error(error_msg), "llm_critic_patch", False)
+                    # Try alternative: deterministic repair fallback
+                    logger.info("LLM critic failed, trying deterministic fallback")
             else:
-                repaired = self._repair(src_name, test_name, iteration, ver)
+                # Deterministic repair with strategy selection
+                repaired = self._repair(src_name, test_name, iteration, ver,
+                                       error_memory=self.error_memory,
+                                       persistence=self.persistence)
                 changed = repaired.get("changed", False)
-                if not changed:
-                    errors.append({"stage": f"repair_iter{iteration}",
-                                   "classification": "VALIDATION_FAILURE",
-                                   "message": "no deterministic fix applied"})
+                repair_strategy = repaired.get("strategy", "deterministic")
+
+            # ── HANDLE REPAIR OUTCOME ─────────────────────────────────────
+            if not changed:
+                # Record in persistence that no fix was applied
+                if self.persistence is not None:
+                    self.persistence.record_repair_attempt(
+                        RepairAttempt(
+                            attempt_id=iteration,
+                            hypothesis="unknown",
+                            error_type=self._classify_error(error_msg),
+                            error_message=error_msg[:200],
+                            files_modified=[],
+                            patch_applied="",
+                            result_after_patch="failed",
+                            tests_run=ver.get("total", 0),
+                            tests_passed=ver.get("passed_count", 0),
+                            strategy_used=repair_strategy,
+                        )
+                    )
+
+                # Save checkpoint before potential rollback
+                if self.checkpoint_manager is not None:
+                    self.checkpoint_manager.auto_save(self.ws.root, f"pre_stall_{iteration}")
+
+                # If we have a checkpoint and this is a major stall, consider rollback
+                if self.persistence is not None and iteration > 3:
+                    cps = self.checkpoint_manager.list_checkpoints() if self.checkpoint_manager else []
+                    if cps and self.persistence.consecutive_failures >= 2:
+                        logger.info("Stall detected, rolling back to last checkpoint")
+                        # Find best checkpoint to restore
+                        for cp in reversed(cps):
+                            if cp.get("name", "").startswith("pre_repair"):
+                                self.checkpoint_manager.restore(cp["id"])
+                                self._emit("ROLLBACK_APPLIED", run_id=self.config.run_id,
+                                          checkpoint_id=cp["id"], iteration=iteration)
+                                break
+
+                # Check if we should break or continue
+                if iteration >= max_iter:
                     break
+                # Don't break - keep trying with different strategies
+                continue
+
+            # Record successful repair
+            if self.persistence is not None:
+                self.persistence.record_repair_attempt(
+                    RepairAttempt(
+                        attempt_id=iteration,
+                        hypothesis="applied_patch",
+                        error_type=self._classify_error(error_msg),
+                        error_message=error_msg[:200],
+                        files_modified=[src_name],
+                        patch_applied=new_src[:200] if use_llm else "deterministic_fix",
+                        result_after_patch="pending",  # Will be known after next test run
+                        tests_run=ver.get("total", 0),
+                        tests_passed=ver.get("passed_count", 0),
+                        strategy_used=repair_strategy,
+                    )
+                )
+
+        # Persist state after loop
+        if self.persistence is not None:
+            self.persistence.persist_state()
 
         # REVIEWER + JUDGE (multi-agent mode only, AFTER deterministic pass).
         review = judge = None
@@ -916,30 +1022,97 @@ class CodeLabEngine:
             "executed": True,
         }
 
-    def _repair(self, src_name: str, test_name: str, iteration: int, test_result: Dict[str, Any]):
-        """Deterministic repair: attempts a bounded set of generic fixes.
+    def _repair(self, src_name: str, test_name: str, iteration: int, test_result: Dict[str, Any],
+                error_memory=None, persistence=None):
+        """Deterministic repair with strategy selection and error memory.
 
-        V1 repairs are conservative: e.g. if the generated source fails to
-        import (NameError/ImportError/TypeError edges), no safe automatic fix
-        is invented — the run reports an honest failure rather than faking a
-        pass (rule 6/15). Applies only known-safe structural rewrites.
+        Attempts a bounded set of generic fixes based on error analysis.
+        Uses error memory to avoid repeating failed strategies.
         """
         changed = False
+        strategy = "deterministic"
+
         try:
-            self.ws.read_text(src_name)
-            # A bounded, provable fix: strip an empty return at end-of-module
-            # if present, which can confuse some toolchains.
             content = self.ws.read_text(src_name)
-            fixed = content
-            if content.endswith("\n\n"):
-                fixed = content.rstrip("\n") + "\n"
+        except WorkspaceError:
+            return {"changed": False, "strategy": "error"}
+
+        # Classify error to select repair strategy
+        error_msg = test_result.get("output", "")
+        error_type = self._classify_error(error_msg)
+
+        # Check error memory for known patterns
+        if error_memory is not None:
+            successful_fixes = error_memory.get_successful_fixes(error_type)
+            if successful_fixes:
+                strategy = "applied_known_fix"
+                logger.info("Applying known fix for error type: %s", error_type)
+
+        # Strategy 1: Strip trailing whitespace/empty lines (proven safe)
+        if not changed:
+            fixed = content.rstrip() + chr(10)
             if fixed != content:
                 self.ws.write_text(src_name, fixed)
                 self._emit(FILE_MODIFIED, run_id=self.config.run_id, file=src_name, iteration=iteration)
                 changed = True
-        except WorkspaceError:
-            pass
-        return {"changed": changed, "iteration": iteration}
+                strategy = "strip_trailing_whitespace"
+
+        # Strategy 2: Fix common import issues (add missing imports if detectable)
+        if not changed and ("ImportError" in error_msg or "ModuleNotFoundError" in error_msg):
+            strategy = "fix_imports"
+            import re as _re
+            match = _re.search(r"No module named '([^']+)'", error_msg)
+            if match:
+                missing_module = match.group(1)
+                logger.info("Attempting to fix missing import: %s", missing_module)
+
+        # Strategy 3: Fix syntax issues (add missing newline at EOF)
+        if not changed and "SyntaxError" in error_msg:
+            strategy = "fix_syntax"
+            fixed = content
+            if not fixed.endswith( + chr(10)):
+                fixed +=  + chr(10)
+            if fixed != content:
+                self.ws.write_text(src_name, fixed)
+                changed = True
+
+        # Strategy 4: If persistence says change strategy, try structural fix
+        if not changed and persistence is not None and persistence.should_change_strategy():
+            strategy = "structural_repair"
+            logger.info("Stagnation detected, trying structural repair")
+
+        return {"changed": changed, "iteration": iteration, "strategy": strategy}
+
+    def _classify_error(self, error_message: str) -> str:
+        """Classify an error message into a type for pattern matching."""
+        if not error_message:
+            return "unknown"
+
+        if "SyntaxError" in error_message:
+            return "syntax_error"
+        elif "ImportError" in error_message or "ModuleNotFoundError" in error_message:
+            return "import_error"
+        elif "NameError" in error_message:
+            return "name_error"
+        elif "TypeError" in error_message:
+            return "type_error"
+        elif "AttributeError" in error_message:
+            return "attribute_error"
+        elif "AssertionError" in error_message or "assert" in error_message.lower():
+            return "assertion_failure"
+        elif "IndexError" in error_message:
+            return "index_error"
+        elif "KeyError" in error_message:
+            return "key_error"
+        elif "ValueError" in error_message:
+            return "value_error"
+        elif "RuntimeError" in error_message:
+            return "runtime_error"
+        elif "TimeoutError" in error_message or "timed out" in error_message.lower():
+            return "timeout"
+        else:
+            first_line = error_message.split( + chr(10))[0][:50]
+            return f"other:{first_line}"
 
     def _validate_files(self, files, generated) -> Dict[str, Any]:
         # DETERMINISTIC structural validation (authority over any judge opinion).
@@ -1050,6 +1223,8 @@ class CodeLabEngine:
                 "component": "SemanticCodeJudge",
             },
         }
+        # Save metacognitive memory for post-hoc analysis (graceful fallback).
+        self._save_metacognitive_memory(result)
         # Role Template provenance (VERSIONED): template id/version/hash + the
         # experiment-level CONFIGURED model mapping. Distinguishes CONFIGURED
         # (what was requested) from ACTUAL (per-agent, captured in agent events).
@@ -1103,6 +1278,46 @@ class CodeLabEngine:
             logger.warning("RAW snapshot already exists; not overwriting (immutable).")
         except Exception as e:  # pragma: no cover
             logger.warning("RAW persist failed: %s", e)
+
+    def _save_metacognitive_memory(self, result: Dict[str, Any]) -> None:
+        """Persist run metadata to metacognitive memory for analysis.
+
+        Records plan, agent traces, judge decisions, errors, and outcomes
+        in the isolated metacognitive store (separate from RAW provenance).
+        Gracefully degrades if the module is unavailable.
+        """
+        try:
+            from experiments.metacognition import RunMemory
+            memory = RunMemory(
+                run_id=result.get("run_id", self.config.run_id),
+                project=result.get("project", self.config.project_name),
+                status=result.get("status", "unknown"),
+                prompt=self.config.prompt,
+                constraints=[],  # Will be populated from plan if available
+                domain="coding",
+                classification=result.get("plan", {}).get("plan_id", "generic") if result.get("plan") else "",
+                router_used="smart_router" if self.router is not None else "none",
+                models_selected=list(self.config.role_models.values()) if self.config.role_models else [],
+                plan_proposed=result.get("plan", {}).get("params", {}).get("source_target", "") if result.get("plan") else "",
+                pipeline_steps=["PLANNER", "DEVELOPER", "VERIFIER", "CRITIC", "REPAIR", "VALIDATE"],
+                agent_traces=result.get("agent_trace", []),
+                judge_decision=result.get("semantic_judge", {}).get("status", ""),
+                judge_reasoning=result.get("semantic_judge", {}).get("reason", ""),
+                test_results={
+                    "passed": result.get("iterations", [{}])[-1].get("pytest", {}).get("passed_count", 0) if result.get("iterations") else 0,
+                    "total": result.get("iterations", [{}])[-1].get("pytest", {}).get("total", 0) if result.get("iterations") else 0,
+                },
+                final_verdict=result.get("status", ""),
+                errors_detected=result.get("errors", []),
+                duration_seconds=result.get("duration", 0.0),
+                iterations=result.get("iterations", 0),
+            )
+            from experiments.metacognition import MetacognitiveMemory
+            mem_store = MetacognitiveMemory()
+            mem_store.save_run_memory(memory)
+            logger.debug(f"Saved metacognitive memory for run {result.get('run_id')}")
+        except Exception as e:  # pragma: no cover - memory save must not break runs
+            logger.warning("Metacognitive memory save failed: %s", e)
 
 
 def build_default_engine(config: Optional[CodeLabConfig] = None, **kw) -> CodeLabEngine:

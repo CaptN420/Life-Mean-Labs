@@ -11,7 +11,7 @@ Provides sandboxed execution for agents with:
 from .sandbox import SandboxWorkspace, validate_path
 from .resource_limits import ResourceLimits, ProcessMonitor
 from .abort_mechanism import AbortRegistry, abort_run
-from .orchestrator import LabOrchestrator
+from .lab_orchestrator import LabOrchestrator
 
 __all__ = [
     "SandboxWorkspace",

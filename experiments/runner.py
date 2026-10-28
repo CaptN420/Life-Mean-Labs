@@ -309,8 +309,16 @@ class ExperimentRunner:
             tool_name = detection.get("tool_name", "")
             import re
 
+            # ── Coding: pass description directly to coding_generator ────────
+            if "coding_generator" in tool_name or "coding" in task.domain.lower():
+                # Extract difficulty from description if present
+                diff_match = re.search(r'difficulty\s+(\d)', task.description)
+                difficulty = int(diff_match.group(1)) if diff_match else 2
+                tool_kwargs["description"] = task.description
+                tool_kwargs["difficulty"] = difficulty
+
             # ── Physics: F = ma ──
-            if "physics_force" in tool_name or "force" in task.description.lower():
+            elif "physics_force" in tool_name or "force" in task.description.lower():
                 nums = [float(x) for x in re.findall(r'\d+\.?\d*', task.description)]
                 if len(nums) >= 2:
                     tool_kwargs["mass"] = nums[0]
@@ -368,6 +376,11 @@ class ExperimentRunner:
                     if isinstance(raw_answer, dict):
                         # Try to find the primary answer key based on task type
                         desc = task.description.lower()
+
+                        # ── Coding: return source code ──────────────────────────
+                        if "coding" in task.domain.lower() or "code" in desc:
+                            return raw_answer.get("source", "")
+
                         if "gcd" in desc:
                             answer = raw_answer.get("gcd")
                         elif "lcm" in desc:

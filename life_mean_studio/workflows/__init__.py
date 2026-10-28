@@ -44,6 +44,11 @@ class WorkflowConfig:
     version: str = "1.0"
     mode: str = "single"  # single or multi
     
+    # Synthetic-data generation settings (used by the real engine on RUN)
+    domain: str = "math"
+    num_tasks: int = 10
+    seed: int = 42
+    
     # Agent configuration
     agents: List[AgentConfig] = field(default_factory=list)
     
@@ -99,6 +104,9 @@ class WorkflowConfig:
             "description": self.description,
             "version": self.version,
             "mode": self.mode,
+            "domain": self.domain,
+            "num_tasks": self.num_tasks,
+            "seed": self.seed,
             "agents": [agent.to_dict() for agent in self.agents],
             "llm_base_url": self.llm_base_url,
             "llm_model": self.llm_model,
@@ -123,6 +131,9 @@ class WorkflowConfig:
             description=data.get("description", ""),
             version=data.get("version", "1.0"),
             mode=data.get("mode", "single"),
+            domain=data.get("domain", "math"),
+            num_tasks=data.get("num_tasks", 10),
+            seed=data.get("seed", 42),
             agents=agents,
             llm_base_url=data.get("llm_base_url"),
             llm_model=data.get("llm_model"),

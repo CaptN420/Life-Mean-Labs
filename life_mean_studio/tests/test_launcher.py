@@ -48,38 +48,43 @@ class TestImports:
 
 class TestSecurityConstraints:
     """Test security constraints are enforced."""
-    
-    def test_run_button_disabled_by_design(self):
-        """Test that RUN button is disabled by design."""
-        # This is verified by code inspection - the button is created with setEnabled(False)
-        pass
-    
-    def test_stop_button_disabled_by_design(self):
-        """Test that STOP button is disabled by design."""
-        pass
-    
+
+    def test_run_button_enabled_by_design(self):
+        """RUN is enabled — it drives the real engine (no UI stub)."""
+        import inspect
+        from life_mean_studio.launcher.app import LifeMeanStudioApp
+        source = inspect.getsource(LifeMeanStudioApp._create_quick_run_section)
+        assert "self.run_btn.setEnabled(True)" in source
+
+    def test_stop_button_disabled_by_default(self):
+        """STOP starts disabled (no active run) and is enabled by the runner."""
+        import inspect
+        from life_mean_studio.launcher.app import LifeMeanStudioApp
+        source = inspect.getsource(LifeMeanStudioApp._create_quick_run_section)
+        assert "self.stop_btn.setEnabled(False)" in source
+
     def test_no_subprocess_calls(self):
         """Test that no subprocess calls are made in UI code."""
         import inspect
         from life_mean_studio.launcher import app
-        
+
         source = inspect.getsource(app)
         assert "subprocess" not in source.lower() or "import subprocess" not in source
-    
+
     def test_no_network_server_calls(self):
         """Test that no network servers are started."""
         import inspect
         from life_mean_studio.launcher import app
-        
+
         source = inspect.getsource(app)
         assert "http.server" not in source
         assert "socketserver" not in source
-    
+
     def test_no_docker_calls(self):
         """Test that no Docker calls are made."""
         import inspect
         from life_mean_studio.launcher import app
-        
+
         source = inspect.getsource(app)
         # Check for actual docker module imports, not just mentions in comments
         assert "import docker" not in source.lower()
@@ -302,25 +307,37 @@ class TestNavigationStructure:
         assert hasattr(LifeMeanStudioApp, '_create_settings_page')
 
 
-class TestDisabledFeatures:
-    """Test that features are properly disabled."""
-    
-    def test_quick_run_buttons_disabled(self):
-        """Test that Quick Run buttons are disabled in code."""
+class TestRunControls:
+    """Quick Run controls are wired to the real engine (no UI stub)."""
+
+    def test_quick_run_buttons_enabled(self):
+        """RUN is enabled by construction; STOP starts disabled (no run yet)."""
         import inspect
         from life_mean_studio.launcher.app import LifeMeanStudioApp
-        
+
         source = inspect.getsource(LifeMeanStudioApp._create_quick_run_section)
-        # Verify setEnabled(False) is called for run and stop buttons
-        assert "setEnabled(False)" in source
-    
-    def test_service_buttons_disabled(self):
-        """Test that service buttons are disabled in code."""
+        assert "self.run_btn.setEnabled(True)" in source
+        assert "self.stop_btn.setEnabled(False)" in source
+        # Handlers are wired, not email
+        assert "self.run_btn.clicked.connect(self._on_run)" in source
+        assert "self.stop_btn.clicked.connect(self._on_stop)" in source
+
+    def test_runner_wired_in_constructor(self):
+        """The app builds a StudioRunner (real engine), not a stub."""
         import inspect
         from life_mean_studio.launcher.app import LifeMeanStudioApp
-        
+
+        source = inspect.getsource(LifeMeanStudioApp.__init__)
+        assert "StudioRunner(self.storage)" in source
+
+    def test_service_buttons_disabled(self):
+        """Test that service start/stop legacy button stays disabled (no direct
+        service control; the Services page only shows real health probes)."""
+        import inspect
+        from life_mean_studio.launcher.app import LifeMeanStudioApp
+
         source = inspect.getsource(LifeMeanStudioApp._create_services_page)
-        assert "setEnabled(False)" in source
+        assert "legacy_btn.setEnabled(False)" in source
 
 
 class TestErrorHandling:

@@ -82,12 +82,7 @@ TOOL_DETECTION: Dict[str, List[Dict[str, Any]]] = {
         {"tool": "algebra_factor", "param": "expression", "score": 15},
     ],
 
-    # ── Math tools ──
-    "gcd": [{"tool": "math_gcd", "param": "a", "score": 15}],
-    "lcm": [{"tool": "math_lcm", "param": "a", "score": 15}],
-    "prime": [{"tool": "math_is_prime", "param": "n", "score": 12}],
-    "fibonacci": [{"tool": "math_fibonacci", "param": "n", "score": 12}],
-    "factorial": [{"tool": "math_factorial", "param": "n", "score": 12}],
+    # ── Math tools (simplified - most algorithms now use coding_generator) ──
     "trig": [{"tool": "math_trig", "param": "angle_deg", "score": 10}],
     "logarithm": [{"tool": "math_log_", "param": "value", "score": 10}],
     "bayes": [{"tool": "math_bayes_theorem", "param": "prior", "score": 12}],
@@ -113,6 +108,17 @@ TOOL_DETECTION: Dict[str, List[Dict[str, Any]]] = {
     "loc": [{"tool": "coding_loc", "param": "source", "score": 10}],
     "cyclomatic": [{"tool": "coding_cyclomatic", "param": "source", "score": 10}],
     "regex": [{"tool": "coding_validate_regex", "param": "pattern", "score": 10}],
+    "write code": [{"tool": "coding_generator", "param": "description", "score": 20}],
+    "coding task": [{"tool": "coding_generator", "param": "description", "score": 20}],
+    "generate function": [{"tool": "coding_generator", "param": "description", "score": 20}],
+    "implement": [{"tool": "coding_generator", "param": "description", "score": 18}],
+    "fibonacci": [{"tool": "coding_generator", "param": "description", "score": 15}],
+    "factorial": [{"tool": "coding_generator", "param": "description", "score": 15}],
+    "gcd": [{"tool": "coding_generator", "param": "description", "score": 15}],
+    "lcm": [{"tool": "coding_generator", "param": "description", "score": 15}],
+    "prime": [{"tool": "coding_generator", "param": "description", "score": 15}],
+    "sort": [{"tool": "coding_generator", "param": "description", "score": 15}],
+    "search": [{"tool": "coding_generator", "param": "description", "score": 15}],
 
     # ── Math (advanced) ──
     "integrate": [{"tool": "eqsolve_integrate", "param": "expr", "score": 12}],
@@ -127,10 +133,13 @@ DOMAIN_MAP: Dict[str, str] = {
     "ruff": "coding", "mypy": "coding", "pylint": "coding",
     "format code": "coding", "security audit": "coding", "type check": "coding",
     "loc": "coding", "cyclomatic": "coding", "regex": "coding",
+    "write code": "coding", "coding task": "coding", "generate function": "coding",
+    "implement": "coding", "fibonacci": "coding", "factorial": "coding",
+    "gcd": "coding", "lcm": "coding", "prime": "coding", "sort": "coding",
+    "search": "coding",
     # Math
     "simplify": "math", "expand": "math", "derivative": "math",
-    "solve": "math", "factor": "math", "gcd": "math", "lcm": "math",
-    "prime": "math", "fibonacci": "math", "factorial": "math",
+    "solve": "math", "factor": "math",
     "trig": "math", "logarithm": "math", "bayes": "math",
     "integrate": "math", "taylor": "math", "limit": "math",
     # Physics

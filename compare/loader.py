@@ -199,6 +199,11 @@ def load_experiment(experiment_id: str, raw_dir: Optional[Path] = None) -> RunMe
     raw_dir = raw_dir or default_raw_dir()
     path = raw_dir / f"{experiment_id}.jsonl"
     if not path.exists():
+        # Code Lab / Debate Lab runs persist their RAW snapshot elsewhere;
+        # delegate to the lab-run adapter instead of reporting a false 404.
+        from compare.lab_runs import is_lab_run_id, load_lab_run
+        if is_lab_run_id(experiment_id):
+            return load_lab_run(experiment_id)
         raise CompareLoadError(
             f"no RAW evidence for experiment '{experiment_id}' at {path}")
     tasks: List[TaskRecord] = []
@@ -236,13 +241,28 @@ def load_experiments(experiment_ids: Iterable[str],
     return out
 
 
-def list_available_experiments(raw_dir: Optional[Path] = None) -> List[str]:
-    """List experiment ids that have RAW evidence (sorted, deterministic)."""
+def list_available_experiments(raw_dir: Optional[Path] = None,
+                               include_lab_runs: Optional[bool] = None) -> List[str]:
+    """List every id with RAW evidence — experiments + Code Lab / Debate Lab.
+
+    Lab runs are included only for the default RAW store (production view);
+    passing an explicit ``raw_dir`` (tests, isolated scans) keeps the result
+    scoped to that directory unless ``include_lab_runs=True`` is forced.
+    """
+    explicit_dir = raw_dir is not None
     raw_dir = raw_dir or default_raw_dir()
-    if not raw_dir.is_dir():
-        return []
+    if include_lab_runs is None:
+        include_lab_runs = not explicit_dir
     ids = []
-    for name in os.listdir(raw_dir):
-        if name.endswith(".jsonl"):
-            ids.append(name[: -len(".jsonl")])
-    return sorted(ids)
+    if raw_dir.is_dir():
+        for name in os.listdir(raw_dir):
+            if name.endswith(".jsonl"):
+                ids.append(name[: -len(".jsonl")])
+    if include_lab_runs:
+        try:
+            from compare.lab_runs import list_lab_run_rows
+            ids.extend(str(row.get("experiment_id")) for row in list_lab_run_rows()
+                       if row.get("experiment_id"))
+        except Exception:  # pragma: no cover - availability must never fail
+            pass
+    return sorted(set(ids))
