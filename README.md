@@ -1,3 +1,163 @@
+# Life-Mean-Labs 🧠
+
+## Adaptive Router v1.1 — Evidence, Benchmark & Architecture Validation Engine
+
+**Question fondamentale :** Combien de tokens peut-on retirer avant que l'agent cesse de prendre la bonne décision ?
+
+---
+
+### Mission
+
+Transformer le routeur adaptatif en un moteur mesurable, reproductible et vérifiable, capable de :
+
+- **Valider** les résultats avec traçabilité complète
+- **Benchmark** les stratégies (Déterministe, Computationnel, LLM, Cache)
+- **Optimiser** le routage basé sur la fiabilité vs coût
+- **Résister** aux pannes et erreurs via fallback intelligent
+
+---
+
+### Architecture
+
+```
+CACHE → DETERMINISTIC → COMPUTATIONAL → LLM → ERROR
+       ↑___________________________________|
+                  Fallback Chain
+```
+
+### Classification des Tâches
+
+| Type | Description | Moteur Privilégié |
+|------|-------------|-------------------|
+| `DETERMINISTIC` | Calcul exact, règles explicites | Déterministe |
+| `COMPUTATIONAL` | Simulation, optimisation, numérique | Computationnel |
+| `REASONING` | Analyse complexe, multi-étapes | LLM |
+| `AMBIGUOUS` | Données insuffisantes, multiples interprétations | LLM + Validation |
+| `UNKNOWN` | Indéterminé | Fallback progressif |
+
+### Validation des Résultats
+
+| Statut | Signification |
+|--------|---------------|
+| `VERIFIED` | Résultat confirmé par les critères de vérification |
+| `PARTIAL` | Vérification partielle ou couverture insuffisante |
+| `UNVERIFIED` | Aucune vérification indépendante concluante |
+| `INVALID` | Résultat contradictoire ou incorrect |
+
+### Moteurs Disponibles
+
+| Moteur | Usage | Coût Relatif |
+|--------|-------|--------------|
+| `CACHE` | Résultat mis en cache | 0 (gratuit) |
+| `DETERMINISTIC` | Calcul exact Python | Faible |
+| `COMPUTATIONAL` | Simulation numérique | Moyen |
+| `LLM` | Raisonnement langage | Élevé |
+| `ERROR` | Aucune stratégie disponible | N/A |
+
+---
+
+### Quick Start
+
+```python
+from core.router.adaptive import AdaptiveRouter, EngineType, CostConfig
+from core.router.evidence import EvidenceValidator, EvidenceCollector
+
+# Configuration optimisée
+router = AdaptiveRouter(
+    cost_config=CostConfig(
+        reliability_weight=2.0,
+        compute_weight=1.0,
+        token_weight=0.01,
+        latency_weight=0.5,
+    ),
+    max_fallbacks=3,
+)
+
+# Validator avec collecte d'évidence
+validator = EvidenceValidator()
+
+# Router une tâche
+decision = router.route(
+    task_id="task-001",
+    description="Calculate gcd of 48 and 180",
+    tool_name="math_gcd",
+    kwargs={"a": 48, "b": 180},
+    llm_available=True,
+)
+
+# Analyser les résultats
+print(f"Classification: {decision.classification}")
+print(f"Moteur sélectionné: {decision.selected_engine}")
+print(f"Validation: {decision.validation}")
+print(f"Coût estimé: {decision.compute_cost} tokens")
+```
+
+---
+
+### Benchmarks
+
+Comparer les stratégies sur tâches identiques :
+
+```python
+from core.router.evidence import BenchmarkEngine
+
+benchmark = BenchmarkEngine()
+
+# Exécuter avec différentes stratégies
+result_det = benchmark.run_benchmark("task-001", "DETERMINISTIC", deterministic_worker, task)
+result_llm = benchmark.run_benchmark("task-001", "LLM", llm_worker, task)
+
+# Comparaison
+comparison = benchmark.get_comparison("task-001")
+```
+
+---
+
+### Structure du Projet
+
+```
+core/router/
+├── __init__.py          # Export publics
+├── adaptive.py          # Routeur adaptatif v1.1
+├── evidence.py          # Couche validation + benchmarks
+└── README.md            # Cette documentation
+
+tests/
+├── test_adaptive_router.py    # Tests existants (23 pass)
+└── test_evidence_layer.py     # Nouveaux tests v1.1
+```
+
+---
+
+### Règles de Développement
+
+1. **Ne pas inventer une preuve** — Mesurer, ne pas estimer
+2. **Ne pas confondre succès des tests et preuve d'optimalité**
+3. **Préserver la reproductibilité** — Chaque benchmark doit être re-exécutable
+4. **Distinguer simulation et exécution réelle**
+5. **Ne jamais masquer une régression**
+
+---
+
+### Résultats
+
+Les rapports de validation, benchmarks et analyses d'architecture sont enregistrés dans :
+
+```
+results/
+├── README.md
+├── validation/          # Décisions de routage validées
+├── benchmarks/          # Comparaisons de stratégies
+├── architecture/        # Analyses structurelles
+└── traces/              # Journaux d'exécution
+```
+
+---
+
+**Principe fondamental :** Une expérience observée n'est pas une preuve de causalité, et un test réussi n'est pas une validation complète de l'architecture.
+
+---
+
 # Life_mean Lab 🧠
 
 *A multi-agent system & synthetic-data laboratory — where machines argue to think, and think to generate.*
