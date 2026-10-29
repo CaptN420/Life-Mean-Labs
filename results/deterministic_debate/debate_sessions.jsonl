@@ -1,0 +1,99 @@
+{
+  "session_id": "test_deterministic_001",
+  "trace_id": "debate_20261028_abc123",
+  "topic": "Does life have inherent meaning?",
+  "status": "completed",
+  "task_type": "philosophical",
+  "arbiter_decision": "VERIFIED",
+  "arbiter_justification": "Both hypotheses supported by independent evidence. Contradiction resolved via synthesis: meaning is contextual.",
+  "arbiter_rule_version": "1.0.0",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "agent_id": "agent_a",
+      "hypothesis": "Life has inherent meaning through existential commitment",
+      "arguments": ["Existential commitment provides framework for meaning", "Personal agency creates purpose"],
+      "evidence_refs": ["ref_1"],
+      "status": "VERIFIED",
+      "trace_id": "debate_20261028_abc123"
+    },
+    {
+      "claim_id": "c2",
+      "agent_id": "agent_b",
+      "hypothesis": "Meaning is socially constructed and contextual",
+      "arguments": ["Cross-cultural variation in meaning systems", "Neuroscientific basis for value assignment"],
+      "evidence_refs": ["ref_2"],
+      "status": "VERIFIED",
+      "trace_id": "debate_20261028_abc123"
+    }
+  ],
+  "evidence_registry": [
+    {
+      "evidence_id": "ref_1",
+      "claim_id": "c1",
+      "evidence_type": "independent",
+      "content": "Logical proof: existential commitment is a necessary condition for meaning attribution",
+      "verified": true,
+      "verification_method": "deduction"
+    },
+    {
+      "evidence_id": "ref_2",
+      "claim_id": "c2",
+      "evidence_type": "independent",
+      "content": "Empirical observation: meaning systems vary across cultures and individuals",
+      "verified": true,
+      "verification_method": "observation"
+    }
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "cd1",
+      "claim_a_id": "c1",
+      "claim_b_id": "c2",
+      "description": "Inherent meaning vs constructed meaning",
+      "resolved": true,
+      "resolution": "Synthesis: meaning is both inherent (through commitment) and contextual (through construction)"
+    }
+  ],
+  "transcript": [
+    {
+      "turn_number": 1,
+      "speaker_id": "agent_a",
+      "response_text": "Life derives meaning through the framework of existential commitment...",
+      "model_used": "kwaipilot_kat-coder-v2.5-dev",
+      "provider": "MOCK"
+    },
+    {
+      "turn_number": 2,
+      "speaker_id": "agent_b",
+      "response_text": "Meaning is not inherent but emerges from social construction...",
+      "model_used": "kwaipilot_kat-coder-v2.5-dev",
+      "provider": "MOCK"
+    }
+  ],
+  "events": [
+    {"sequence_number": 1, "event_type": "DEBATE_STARTED", "timestamp": "2026-10-28T10:00:00Z", "session_id": "test_deterministic_001", "data": {"topic": "Does life have inherent meaning?", "max_turns": 10, "task_type": "philosophical"}},
+    {"sequence_number": 2, "event_type": "ROUND_STARTED", "timestamp": "2026-10-28T10:00:01Z", "session_id": "test_deterministic_001", "data": {"turn": 1, "speaker": "agent_a"}},
+    {"sequence_number": 3, "event_type": "CLAIM_SUBMITTED", "timestamp": "2026-10-28T10:00:02Z", "session_id": "test_deterministic_001", "data": {"claim_id": "c1", "agent": "agent_a", "status": "VERIFIED"}},
+    {"sequence_number": 4, "event_type": "ROUND_STARTED", "timestamp": "2026-10-28T10:00:03Z", "session_id": "test_deterministic_001", "data": {"turn": 2, "speaker": "agent_b"}},
+    {"sequence_number": 5, "event_type": "COUNTERCLAIM_SUBMITTED", "timestamp": "2026-10-28T10:00:04Z", "session_id": "test_deterministic_001", "data": {"claim_id": "c2", "agent": "agent_b", "status": "VERIFIED"}},
+    {"sequence_number": 6, "event_type": "CONTRADICTION_DETECTED", "timestamp": "2026-10-28T10:00:05Z", "session_id": "test_deterministic_001", "data": {"contradiction_id": "cd1"}},
+    {"sequence_number": 7, "event_type": "EVIDENCE_VERIFIED", "timestamp": "2026-10-28T10:00:06Z", "session_id": "test_deterministic_001", "data": {"evidence_id": "ref_1", "verified": true}},
+    {"sequence_number": 8, "event_type": "EVIDENCE_VERIFIED", "timestamp": "2026-10-28T10:00:07Z", "session_id": "test_deterministic_001", "data": {"evidence_id": "ref_2", "verified": true}},
+    {"sequence_number": 9, "event_type": "CONTRADICTION_RESOLVED", "timestamp": "2026-10-28T10:00:08Z", "session_id": "test_deterministic_001", "data": {"contradiction_id": "cd1"}},
+    {"sequence_number": 10, "event_type": "ARBITER_DECISION", "timestamp": "2026-10-28T10:00:09Z", "session_id": "test_deterministic_001", "data": {"decision": "VERIFIED", "rules": ["validity", "constraints", "consistency"]}},
+    {"sequence_number": 11, "event_type": "DEBATE_COMPLETED", "timestamp": "2026-10-28T10:00:10Z", "session_id": "test_deterministic_001", "data": {"turns_committed": 2}}
+  ],
+  "metrics": {
+    "total_turns": 2,
+    "total_claims": 2,
+    "total_evidence": 2,
+    "total_contradictions": 1,
+    "resolved_contradictions": 1,
+    "duration_seconds": 10.0,
+    "personas_used": ["agent_a", "agent_b"],
+    "routing_method": "role_mapping",
+    "task_type": "philosophical",
+    "trace_id": "debate_20261028_abc123"
+  }
+}

@@ -76,6 +76,8 @@ class ExperimentUIController:
         self._autopilots: Dict[str, Any] = {}
         self._stop_requested: Dict[str, bool] = {}
         self._worker_threads: Dict[str, threading.Thread] = {}
+        # Observability tracker per experiment (live debate transcript, traces)
+        self._observability: Dict[str, Any] = {}
 
     def register_experiment(
         self,
@@ -98,6 +100,91 @@ class ExperimentUIController:
             self._configurations[experiment_id] = config
             logger.info(f"Registered experiment {experiment_id}")
             return state
+
+    def set_mode(self, experiment_id: str, mode: str) -> bool:
+        """Set the execution mode for an experiment (deterministic|debate).
+
+        Args:
+            experiment_id: Experiment identifier
+            mode: 'deterministic' or 'debate'
+
+        Returns:
+            True if mode was set successfully
+        """
+        with self._lock:
+            if experiment_id not in self._experiments:
+                logger.error(f"Experiment {experiment_id} not found for mode switch")
+                return False
+            # Validate mode
+            if mode not in ("deterministic", "debate"):
+                logger.error(f"Invalid mode '{mode}' for experiment {experiment_id}")
+                return False
+            state = self._experiments[experiment_id]
+            config = self._configurations.get(experiment_id, {})
+            if mode == "debate":
+                state.mode = "debate"
+                config["debate"] = True
+                config["deterministic"] = False
+            else:
+                state.mode = "deterministic"
+                config["debate"] = False
+                config["deterministic"] = True
+            self._configurations[experiment_id] = config
+            logger.info(f"Experiment {experiment_id} mode set to {mode}")
+            return True
+
+    def restart_experiment(self, experiment_id: str) -> bool:
+        """Restart an experiment from the beginning with current configuration.
+
+        Args:
+            experiment_id: Experiment identifier
+
+        Returns:
+            True if restart was initiated successfully
+        """
+        with self._lock:
+            if experiment_id not in self._experiments:
+                logger.error(f"Experiment {experiment_id} not found for restart")
+                return False
+            state = self._experiments[experiment_id]
+            if state.is_running:
+                logger.warning(f"Cannot restart experiment {experiment_id} while running")
+                return False
+            # Reset state for fresh run
+            state.tasks_generated = 0
+            state.tasks_completed = 0
+            state.tasks_valid = 0
+            state.tasks_invalid = 0
+            state.current_pass_rate = 0.0
+            state.avg_novelty_score = 0.0
+            state.errors = []
+            logger.info(f"Experiment {experiment_id} reset for restart")
+        # Start the experiment with reset state
+        return self.start_experiment(experiment_id)
+
+    def continue_experiment(self, experiment_id: str) -> bool:
+        """Continue an experiment from where it left off (if stopped).
+
+        Args:
+            experiment_id: Experiment identifier
+
+        Returns:
+            True if continuation was initiated successfully
+        """
+        with self._lock:
+            if experiment_id not in self._experiments:
+                logger.error(f"Experiment {experiment_id} not found for continue")
+                return False
+            state = self._experiments[experiment_id]
+            if state.is_running:
+                logger.warning(f"Cannot continue experiment {experiment_id} while already running")
+                return False
+            # If completed, allow restart from beginning
+            if state.tasks_completed > 0 and state.tasks_generated == state.tasks_completed:
+                logger.info(f"Experiment {experiment_id} was completed, restarting from beginning")
+                return self.restart_experiment(experiment_id)
+        # Start the experiment
+        return self.start_experiment(experiment_id)
 
     def start_experiment(self, experiment_id: str) -> bool:
         """Start an experiment.
@@ -409,6 +496,17 @@ class ExperimentUIController:
                 autopilot = AutoPilot()
                 with self._lock:
                     self._autopilots[experiment_id] = autopilot
+                    # Initialize observability tracker
+                    from experiments.observability import AutopilotObservability
+                    obs = AutopilotObservability()
+                    # Build agent list from config or defaults
+                    agents_cfg = config.get("agents", [
+                        {"agent_id": "agent_1", "persona": "existentialist", "role": "advocate"},
+                        {"agent_id": "agent_2", "persona": "stoic", "role": "skeptic"},
+                        {"agent_id": "agent_3", "persona": "nihilist", "role": "synthesizer"},
+                    ])
+                    obs.start_experiment(experiment_id, config, prompt=config.get("prompt", ""), agents=agents_cfg)
+                    self._observability[experiment_id] = obs
                 # Deterministic validator is the authority; AutoPilot reuses it
                 # via _validate_response AFTER the debate.
                 debate_results = autopilot.run_experiment(
@@ -470,6 +568,12 @@ class ExperimentUIController:
         except Exception as e:
             logger.error(f"Experiment {experiment_id} failed: {e}")
             self.add_error(experiment_id, str(e))
+            # Record error in observability
+            with self._lock:
+                obs = self._observability.get(experiment_id)
+                if obs:
+                    obs.record_error(str(e))
+                    obs.complete_experiment(status="FAILED")
         finally:
             # Mark as complete
             with self._lock:
@@ -479,6 +583,10 @@ class ExperimentUIController:
                 self._stop_requested.pop(experiment_id, None)
                 self._worker_threads.pop(experiment_id, None)
                 self._autopilots.pop(experiment_id, None)
+                # Complete observability tracking
+                obs = self._observability.pop(experiment_id, None)
+                if obs:
+                    obs.complete_experiment(status="COMPLETED")
             self._notify_callbacks(experiment_id, "stopped")
 
     def _is_stop_requested(self, experiment_id: str) -> bool:
@@ -545,11 +653,7 @@ class ExperimentUIController:
                 pass
 
     def get_dashboard_data(self) -> Dict[str, Any]:
-        """Get dashboard data for all experiments.
-
-        Returns:
-            Dictionary with dashboard information
-        """
+        """Get dashboard data for all experiments."""
         with self._lock:
             experiments = {}
             for exp_id, state in self._experiments.items():
@@ -561,3 +665,26 @@ class ExperimentUIController:
                 "running_count": sum(1 for e in experiments.values() if e["is_running"]),
                 "timestamp": time.time(),
             }
+
+    def get_observability(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+        """Get observability data for an experiment."""
+        with self._lock:
+            obs = self._observability.get(experiment_id)
+            if obs is None:
+                return None
+            return {
+                "config": obs.get_config(),
+                "prompt": obs.get_prompt(),
+                "agents": {aid: arec.to_dict() for aid, arec in obs.get_agents().items()},
+                "events": obs.get_events(limit=200),
+                "traces": obs.get_traces(limit=100),
+                "progress": obs.get_progress(),
+            }
+
+    def export_experiment_manifest(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+        """Export complete experiment manifest for reproducibility."""
+        with self._lock:
+            obs = self._observability.get(experiment_id)
+            if obs is None:
+                return None
+            return obs.export_manifest()

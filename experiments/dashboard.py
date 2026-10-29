@@ -136,6 +136,14 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
             self._cluster_tree()
         elif parsed.path == "/api/cluster/graph":
             self._cluster_graph()
+        elif parsed.path == "/api/sentinel/status":
+            self._sentinel_status()
+        elif parsed.path == "/api/sentinel/config":
+            self._sentinel_config_get()
+        elif parsed.path.startswith("/api/sentinel/alerts"):
+            self._sentinel_alerts_get()
+        elif parsed.path == "/api/sentinel/confirm-upload":
+            self._sentinel_confirm_upload()
         elif parsed.path == "/dashboard":
             self._serve_dashboard()
         else:
@@ -187,6 +195,54 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
             else:
                 self.ui_controller.stop_experiment(exp_id)
                 self._send_json({"status": "stopped"})
+        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/mode"):
+            exp_id = parsed.path.split("/")[-2]
+            if self.ui_controller.get_experiment(exp_id) is None:
+                self._send_error(404, f"Experiment {exp_id} not found", code="not_found")
+            else:
+                mode = data.get("mode", "deterministic")
+                if mode not in ("deterministic", "debate"):
+                    self._send_error(400, f"Invalid mode: {mode}. Must be 'deterministic' or 'debate'", code="invalid")
+                    return
+                success = self.ui_controller.set_mode(exp_id, mode)
+                if success:
+                    self._send_json({"status": "mode_set", "mode": mode})
+                else:
+                    self._send_error(500, "Failed to set mode", code="server")
+        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/restart"):
+            exp_id = parsed.path.split("/")[-2]
+            if self.ui_controller.get_experiment(exp_id) is None:
+                self._send_error(404, f"Experiment {exp_id} not found", code="not_found")
+            else:
+                success = self.ui_controller.restart_experiment(exp_id)
+                if success:
+                    self._send_json({"status": "restarted"})
+                else:
+                    self._send_error(500, "Failed to restart experiment", code="server")
+        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/continue"):
+            exp_id = parsed.path.split("/")[-2]
+            if self.ui_controller.get_experiment(exp_id) is None:
+                self._send_error(404, f"Experiment {exp_id} not found", code="not_found")
+            else:
+                success = self.ui_controller.continue_experiment(exp_id)
+                if success:
+                    self._send_json({"status": "continued"})
+                else:
+                    self._send_error(500, "Failed to continue experiment", code="server")
+        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/observability"):
+            exp_id = parsed.path.split("/")[-2]
+            obs_data = self.ui_controller.get_observability(exp_id)
+            if obs_data is None:
+                self._send_error(404, f"Observability data not found for {exp_id}", code="not_found")
+            else:
+                self._send_json(obs_data)
+        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/manifest"):
+            exp_id = parsed.path.split("/")[-2]
+            manifest = self.ui_controller.export_experiment_manifest(exp_id)
+            if manifest is None:
+                self._send_error(404, f"Manifest not found for {exp_id}", code="not_found")
+            else:
+                self._send_json(manifest)
         elif parsed.path == "/api/experimental/designs":
             self._experimental_design_create(data)
         elif parsed.path == "/api/experimental/harness":
@@ -244,6 +300,8 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
                     self._send_error(404, "Not found")
             else:
                 self._send_error(404, "Not found")
+        elif parsed.path.startswith("/api/sentinel/config"):
+            self._sentinel_config_put(data)
         elif _pipe_id := self.match_pipeline_id(parsed.path):
             sub = parsed.path.split("/")[-1]
             if sub == "approve":
@@ -835,6 +893,61 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
         """Custom log formatter."""
         logger.debug(f"{self.address_string()} - {format % args}")
 
+    # ── Sentinel API ────────────────────────────────────────────────────────
+
+    def _sentinel_status(self) -> None:
+        """GET /api/sentinel/status — current Sentinel status."""
+        if not hasattr(self, 'sentinel_controller') or self.sentinel_controller is None:
+            self._send_json({"error": "Sentinel not initialized", "enabled": False})
+            return
+        self._send_json(self.sentinel_controller.get_status())
+
+    def _sentinel_config_get(self) -> None:
+        """GET /api/sentinel/config — current Sentinel configuration."""
+        if not hasattr(self, 'sentinel_controller') or self.sentinel_controller is None:
+            self._send_json({"error": "Sentinel not initialized"})
+            return
+        status = self.sentinel_controller.get_status()
+        self._send_json({
+            "enabled": status.get("enabled", False),
+            "provider": status.get("provider", "local"),
+            "model_id": status.get("model_id", ""),
+            "analysis_mode": status.get("analysis_mode", "hybrid"),
+            "external_log_upload": status.get("external_log_upload", False),
+        })
+
+    def _sentinel_config_put(self, data: Dict[str, Any]) -> None:
+        """PUT /api/sentinel/config — update Sentinel configuration."""
+        if not hasattr(self, 'sentinel_controller') or self.sentinel_controller is None:
+            self._send_error(503, "Sentinel not initialized")
+            return
+        result = self.sentinel_controller.update_config(
+            provider=data.get("provider"),
+            model_id=data.get("model_id"),
+            analysis_mode=data.get("analysis_mode"),
+            external_log_upload=data.get("external_log_upload"),
+        )
+        if "error" in result:
+            self._send_error(400, result["error"])
+        else:
+            self._send_json(result)
+
+    def _sentinel_alerts_get(self) -> None:
+        """GET /api/sentinel/alerts — recent Sentinel alerts."""
+        if not hasattr(self, 'sentinel_controller') or self.sentinel_controller is None:
+            self._send_json({"alerts": []})
+            return
+        self._send_json(self.sentinel_controller.get_alerts())
+
+    def _sentinel_confirm_upload(self) -> None:
+        """POST /api/sentinel/confirm-upload — confirm external log upload."""
+        if not hasattr(self, 'sentinel_controller') or self.sentinel_controller is None:
+            self._send_error(503, "Sentinel not initialized")
+            return
+        confirmed = self.sentinel_controller.request_upload_confirmation()
+        self._send_json({"confirmed": confirmed})
+
+
 
 def start_dashboard(
     host: str = "127.0.0.1",
@@ -860,6 +973,22 @@ def start_dashboard(
     if debate_lab_controller is None and _DEBATE_LAB_AVAILABLE:
         debate_lab_controller = DebateLabController()
     DashboardHandler.debate_lab_controller = debate_lab_controller
+    # Wire up Sentinel controller if available
+    try:
+        from core.safety.sentinel import Sentinel, SentinelConfig
+        from core.safety.sentinel_controller import SentinelController
+        from core.observability.event_bus import EventBus
+        from core.providers.base import ProviderRegistry
+        event_bus = EventBus()
+        provider_registry = ProviderRegistry()
+        sentinel_config = SentinelConfig()
+        sentinel = Sentinel(event_bus=event_bus, provider_registry=provider_registry, config=sentinel_config)
+        sentinel_controller = SentinelController(sentinel)
+        DashboardHandler.sentinel_controller = sentinel_controller
+        logger.info("Sentinel controller initialized")
+    except Exception as exc:  # pragma: no cover - graceful degradation
+        logger.warning("Sentinel unavailable: %s", exc)
+        DashboardHandler.sentinel_controller = None
     # Wire up the modular self-extension layer
     try:
         from life_mean_extensions.pipeline import create_extension_layer

@@ -543,27 +543,27 @@ class LifeMeanStudioApp(QMainWindow):
         
         # Buttons
         btn_layout = QHBoxLayout()
-        
+
         create_btn = QPushButton("Create New")
         create_btn.clicked.connect(self._create_workflow)
         btn_layout.addWidget(create_btn)
-        
+
         edit_btn = QPushButton("Edit")
-        edit_btn.setEnabled(False)  # Will be enabled when item selected
+        edit_btn.clicked.connect(self._edit_workflow)
         btn_layout.addWidget(edit_btn)
-        
+
         duplicate_btn = QPushButton("Duplicate")
-        duplicate_btn.setEnabled(False)
+        duplicate_btn.clicked.connect(self._duplicate_workflow)
         btn_layout.addWidget(duplicate_btn)
-        
+
         load_btn = QPushButton("Load to Quick Run")
         load_btn.clicked.connect(self._load_workflow_to_quick_run)
         btn_layout.addWidget(load_btn)
-        
+
         delete_btn = QPushButton("Delete")
         delete_btn.clicked.connect(self._delete_workflow)
         btn_layout.addWidget(delete_btn)
-        
+
         layout.addLayout(btn_layout)
         
         return widget
@@ -663,7 +663,7 @@ class LifeMeanStudioApp(QMainWindow):
         if not item:
             QMessageBox.warning(self, "Warning", "No workflow selected")
             return
-        
+
         wf_id = item.data(Qt.UserRole)
         # Navigate to home page and select the workflow
         self._navigate_to(0)
@@ -672,6 +672,146 @@ class LifeMeanStudioApp(QMainWindow):
             if self.workflow_combo.itemData(i) == wf_id:
                 self.workflow_combo.setCurrentIndex(i)
                 break
+
+    def _edit_workflow(self):
+        """Edit selected workflow."""
+        item = self.workflow_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No workflow selected")
+            return
+        wf_id = item.data(Qt.UserRole)
+        config = self.workflow_manager.get(wf_id)
+        if not config:
+            QMessageBox.critical(self, "Error", "Could not load workflow for editing")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Edit Workflow")
+        layout = QFormLayout(dialog)
+        name_edit = QLineEdit(config.name)
+        layout.addRow("Name:", name_edit)
+        mode_combo = QComboBox()
+        mode_combo.addItems(["single", "multi"])
+        mode_combo.setCurrentText(config.mode)
+        layout.addRow("Mode:", mode_combo)
+        domain_combo = QComboBox()
+        domain_combo.addItems(["math", "code", "science", "philosophy", "general"])
+        domain_combo.setCurrentText(config.domain)
+        layout.addRow("Domain:", domain_combo)
+        num_tasks_spin = QSpinBox()
+        num_tasks_spin.setRange(1, 100)
+        num_tasks_spin.setValue(config.num_tasks)
+        layout.addRow("Num Tasks:", num_tasks_spin)
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("Save")
+        cancel_btn = QPushButton("Cancel")
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addRow("", btn_layout)
+        ok_btn.clicked.connect(lambda: self._save_edited_workflow(dialog, wf_id, name_edit.text(), mode_combo.currentText(), domain_combo.currentText(), num_tasks_spin.value()))
+        cancel_btn.clicked.connect(dialog.reject)
+        dialog.exec()
+
+    def _save_edited_workflow(self, dialog, wf_id, name, mode, domain, num_tasks):
+        if not name:
+            QMessageBox.warning(self, "Error", "Name is required")
+            return
+        try:
+            self.workflow_manager.update(wf_id, {"config": WorkflowConfig(name=name, description="", mode=mode, domain=domain, num_tasks=num_tasks).to_dict()})
+            self._refresh_workflow_list()
+            dialog.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to update workflow: {e}")
+
+    def _duplicate_workflow(self):
+        """Duplicate selected workflow."""
+        item = self.workflow_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No workflow selected")
+            return
+        wf_id = item.data(Qt.UserRole)
+        config = self.workflow_manager.get(wf_id)
+        if not config:
+            QMessageBox.critical(self, "Error", "Could not load workflow for duplication")
+            return
+        try:
+            new_config = WorkflowConfig(name=f"{config.name} (Copy)", description=config.description, mode=config.mode, domain=config.domain, num_tasks=config.num_tasks, seed=config.seed)
+            self.workflow_manager.create(new_config)
+            self._refresh_workflow_list()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to duplicate workflow: {e}")
+
+    def _edit_prompt(self):
+        """Edit selected prompt."""
+        item = self.prompt_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No prompt selected")
+            return
+        prompt_id = item.data(Qt.UserRole)
+        prompt = self.prompt_collection.get(prompt_id)
+        if not prompt:
+            QMessageBox.critical(self, "Error", "Could not load prompt for editing")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Edit Prompt")
+        layout = QFormLayout(dialog)
+        name_edit = QLineEdit(prompt.name)
+        layout.addRow("Name:", name_edit)
+        category_combo = QComboBox()
+        category_combo.addItems(["general", "coding", "security", "research"])
+        category_combo.setCurrentText(prompt.category)
+        layout.addRow("Category:", category_combo)
+        content_edit = QTextEdit()
+        content_edit.setPlainText(prompt.content)
+        layout.addRow("Content:", content_edit)
+        btn_layout = QHBoxLayout()
+        ok_btn = QPushButton("Save")
+        cancel_btn = QPushButton("Cancel")
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addRow("", btn_layout)
+        ok_btn.clicked.connect(lambda: self._save_edited_prompt(dialog, prompt_id, name_edit.text(), category_combo.currentText(), content_edit.toPlainText()))
+        cancel_btn.clicked.connect(dialog.reject)
+        dialog.exec()
+
+    def _save_edited_prompt(self, dialog, prompt_id, name, category, content):
+        if not name or not content:
+            QMessageBox.warning(self, "Error", "Name and content are required")
+            return
+        try:
+            self.prompt_collection.update(prompt_id, {"name": name, "category": category, "content": content})
+            self._refresh_prompt_list()
+            dialog.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to update prompt: {e}")
+
+    def _duplicate_prompt(self):
+        """Duplicate selected prompt."""
+        item = self.prompt_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No prompt selected")
+            return
+        prompt_id = item.data(Qt.UserRole)
+        prompt = self.prompt_collection.get(prompt_id)
+        if not prompt:
+            QMessageBox.critical(self, "Error", "Could not load prompt for duplication")
+            return
+        try:
+            self.prompt_collection.create(f"{prompt.name} (Copy)", prompt.content, prompt.category)
+            self._refresh_prompt_list()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to duplicate prompt: {e}")
+
+    def _delete_prompt(self):
+        """Delete selected prompt."""
+        item = self.prompt_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No prompt selected")
+            return
+        prompt_id = item.data(Qt.UserRole)
+        reply = QMessageBox.question(self, "Confirm", "Delete this prompt?", QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.prompt_collection.delete(prompt_id)
+            self._refresh_prompt_list()
     
     def _create_prompts_page(self):
         """Create the prompts page."""
@@ -689,22 +829,28 @@ class LifeMeanStudioApp(QMainWindow):
         
         # Buttons
         btn_layout = QHBoxLayout()
-        
+
         create_btn = QPushButton("Create New")
         create_btn.clicked.connect(self._create_prompt)
         btn_layout.addWidget(create_btn)
-        
+
         edit_btn = QPushButton("Edit")
+        edit_btn.clicked.connect(self._edit_prompt)
         btn_layout.addWidget(edit_btn)
-        
+
         duplicate_btn = QPushButton("Duplicate")
+        duplicate_btn.clicked.connect(self._duplicate_prompt)
         btn_layout.addWidget(duplicate_btn)
-        
+
+        delete_btn = QPushButton("Delete")
+        delete_btn.clicked.connect(self._delete_prompt)
+        btn_layout.addWidget(delete_btn)
+
         search_edit = QLineEdit()
         search_edit.setPlaceholderText("Search prompts...")
         search_edit.textChanged.connect(self._search_prompts)
         btn_layout.addWidget(search_edit)
-        
+
         layout.addLayout(btn_layout)
         
         return widget
@@ -713,8 +859,8 @@ class LifeMeanStudioApp(QMainWindow):
         """Refresh the prompt list."""
         self.prompt_list.clear()
         for prompt in self.prompt_collection.list_all():
-            item = QListWidgetItem(f"{prompt['name']} ({prompt['category']})")
-            item.setData(Qt.UserRole, prompt["id"])
+            item = QListWidgetItem(f"{prompt.name} ({prompt.category})")
+            item.setData(Qt.UserRole, prompt.id)
             self.prompt_list.addItem(item)
     
     def _create_prompt(self):
@@ -765,8 +911,8 @@ class LifeMeanStudioApp(QMainWindow):
         """Search prompts."""
         self.prompt_list.clear()
         for prompt in self.prompt_collection.search(query):
-            item = QListWidgetItem(f"{prompt['name']} ({prompt['category']})")
-            item.setData(Qt.UserRole, prompt["id"])
+            item = QListWidgetItem(f"{prompt.name} ({prompt.category})")
+            item.setData(Qt.UserRole, prompt.id)
             self.prompt_list.addItem(item)
     
     def _create_console_page(self):

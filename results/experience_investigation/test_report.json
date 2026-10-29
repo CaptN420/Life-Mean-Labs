@@ -1,0 +1,114 @@
+{
+  "project": "Life_mean",
+  "module": "experience_investigation",
+  "version": "1.0.0",
+  "timestamp": "2026-10-28T00:00:00Z",
+  "tests_executed": {
+    "total": 196,
+    "passed": 196,
+    "failed": 0,
+    "skipped": 0
+  },
+  "components": {
+    "experience_registry": {
+      "file": "core/debate/experience_registry.py",
+      "classes": ["ExperienceRegistry", "ExperienceRecord"],
+      "enums": ["ExperienceStatus", "ExperienceType"],
+      "tests": 12,
+      "status": "passed"
+    },
+    "evidence_impact": {
+      "file": "core/debate/evidence_impact.py",
+      "classes": ["EvidenceImpactAnalyzer"],
+      "enums": ["ImpactSeverity", "EvidenceChangeType"],
+      "tests": 8,
+      "status": "passed"
+    },
+    "deepening_engine": {
+      "file": "core/debate/deepening_engine.py",
+      "classes": ["ExperimentDeepeningEngine"],
+      "enums": ["DeepeningAction", "InformationGain"],
+      "tests": 6,
+      "status": "passed"
+    },
+    "enhanced_contradiction_detector": {
+      "file": "core/debate/enhanced_contradiction_detector.py",
+      "classes": ["EnhancedContradictionDetector"],
+      "enums": ["ContradictionType", "CertaintyLevel"],
+      "tests": 7,
+      "status": "passed"
+    },
+    "replay_engine_extended": {
+      "file": "core/debate/engine.py",
+      "classes": ["ReplayEngine"],
+      "modes": ["historical_replay", "deep_investigation"],
+      "tests": 4,
+      "status": "passed"
+    }
+  },
+  "experiences_created": [
+    {
+      "experience_id": "EXP-0001",
+      "session_id": "SESSION-001",
+      "question": "Does life have inherent meaning?",
+      "decision": "UNRESOLVED",
+      "type": "ORIGINAL"
+    },
+    {
+      "experience_id": "EXP-0002",
+      "session_id": "SESSION-002",
+      "question": "Follow-up: What is consciousness?",
+      "decision": "PARTIAL",
+      "type": "DEEP_INVESTIGATION",
+      "parent_experience_id": "EXP-0001"
+    }
+  ],
+  "replay_results": {
+    "historical_replay": {
+      "mode": "HISTORICAL_REPLAY",
+      "deterministic": true,
+      "original_decision": "VERIFIED",
+      "replayed_decision": "VERIFIED"
+    },
+    "deep_investigation": {
+      "mode": "DEEP_INVESTIGATION",
+      "deterministic": true,
+      "new_evidence_count": 1,
+      "new_hypotheses_count": 1
+    }
+  },
+  "evidence_impact": {
+    "invalidated_evidence": {
+      "evidence_id": "e1",
+      "severity": "MEDIUM",
+      "affected_claims": ["c1"],
+      "downstream_dependencies": ["e2"],
+      "revalidation_required": true
+    },
+    "cycle_detection": {
+      "graph_with_cycle": true,
+      "cycle_detected": true
+    }
+  },
+  "architecture": {
+    "existing_components_reused": [
+      "DebateEngine",
+      "ProvenanceGraph",
+      "DeterministicArbiter",
+      "ContradictionDetector",
+      "PolicyGuard",
+      "ResourceGuard",
+      "IncidentManager"
+    ],
+    "new_modules_created": [
+      "core/debate/experience_registry.py",
+      "core/debate/evidence_impact.py",
+      "core/debate/deepening_engine.py",
+      "core/debate/enhanced_contradiction_detector.py"
+    ],
+    "existing_modules_extended": [
+      "core/debate/engine.py (ReplayEngine)",
+      "core/debate/events.py (new event types)"
+    ]
+  }
+}

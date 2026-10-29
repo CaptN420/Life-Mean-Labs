@@ -8,6 +8,7 @@ from .loop_detector import LoopDetector, LoopEvent
 from .policy_guard import PolicyGuard, PolicyViolation
 from .resource_guard import ResourceGuard, ResourceExceeded
 from .incident_manager import IncidentManager, IncidentEvent
+from .sentinel import Sentinel, SentinelConfig, SentinelAlertLevel, SentinelAction
 
 __all__ = [
     "LoopDetector",
@@ -18,4 +19,8 @@ __all__ = [
     "ResourceExceeded",
     "IncidentManager",
     "IncidentEvent",
+    "Sentinel",
+    "SentinelConfig",
+    "SentinelAlertLevel",
+    "SentinelAction",
 ]

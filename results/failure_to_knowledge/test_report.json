@@ -1,0 +1,93 @@
+{
+  "project": "Life_mean",
+  "module": "failure_to_knowledge",
+  "version": "1.0.0",
+  "timestamp": "2026-10-28T00:00:00Z",
+  "tests_executed": {
+    "total": 252,
+    "passed": 252,
+    "failed": 0,
+    "skipped": 0
+  },
+  "components": {
+    "failure_analyzer": {
+      "file": "core/debate/failure_analyzer.py",
+      "classes": ["FailureAnalyzer"],
+      "enums": ["FailureCategory", "HypothesisStatus"],
+      "tests": 8,
+      "status": "passed"
+    },
+    "comparable_run_finder": {
+      "file": "core/debate/comparable_run_finder.py",
+      "classes": ["ComparableRunFinder"],
+      "enums": ["RunStatus", "MetricAvailability"],
+      "tests": 4,
+      "status": "passed"
+    },
+    "causal_hypothesis_engine": {
+      "file": "core/debate/causal_hypothesis_engine.py",
+      "classes": ["CausalHypothesisEngine"],
+      "enums": ["HypothesisStatus", "InformationGain"],
+      "tests": 4,
+      "status": "passed"
+    },
+    "controlled_experiment_designer": {
+      "file": "core/debate/experiment_designer.py",
+      "classes": ["ControlledExperimentDesigner"],
+      "enums": ["ExperimentStatus", "VariableType"],
+      "tests": 2,
+      "status": "passed"
+    },
+    "experiment_execution_gate": {
+      "file": "core/debate/experiment_gate.py",
+      "classes": ["ExperimentExecutionGate"],
+      "enums": ["GateStatus", "ApprovalResult"],
+      "tests": 6,
+      "status": "passed"
+    },
+    "experimental_knowledge_extractor": {
+      "file": "core/debate/knowledge_extractor.py",
+      "classes": ["ExperimentalKnowledgeExtractor"],
+      "enums": ["KnowledgeStatus"],
+      "tests": 3,
+      "status": "passed"
+    },
+    "false_success_detector": {
+      "file": "core/debate/false_success_detector.py",
+      "classes": ["FalseSuccessDetector"],
+      "enums": ["FalseSuccessStatus"],
+      "tests": 4,
+      "status": "passed"
+    }
+  },
+  "architecture": {
+    "existing_components_reused": [
+      "ExperienceRegistry",
+      "EvidenceImpactAnalyzer",
+      "ProvenanceGraph",
+      "EventBus",
+      "PolicyGuard",
+      "ResourceGuard"
+    ],
+    "new_modules_created": [
+      "core/debate/failure_analyzer.py",
+      "core/debate/comparable_run_finder.py",
+      "core/debate/causal_hypothesis_engine.py",
+      "core/debate/experiment_designer.py",
+      "core/debate/experiment_gate.py",
+      "core/debate/knowledge_extractor.py",
+      "core/debate/false_success_detector.py"
+    ],
+    "existing_modules_extended": [
+      "core/debate/events.py (13 new event types)"
+    ]
+  },
+  "security_guarantees": {
+    "no_automatic_experiment_execution": true,
+    "authorization_required_before_execution": true,
+    "policy_guard_integration": true,
+    "resource_guard_integration": true,
+    "immutable_knowledge_records": true,
+    "negative_results_preserved": true
+  }
+}

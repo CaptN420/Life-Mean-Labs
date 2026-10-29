@@ -1,0 +1,14 @@
+{
+  "analysis_id": "IMPACT-001",
+  "timestamp": "2026-10-28T00:00:00Z",
+  "evidence_id": "e1",
+  "change_type": "INVALIDATED",
+  "severity": "MEDIUM",
+  "affected_claims": ["c1"],
+  "downstream_dependencies": ["e2"],
+  "transitive_effects": ["conclusion_2"],
+  "affected_conclusions": ["conclusion_1", "conclusion_2"],
+  "revalidation_required": true,
+  "cycle_detected": false,
+  "description": "Medium impact: 2 items affected"
+}

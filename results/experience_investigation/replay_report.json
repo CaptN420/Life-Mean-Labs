@@ -1,0 +1,25 @@
+{
+  "replay_id": "REPLAY-001",
+  "timestamp": "2026-10-28T00:00:00Z",
+  "mode": "HISTORICAL_REPLAY",
+  "original_session": {
+    "session_id": "debate_1793166764_9e15",
+    "topic": "Does life have inherent meaning?",
+    "decision": "VERIFIED",
+    "rules_applied": ["multiple_verified_claims"],
+    "rule_version": "1.0.0"
+  },
+  "replayed_session": {
+    "session_id": "debate_1793166765_167e",
+    "topic": "Does life have inherent meaning?",
+    "decision": "VERIFIED",
+    "rules_applied": ["multiple_verified_claims"],
+    "rule_version": "1.0.0"
+  },
+  "deterministic": true,
+  "verification": {
+    "same_decision": true,
+    "same_rules": true,
+    "same_rule_version": true
+  }
+}

@@ -597,6 +597,7 @@
 
         <nav class="tabs">
             <button class="tab-btn active" data-tab="autopilot" onclick="switchTab('autopilot', this)">Autopilot</button>
+            <button class="tab-btn" data-tab="experiments" onclick="switchTab('experiments', this)">Experiments</button>
             <button class="tab-btn" data-tab="debate" onclick="switchTab('debate', this)">Debate</button>
             <button class="tab-btn" data-tab="code-lab" onclick="switchTab('code-lab', this)">Code Lab</button>
             <button class="tab-btn" data-tab="settings" onclick="switchTab('settings', this)">Settings</button>
@@ -678,6 +679,149 @@
             <div class="card">
                 <h2>Experiments</h2>
                 <div id="experiment-list" class="experiment-list">
+                    <div class="empty-state">No experiments yet. Create one to get started.</div>
+                </div>
+            </div>
+
+            <!-- ── Observability Panels (shown when experiment is selected) ── -->
+            <div id="observability-panels" style="display:none; margin-top:1.5rem;">
+                <!-- Experiment Prompt -->
+                <div class="card">
+                    <h2>Experiment Prompt</h2>
+                    <div class="form-group">
+                        <label for="obs-prompt">Prompt (read-only during execution)</label>
+                        <textarea id="obs-prompt" rows="4" style="width:100%;font-family:monospace;" readonly></textarea>
+                    </div>
+                </div>
+
+                <!-- Deterministic Configuration -->
+                <div class="card">
+                    <h2>Deterministic Configuration</h2>
+                    <pre id="obs-config" style="background:#f8f9fa;padding:1rem;border-radius:4px;font-size:0.85rem;overflow:auto;"></pre>
+                </div>
+
+                <!-- Active Agents -->
+                <div class="card">
+                    <h2>Active Agents</h2>
+                    <div id="obs-agents" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
+                        <div class="empty-state">No agents configured</div>
+                    </div>
+                </div>
+
+                <!-- Live Debate Transcript -->
+                <div class="card" style="grid-column:1/-1;">
+                    <h2>Live Debate Transcript</h2>
+                    <div style="margin-bottom:0.5rem;">
+                        <button class="btn-sm" onclick="filterTranscript('all')">All</button>
+                        <button class="btn-sm" onclick="filterTranscript('turn_completed')">Turns</button>
+                        <button class="btn-sm" onclick="filterTranscript('rule_applied')">Rules</button>
+                        <button class="btn-sm" onclick="filterTranscript('error')">Errors</button>
+                    </div>
+                    <pre id="obs-transcript" style="max-height:400px;overflow:auto;font-size:0.8rem;white-space:pre-wrap;background:#f8f9fa;padding:1rem;border-radius:4px;"></pre>
+                </div>
+
+                <!-- Deterministic Decision Trace -->
+                <div class="card" style="grid-column:1/-1;">
+                    <h2>Deterministic Decision Trace</h2>
+                    <p class="subtitle" style="font-size:0.8rem;margin-bottom:0.75rem;">Shows why each transition happened — rules applied, state changes, agent selection criteria.</p>
+                    <div id="obs-traces">
+                        <div class="empty-state">No traces recorded yet</div>
+                    </div>
+                </div>
+
+                <!-- Experiment Progress -->
+                <div class="card">
+                    <h2>Experiment Progress</h2>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;">
+                        <div class="stat-card"><div class="stat-value" id="obs-status">—</div><div class="stat-label">Status</div></div>
+                        <div class="stat-card"><div class="stat-value" id="obs-round">—</div><div class="stat-label">Round</div></div>
+                        <div class="stat-card"><div class="stat-value" id="obs-active-agent">—</div><div class="stat-label">Active Agent</div></div>
+                        <div class="stat-card"><div class="stat-value" id="obs-elapsed">—</div><div class="stat-label">Elapsed</div></div>
+                        <div class="stat-card"><div class="stat-value" id="obs-tasks">—</div><div class="stat-label">Tasks Done</div></div>
+                        <div class="stat-card"><div class="stat-value" id="obs-synthesis">—</div><div class="stat-label">Synthesis</div></div>
+                    </div>
+                </div>
+
+                <!-- Export Controls -->
+                <div class="card">
+                    <h2>Export & Reproduce</h2>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <button class="btn-sm" onclick="exportTranscript()">Export Transcript</button>
+                        <button class="btn-sm" onclick="exportManifest()">Export Manifest</button>
+                        <button class="btn-sm" onclick="replayExperiment()">Replay Configuration</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Experiments tab — mode switch, restart, continue (GOAL: reproducible experiments) ── -->
+        <div id="panel-experiments" class="tab-panel">
+            <p class="subtitle" style="margin-bottom:1rem;">Manage existing experiments: switch execution mode (Deterministic ↔ Debate), restart from scratch, or continue a stopped run. All experiments are retaken with the selected configuration.</p>
+            <div class="grid">
+                <!-- Mode Switch Card -->
+                <div class="card">
+                    <h2>Execution Mode</h2>
+                    <form id="experiment-mode-form">
+                        <div class="form-group">
+                            <label for="exp-domain">Domain</label>
+                            <select id="exp-domain" name="domain">
+                                <option value="math">Math</option>
+                                <option value="physics">Physics</option>
+                                <option value="chemistry">Chemistry</option>
+                                <option value="coding">Coding</option>
+                                <option value="logic">Logic</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="exp-difficulty-range">Difficulty Range</label>
+                            <input type="text" id="exp-difficulty-range" name="difficulty_range" value="[1, 5]" placeholder="[1, 5]">
+                        </div>
+                        <div class="form-group">
+                            <label for="exp-num-tasks">Number of Tasks</label>
+                            <input type="number" id="exp-num-tasks" name="num_tasks" value="100" min="1" max="10000">
+                        </div>
+                        <div class="form-group">
+                            <label for="exp-seed">Seed</label>
+                            <input type="number" id="exp-seed" name="seed" value="42">
+                        </div>
+                        <div class="form-group">
+                            <label for="exp-exec-mode">Execution mode</label>
+                            <select id="exp-exec-mode" name="mode">
+                                <option value="deterministic" selected>Deterministic</option>
+                                <option value="debate">Debate / Multi-Agent</option>
+                            </select>
+                        </div>
+                        <button type="submit">Create New Experiment</button>
+                    </form>
+                </div>
+                <!-- Stats Card -->
+                <div class="card">
+                    <h2>Pipeline Statistics</h2>
+                    <div class="stat-grid">
+                        <div class="stat">
+                            <div class="stat-value" id="exp-total-experiments">0</div>
+                            <div class="stat-label">Experiments</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="exp-running-count">0</div>
+                            <div class="stat-label">Running</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="exp-total-tasks">0</div>
+                            <div class="stat-label">Tasks Generated</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="exp-pass-rate">0%</div>
+                            <div class="stat-label">Pass Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experiments List with Mode Switch -->
+            <div class="card">
+                <h2>Experiments — Mode Switch &amp; Management</h2>
+                <div id="experiment-list-managed" class="experiment-list">
                     <div class="empty-state">No experiments yet. Create one to get started.</div>
                 </div>
             </div>
@@ -1352,6 +1496,7 @@
             if (name === 'clustertree') { loadClusterTree(); }
             if (name === 'experimental') { loadExperimental(); }
             if (name === 'skills') { loadSkillsPanel(); }
+            if (name === 'experiments') switchToManagedExperiments();
         }
 
         // ── Cluster Tree ── experiments by subject + run-directory explorer ──
@@ -3479,6 +3624,7 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                                 ? `<button class="btn-sm btn-danger" onclick="stopExperiment('${id}')">Stop</button>`
                                 : `<button class="btn-sm" onclick="startExperiment('${id}')">Start</button>`
                             }
+                            <button class="btn-sm" onclick="loadObservability('${id}')">View</button>
                             <button class="btn-sm" onclick="deleteExperiment('${id}')">Delete</button>
                         </div>
                     </div>`;
@@ -4003,6 +4149,206 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
             }
         }
 
+        // ── Experiments Tab Functions ───────────────────────────────────────
+        async function createManagedExperiment(config) {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config),
+                });
+                let data = {};
+                try { data = await resp.json(); } catch (_) {}
+                if (!resp.ok) {
+                    const msg = (data && data.error) ? data.error
+                        : `Request failed (HTTP ${resp.status})`;
+                    console.error('Create experiment failed:', resp.status, data);
+                    alert(`Failed to create experiment — ${msg}`);
+                    return;
+                }
+                if (data.status === 'created') {
+                    startManagedExperiment(data.experiment_id);
+                } else {
+                    alert('Failed to create experiment — unexpected response.');
+                }
+            } catch (err) {
+                console.error('Failed to create experiment:', err);
+                alert('Failed to create experiment — network error. Is the server running?');
+            }
+        }
+
+        async function startManagedExperiment(id) {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${id}/start`, { method: 'POST' });
+                let data = {};
+                try { data = await resp.json(); } catch (_) {}
+                if (!resp.ok) {
+                    console.error('Start experiment failed:', resp.status, data);
+                    alert(`Failed to start experiment — ${(data && data.error) || ('HTTP ' + resp.status)}`);
+                    return;
+                }
+                loadManagedExperiments();
+            } catch (err) {
+                console.error('Failed to start experiment:', err);
+                alert('Failed to start experiment — network error.');
+            }
+        }
+
+        async function stopManagedExperiment(id) {
+            try {
+                await fetch(`${API_BASE}/experiments/${id}/stop`, { method: 'POST' });
+                loadManagedExperiments();
+            } catch (err) {
+                console.error('Failed to stop experiment:', err);
+            }
+        }
+
+        async function setExperimentMode(id, mode) {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${id}/mode`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode }),
+                });
+                let data = {};
+                try { data = await resp.json(); } catch (_) {}
+                if (!resp.ok) {
+                    console.error('Set mode failed:', resp.status, data);
+                    alert(`Failed to set mode — ${(data && data.error) || ('HTTP ' + resp.status)}`);
+                    return;
+                }
+                loadManagedExperiments();
+            } catch (err) {
+                console.error('Failed to set experiment mode:', err);
+                alert('Failed to set experiment mode — network error.');
+            }
+        }
+
+        async function restartManagedExperiment(id) {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${id}/restart`, { method: 'POST' });
+                let data = {};
+                try { data = await resp.json(); } catch (_) {}
+                if (!resp.ok) {
+                    console.error('Restart failed:', resp.status, data);
+                    alert(`Failed to restart experiment — ${(data && data.error) || ('HTTP ' + resp.status)}`);
+                    return;
+                }
+                loadManagedExperiments();
+            } catch (err) {
+                console.error('Failed to restart experiment:', err);
+                alert('Failed to restart experiment — network error.');
+            }
+        }
+
+        async function continueManagedExperiment(id) {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${id}/continue`, { method: 'POST' });
+                let data = {};
+                try { data = await resp.json(); } catch (_) {}
+                if (!resp.ok) {
+                    console.error('Continue failed:', resp.status, data);
+                    alert(`Failed to continue experiment — ${(data && data.error) || ('HTTP ' + resp.status)}`);
+                    return;
+                }
+                loadManagedExperiments();
+            } catch (err) {
+                console.error('Failed to continue experiment:', err);
+                alert('Failed to continue experiment — network error.');
+            }
+        }
+
+        async function deleteManagedExperiment(id) {
+            if (!confirm(`Delete experiment ${id}?`)) return;
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${id}`, { method: 'DELETE' });
+                if (!resp.ok) {
+                    console.error('Delete failed:', resp.status);
+                    alert('Failed to delete experiment');
+                }
+                loadManagedExperiments();
+            } catch (err) {
+                console.error('Failed to delete experiment:', err);
+                alert('Failed to delete experiment');
+            }
+        }
+
+        async function loadManagedExperiments() {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments`);
+                const data = await resp.json();
+                renderManagedDashboard(data);
+            } catch (err) {
+                console.error('Failed to load managed experiments:', err);
+            }
+        }
+
+        function renderManagedDashboard(data) {
+            // Update stats
+            document.getElementById('exp-total-experiments').textContent = data.total_experiments;
+            document.getElementById('exp-running-count').textContent = data.running_count;
+
+            let totalTasks = 0;
+            let validTasks = 0;
+            Object.values(data.experiments).forEach(exp => {
+                totalTasks += exp.tasks_generated || 0;
+                validTasks += exp.tasks_valid || 0;
+            });
+            document.getElementById('exp-total-tasks').textContent = totalTasks;
+            document.getElementById('exp-pass-rate').textContent = totalTasks > 0 ? `${((validTasks / totalTasks) * 100).toFixed(1)}%` : '0%';
+
+            // Render experiment list (Experiments tab) — with mode switch, restart, continue.
+            const vals = Object.entries(data.experiments);
+            const listEl = document.getElementById('experiment-list-managed');
+            if (vals.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">No experiments yet. Create one to get started.</div>';
+            } else {
+                listEl.innerHTML = vals.map(([id, exp]) => {
+                    const badgeCls = exp.is_running ? 'status-running'
+                        : exp.status === 'FAILED' ? 'status-error'
+                        : exp.status === 'COMPLETED' ? 'status-ok'
+                        : 'status-stopped';
+                    const statusLabel = exp.status || (exp.is_running ? 'RUNNING' : 'STOPPED');
+                    return `
+                    <div class="experiment-item">
+                        <div class="experiment-header">
+                            <span class="experiment-id">${id}</span>
+                            <span class="status-badge ${badgeCls}">${statusLabel}</span>
+                            <span class="experiment-stat" style="margin-left:8px;">Mode: ${exp.mode || 'deterministic'}</span>
+                        </div>
+                        <div class="experiment-stats">
+                            <span class="experiment-stat">Generated: ${exp.tasks_generated}</span>
+                            <span class="experiment-stat">Completed: ${exp.tasks_completed}</span>
+                            <span class="experiment-stat">Valid: ${exp.tasks_valid}</span>
+                            <span class="experiment-stat">Pass Rate: ${((exp.pass_rate||0) * 100).toFixed(1)}%</span>
+                        </div>
+                        ${exp.errors && exp.errors.length > 0 ? `
+                            <div class="error-list">
+                                ${exp.errors.map(e => `<div class="error-item">${escapeHtml(e)}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                        <div class="experiment-actions">
+                            <!-- Mode Switch -->
+                            <select onchange="setExperimentMode('${id}', this.value)" style="margin-right:8px;">
+                                <option value="deterministic" ${exp.mode === 'deterministic' ? 'selected' : ''}>Deterministic</option>
+                                <option value="debate" ${exp.mode === 'debate' ? 'selected' : ''}>Debate</option>
+                            </select>
+                            <!-- Restart / Continue -->
+                            ${exp.is_running
+                                ? `<button class="btn-sm btn-danger" onclick="stopManagedExperiment('${id}')">Stop</button>`
+                                : `<button class="btn-sm" onclick="continueManagedExperiment('${id}')">Continue</button>`
+                            }
+                            <button class="btn-sm" onclick="restartManagedExperiment('${id}')">Restart</button>
+                            <button class="btn-sm" onclick="deleteManagedExperiment('${id}')">Delete</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // Load managed experiments when the tab is opened.
+        function switchToManagedExperiments() { loadManagedExperiments(); }
+
         document.getElementById('experiment-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
@@ -4020,6 +4366,22 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                 debate: mode === 'debate',
             };
             await createExperiment(config);
+        });
+
+        document.getElementById('experiment-mode-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const mode = (formData.get('mode') || 'deterministic');
+            const config = {
+                domain: formData.get('domain'),
+                difficulty_range: JSON.parse(formData.get('difficulty_range') || '[1, 5]'),
+                num_tasks: parseInt(formData.get('num_tasks') || '100'),
+                seed: parseInt(formData.get('seed') || '42'),
+                mode: mode,
+                deterministic: mode === 'deterministic',
+                debate: mode === 'debate',
+            };
+            await createManagedExperiment(config);
         });
 
         // Auto-refresh every 5 seconds
@@ -4414,6 +4776,208 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
         function stageColor(stage) {
             const colors = { active: '#10b981', approved: '#3b82f6', sandboxed: '#f59e0b', audited: '#6366f1', generated: '#8b5cf6', specified: '#64748b', detected: '#94a3b8' };
             return colors[stage] || '#6b7280';
+        }
+
+        // ── Observability Functions ────────────────────────────────────────
+        let _currentObsExperiment = null;
+        let _obsPollInterval = null;
+
+        async function loadObservability(experimentId) {
+            _currentObsExperiment = experimentId;
+            const panels = document.getElementById('observability-panels');
+            if (!panels) return;
+            panels.style.display = 'block';
+
+            // Scroll to observability panels
+            panels.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${experimentId}/observability`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                renderObservability(data);
+            } catch (err) {
+                console.error('Failed to load observability:', err);
+                alert('Failed to load observability data — ' + err.message);
+            }
+
+            // Start polling for live updates if experiment is running
+            if (_obsPollInterval) clearInterval(_obsPollInterval);
+            _obsPollInterval = setInterval(() => {
+                if (_currentObsExperiment) loadObservability(_currentObsExperiment);
+            }, 3000);
+        }
+
+        function renderObservability(data) {
+            // Prompt
+            const promptEl = document.getElementById('obs-prompt');
+            if (promptEl) promptEl.value = data.prompt || '(no prompt recorded)';
+
+            // Config
+            const configEl = document.getElementById('obs-config');
+            if (configEl) configEl.textContent = JSON.stringify(data.config || {}, null, 2);
+
+            // Agents
+            const agentsEl = document.getElementById('obs-agents');
+            if (agentsEl && data.agents) {
+                const agentIds = Object.keys(data.agents);
+                if (agentIds.length === 0) {
+                    agentsEl.innerHTML = '<div class="empty-state">No agents configured</div>';
+                } else {
+                    agentsEl.innerHTML = agentIds.map(id => {
+                        const a = data.agents[id];
+                        const statusColor = a.status === 'Completed' ? '#10b981' :
+                            a.status === 'Failed' ? '#ef4444' :
+                            a.status === 'Running' || a.status === 'Responding' ? '#3b82f6' :
+                            a.status === 'Waiting' ? '#6b7280' : '#f59e0b';
+                        return `
+                            <div class="card" style="margin:0;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                                    <strong>${a.agent_id}</strong>
+                                    <span style="color:${statusColor};font-weight:600;">${a.status}</span>
+                                </div>
+                                <div style="font-size:0.85rem;color:var(--muted-foreground);">
+                                    <div>Persona: ${a.persona || '—'}</div>
+                                    <div>Role: ${a.role || '—'}</div>
+                                    <div>Model: ${a.model || '—'}</div>
+                                    <div>Round: ${a.current_round || 0}</div>
+                                    ${a.errors.length > 0 ? `<div style="color:#ef4444;margin-top:0.5rem;">Errors: ${a.errors.slice(-3).join(', ')}</div>` : ''}
+                                </div>
+                            </div>`;
+                    }).join('');
+                }
+            }
+
+            // Transcript
+            const transcriptEl = document.getElementById('obs-transcript');
+            if (transcriptEl) {
+                const events = (data.events || []).slice(-100);
+                transcriptEl.textContent = events.map(e => {
+                    const ts = new Date(e.timestamp * 1000).toISOString().substr(11, 8);
+                    if (e.kind === 'error') return `[${ts}] ERROR: ${e.error || '(no details)'}`;
+                    if (e.kind === 'rule_applied') return `[${ts}] RULE: ${e.rule_applied} v${e.rule_version || '?'}`;
+                    if (e.kind === 'turn_completed') return `[${ts}] ${e.agent_id}: ${e.response || '(no response)'}`;
+                    return `[${ts}] ${e.kind} — ${e.agent_id || 'system'}`;
+                }).join('\n');
+                transcriptEl.scrollTop = transcriptEl.scrollHeight;
+            }
+
+            // Traces
+            const tracesEl = document.getElementById('obs-traces');
+            if (tracesEl && data.traces) {
+                const traces = data.traces.slice(-50);
+                if (traces.length === 0) {
+                    tracesEl.innerHTML = '<div class="empty-state">No traces recorded yet</div>';
+                } else {
+                    tracesEl.innerHTML = traces.map(t => `
+                        <div style="padding:0.75rem;border-left:3px solid var(--accent);margin-bottom:0.5rem;background:#f8f9fa;">
+                            <div style="font-weight:600;font-size:0.9rem;">${t.rule_name || 'Transition'}</div>
+                            <div style="font-size:0.8rem;color:var(--muted-foreground);">
+                                ${new Date(t.timestamp * 1000).toISOString().substr(0, 19)} · Agent: ${t.agent_affected || 'system'}
+                            </div>
+                            ${t.state_before ? `<details style="margin-top:0.5rem;"><summary>State Before</summary><pre style="font-size:0.75rem;">${JSON.stringify(t.state_before, null, 2)}</pre></details>` : ''}
+                            ${t.state_after ? `<details style="margin-top:0.5rem;"><summary>State After</summary><pre style="font-size:0.75rem;">${JSON.stringify(t.state_after, null, 2)}</pre></details>` : ''}
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Progress
+            if (data.progress) {
+                const p = data.progress;
+                const statusEl = document.getElementById('obs-status');
+                if (statusEl) statusEl.textContent = p.status || '—';
+                const roundEl = document.getElementById('obs-round');
+                if (roundEl) roundEl.textContent = `${p.current_round || 0}/${p.total_rounds || 0}`;
+                const agentEl = document.getElementById('obs-active-agent');
+                if (agentEl) agentEl.textContent = p.active_agent || '—';
+                const elapsedEl = document.getElementById('obs-elapsed');
+                if (elapsedEl) elapsedEl.textContent = formatDuration(p.elapsed_seconds || 0);
+                const tasksEl = document.getElementById('obs-tasks');
+                if (tasksEl) tasksEl.textContent = `${p.tasks_completed || 0}/${p.tasks_total || 0}`;
+                const synthesisEl = document.getElementById('obs-synthesis');
+                if (synthesisEl) synthesisEl.textContent = p.synthesis_status || '—';
+            }
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds) return '0s';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            if (h > 0) return `${h}h ${m}m`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        }
+
+        function filterTranscript(kind) {
+            // Re-render with filter applied (simplified: just reload)
+            if (_currentObsExperiment) loadObservability(_currentObsExperiment);
+        }
+
+        async function exportTranscript() {
+            if (!_currentObsExperiment) return;
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${_currentObsExperiment}/observability`);
+                const data = await resp.json();
+                const events = (data.events || []).map(e => ({
+                    timestamp: new Date(e.timestamp * 1000).toISOString(),
+                    kind: e.kind,
+                    agent_id: e.agent_id,
+                    round_num: e.round_num,
+                    response: e.response,
+                    rule_applied: e.rule_applied,
+                    error: e.error,
+                }));
+                downloadJson(events, `transcript_${_currentObsExperiment}.json`);
+            } catch (err) {
+                alert('Failed to export transcript — ' + err.message);
+            }
+        }
+
+        async function exportManifest() {
+            if (!_currentObsExperiment) return;
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${_currentObsExperiment}/manifest`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                downloadJson(data, `manifest_${_currentObsExperiment}.json`);
+            } catch (err) {
+                alert('Failed to export manifest — ' + err.message);
+            }
+        }
+
+        async function replayExperiment() {
+            if (!_currentObsExperiment) return;
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${_currentObsExperiment}/manifest`);
+                const data = await resp.json();
+                // Create new experiment with same config
+                const config = {
+                    ...data.config,
+                    prompt: data.prompt,
+                    agents: Object.entries(data.agents).map(([id, a]) => ({
+                        agent_id: a.agent_id,
+                        persona: a.persona,
+                        role: a.role,
+                        model: a.model,
+                        provider: a.provider,
+                    })),
+                };
+                await createExperiment(config);
+            } catch (err) {
+                alert('Failed to replay experiment — ' + err.message);
+            }
+        }
+
+        function downloadJson(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
     </script>

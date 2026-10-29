@@ -1,0 +1,13 @@
+{
+  "total_experiences": 2,
+  "by_status": {"COMPLETED": 2},
+  "by_type": {"ORIGINAL": 1, "DEEP_INVESTIGATION": 1},
+  "by_decision": {"VERIFIED": 1, "PARTIAL": 1},
+  "resources_consumed": {
+    "cpu_time_ms": 45.2,
+    "memory_mb": 12.8,
+    "tokens_used": 0
+  },
+  "safety_compliant": true,
+  "policy_violations": 0
+}
