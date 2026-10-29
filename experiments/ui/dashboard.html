@@ -4495,6 +4495,8 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
         }
 
         // ── Skills & Tools tab ───────────────────────────────────────────────
+        const el = id => document.getElementById(id);
+
         async function loadSkillsPanel() {
             await Promise.all([
                 loadCapabilities(),
@@ -4512,7 +4514,6 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                 const needs = data.needs || [];
                 const stats = data.stats || {};
                 // Update stats
-                const el = id => document.getElementById(id);
                 if (el('st-needs-pending')) el('st-needs-pending').textContent = stats.pending || 0;
                 if (list) {
                     if (needs.length === 0) {
