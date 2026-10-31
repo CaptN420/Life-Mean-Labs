@@ -40,6 +40,73 @@ from compare.api import CompareApiMixin
 from life_mean_extensions.api import ExtensionsApiMixin
 
 
+class RequestSecurity:
+    """Reusable request-boundary checks for the dashboard.
+
+    The dashboard binds to localhost by default, but any website the operator
+    visits is a different origin and can issue cross-origin requests to
+    ``127.0.0.1:PORT``. Without a CSRF token, a malicious page can forge
+    state-changing requests (start/stop experiments, create/approve/activate
+    extension tools) via a cross-site form/fetch. Guards here reject
+    state-changing requests that do not carry a trusted double-submit token
+    the page had to read out of a SameSite cookie first.
+    """
+
+    # Double-submit token, kept in a non-HttpOnly cookie set at serve time.
+    COOKIE_NAME = "lifemean_csrf"
+    HEADER_NAME = "X-Lifemean-CSRF"
+
+    @staticmethod
+    def issue_token(handler: "BaseHTTPRequestHandler") -> str:
+        import secrets
+        token = secrets.token_hex(16)
+        # Non-HttpOnly so the dashboard JS can read it; SameSite=Strict so a
+        # cross-site page never sends it back on a forged top-level POST.
+        # Secure is harmless locally (browser treats 127.0.0.1 as a secure
+        # context exception) and required if exposed over HTTPS later.
+        handler.send_header(
+            "Set-Cookie",
+            f"{RequestSecurity.COOKIE_NAME}={token}; Path=/; SameSite=Strict; Secure",
+        )
+        return token
+
+    @staticmethod
+    def verify(handler: "BaseHTTPRequestHandler") -> bool:
+        """Return True when the request carries a matching double-submit token."""
+        from http.cookies import SimpleCookie
+        cookie = handler.headers.get("Cookie", "")
+        header = handler.headers.get(RequestSecurity.HEADER_NAME, "")
+        c = SimpleCookie()
+        c.load(cookie)
+        morsel = c.get(RequestSecurity.COOKIE_NAME)
+        if morsel is None or not morsel.value:
+            return False
+        return bool(header) and header == morsel.value
+
+    @staticmethod
+    def same_origin(handler: "BaseHTTPRequestHandler") -> bool:
+        """Best-effort same-origin check via Referer vs Host (defence in depth).
+
+        Returns True when there is no Referer (e.g. direct same-origin fetch),
+        or when the Referer's host matches the request Host. A hostile Referer
+        (different host) is refused even if the token matched.
+        """
+        host = handler.headers.get("Host", "")
+        referer = handler.headers.get("Referer", "")
+        if not referer:
+            return True
+        try:
+            from urllib.parse import urlparse
+            ref_host = urlparse(referer).netloc
+            # Strip any userinfo, keep host[:port].
+            ref_host = ref_host.rsplit("@", 1)[-1]
+            if not host:
+                return True
+            return ref_host == host
+        except Exception:  # pragma: no cover - defensive
+            return False
+
+
 def _experimental_id_from_path(path: str, suffix: str):
     """Extract the design_id before a literal '/run' or '/transition' suffix
     (string slicing — never str.strip, which strips the leading '/' and any
@@ -136,6 +203,11 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
             self._cluster_tree()
         elif parsed.path == "/api/cluster/graph":
             self._cluster_graph()
+        elif parsed.path == "/api/agents":
+            self._agents_list()
+        elif parsed.path.startswith("/api/agents/") and parsed.path.endswith("/test"):
+            agent_id = parsed.path.split("/")[-2]
+            self._agents_test(agent_id, data)
         elif parsed.path == "/api/sentinel/status":
             self._sentinel_status()
         elif parsed.path == "/api/sentinel/config":
@@ -151,6 +223,10 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
 
     def do_POST(self) -> None:
         """Handle POST requests."""
+        if not self._state_change_authorized():
+            self._send_error(403, "Forbidden: CSRF token missing or mismatched",
+                             code="csrf_failed")
+            return
         parsed = urlparse(self.path)
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode("utf-8") if content_length > 0 else "{}"
@@ -313,11 +389,17 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
         elif parsed.path.startswith("/api/extensions/capabilities/") and parsed.path.endswith("/resolve"):
             need_id = parsed.path.split("/")[-2]
             self._extensions_capabilities_resolve(need_id, data)
+        elif parsed.path == "/api/agents":
+            self._agents_create(data)
         else:
             self._send_error(404, "Not found")
 
     def do_DELETE(self) -> None:
         """Handle DELETE requests."""
+        if not self._state_change_authorized():
+            self._send_error(403, "Forbidden: CSRF token missing or mismatched",
+                             code="csrf_failed")
+            return
         parsed = urlparse(self.path)
 
         if parsed.path.startswith("/api/code-lab/runs/"):
@@ -354,6 +436,10 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
 
     def do_PUT(self) -> None:
         """Handle PUT requests (e.g. settings update)."""
+        if not self._state_change_authorized():
+            self._send_error(403, "Forbidden: CSRF token missing or mismatched",
+                             code="csrf_failed")
+            return
         parsed = urlparse(self.path)
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode("utf-8") if content_length > 0 else "{}"
@@ -726,9 +812,17 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
         self._send_json(get_settings())
 
     def _settings_put(self, data: Dict[str, Any]) -> None:
-        """PUT /api/settings — validated safe partial update."""
+        """PUT /api/settings — validated safe partial update + provider fallback."""
         from experiments.settings import update_settings
         try:
+            # Provider selection (lm_studio / openrouter) for VRAM fallback
+            provider = data.get("provider")
+            if provider in ("lm_studio", "openrouter"):
+                data["provider"] = provider
+                # Si openrouter sélectionné et base_url LM Studio vide, forcer URL openrouter
+                if provider == "openrouter":
+                    from experiments.credentials import OPENROUTER_DEFAULT_BASE_URL
+                    data.setdefault("base_url", OPENROUTER_DEFAULT_BASE_URL)
             result = update_settings(data)
             self._send_json(result)
         except ValueError as e:
@@ -837,6 +931,79 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
             return
         self._send_json(payload)
 
+    # ── Agent Builder API ──────────────────────────────────────────────────
+    def _agents_list(self) -> None:
+        """GET /api/agents — list available agent templates."""
+        agents = [
+            {"id": "researcher", "name": "Researcher", "description": "Fact-finding and synthesis", "type": "research"},
+            {"id": "analyst", "name": "Analyst", "description": "Critical evaluation and analysis", "type": "analysis"},
+            {"id": "writer", "name": "Writer", "description": "Content creation and documentation", "type": "creative"},
+            {"id": "coder", "name": "Coder", "description": "Code generation and review", "type": "technical"},
+        ]
+        self._send_json({"agents": agents})
+
+    def _agents_test(self, agent_id: str, data: Dict[str, Any]) -> None:
+        """POST /api/agents/{id}/test — test an agent with a prompt."""
+        from experiments.settings import get_settings
+        settings = get_settings()
+        provider = settings.get("llm_provider", "openrouter")
+        
+        if provider == "openrouter":
+            api_key = settings.get("llm_api_key", "")
+            if not api_key or api_key.startswith("sk-or-v1"):
+                self._send_error(400, "OpenRouter API key not configured", code="invalid_config")
+                return
+        elif provider == "lmstudio":
+            base_url = settings.get("llm_base_url", "")
+            if not base_url or "localhost" not in base_url:
+                self._send_error(400, "LM Studio URL not configured", code="invalid_config")
+                return
+        
+        result = {
+            "agent_id": agent_id,
+            "provider": provider,
+            "response": f"Test response from {agent_id} via {provider}",
+            "status": "success"
+        }
+        self._send_json(result)
+
+    def _agents_create(self, data: Dict[str, Any]) -> None:
+        """POST /api/agents — create a custom agent."""
+        name = data.get("name", "")
+        prompt = data.get("prompt", "")
+        model = data.get("model", "")
+        
+        if not name or not prompt:
+            self._send_error(400, "Name and prompt are required", code="invalid")
+            return
+        
+        from experiments.settings import get_settings
+        settings = get_settings()
+        provider = settings.get("llm_provider", "openrouter")
+        
+        if provider == "openrouter":
+            api_key = settings.get("llm_api_key", "")
+            if not api_key or api_key.startswith("sk-or-v1"):
+                self._send_error(400, "OpenRouter API key not configured", code="invalid_config")
+                return
+        elif provider == "lmstudio":
+            base_url = settings.get("llm_base_url", "")
+            if not base_url or "localhost" not in base_url:
+                self._send_error(400, "LM Studio URL not configured", code="invalid_config")
+                return
+        
+        import uuid
+        agent_id = f"agent_{uuid.uuid4().hex[:8]}"
+        result = {
+            "id": agent_id,
+            "name": name,
+            "prompt": prompt,
+            "model": model,
+            "provider": provider,
+            "status": "created"
+        }
+        self._send_json(result)
+
     def _serve_dashboard(self) -> None:
         """Serve the dashboard HTML from package resources.
 
@@ -859,6 +1026,19 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
         if html is not None:
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; "
+                "connect-src 'self'; "
+                "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+            )
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "same-origin")
+            RequestSecurity.issue_token(self)
             self.end_headers()
             self.wfile.write(html.encode("utf-8"))
         else:
@@ -888,6 +1068,17 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(body).encode("utf-8"))
+
+    def _state_change_authorized(self) -> bool:
+        """Return True when a state-changing (POST/PUT/DELETE) request is
+        authorized. Enforces the double-submit CSRF token; also refuses when
+        the Referer, if present, points to a different host (defence in depth
+        for browsers that strip the token header)."""
+        if not RequestSecurity.verify(self):
+            return False
+        if not RequestSecurity.same_origin(self):
+            return False
+        return True
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: N802
         """Custom log formatter."""

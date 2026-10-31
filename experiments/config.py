@@ -33,6 +33,7 @@ class ExperimentConfig:
     difficulty_range: Tuple[int, int] = (1, 5)
     num_tasks: int = 100
     seed: int = 42
+    prompt: str = ""  # Optional custom prompt for the experiment
 
     # Reproducibility
     generator_version: str = "1.0.0"
@@ -63,6 +64,7 @@ class ExperimentConfig:
             "difficulty_range": list(self.difficulty_range),
             "num_tasks": self.num_tasks,
             "seed": self.seed,
+            "prompt": self.prompt,
             "generator_version": self.generator_version,
             "prompt_version": self.prompt_version,
             "experiment_id": self.experiment_id,
@@ -84,6 +86,7 @@ class ExperimentConfig:
             difficulty_range=tuple(data.get("difficulty_range", [1, 5])),
             num_tasks=data.get("num_tasks", 100),
             seed=data.get("seed", 42),
+            prompt=data.get("prompt", ""),
             generator_version=data.get("generator_version", "1.0.0"),
             prompt_version=data.get("prompt_version", "1.0.0"),
             experiment_id=data.get("experiment_id", ""),

@@ -17,6 +17,7 @@ import enum
 import hashlib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -169,18 +170,29 @@ class DebateTurn:
     latency_ms: float = 0.0
     tokens_used: int = 0
     timestamp: float = field(default_factory=time.time)
+    # Quality metrics per turn
+    memory_recall_score: float = 0.0          # How much previous context was correctly referenced
+    evidence_citations: int = 0               # Number of verifiable citations in this turn
+    new_evidence_count: int = 0               # New evidence introduced this turn
+    hypothesis_novelty: float = 0.0           # Semantic distance from previous hypotheses (0-1)
+    is_repetitive: bool = False               # Flag if turn repeats prior ideas without new evidence
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "turn_number": self.turn_number,
             "speaker_id": self.speaker_id,
             "claim": self.claim.to_dict() if self.claim else None,
-            "response_text": self.response_text[:500],  # truncated for storage
+            "response_text": self.response_text[:500],
             "model_used": self.model_used,
             "provider": self.provider.value,
             "latency_ms": self.latency_ms,
             "tokens_used": self.tokens_used,
             "timestamp": self.timestamp,
+            "memory_recall_score": self.memory_recall_score,
+            "evidence_citations": self.evidence_citations,
+            "new_evidence_count": self.new_evidence_count,
+            "hypothesis_novelty": self.hypothesis_novelty,
+            "is_repetitive": self.is_repetitive,
         }
 
 
@@ -981,6 +993,12 @@ class DebateEngine:
         self._start_time = 0.0
         self._end_time = 0.0
         self._total_tokens = 0
+        # Quality metrics tracking
+        self._previous_hypotheses: List[str] = []  # For novelty computation
+        self._previous_evidence_refs: set = set()  # For memory recall
+        self._total_evidence_citations = 0
+        self._total_memory_recall = 0.0
+        self._repetitive_turns = 0
 
     @property
     def session_id(self) -> str:
@@ -1051,6 +1069,136 @@ class DebateEngine:
                     self.session_id, self._config.topic, self.task_type.value)
         return True
 
+    def _compute_turn_metrics(self, turn: DebateTurn, response_text: str, new_evidence_count: int) -> None:
+        """Compute quality metrics for a debate turn."""
+        # 1. Memory Recall Score: How many previous evidence refs / claims are referenced
+        recall_score = 0.0
+        if self._previous_evidence_refs:
+            # Extract citations from response (simple pattern matching for now)
+            cited_refs = set(re.findall(r'\b(?:evidence|ref|claim)[_\s]*([A-Za-z0-9_-]+)', response_text, re.IGNORECASE))
+            if cited_refs:
+                matched = cited_refs & self._previous_evidence_refs
+                recall_score = len(matched) / len(cited_refs) if cited_refs else 0.0
+        
+        turn.memory_recall_score = recall_score
+        self._total_memory_recall += recall_score
+        
+        # 2. Evidence Citations: Count verifiable citations in this turn
+        # Look for patterns like [1], (source), DOI, arXiv, etc.
+        citation_patterns = [
+            r'\[\d+\]',           # [1], [2], etc.
+            r'\([^)]*\d{4}[^)]*\)',  # (Author, 2024)
+            r'arXiv:\d{4}\.\d{4,5}',  # arXiv:2024.12345
+            r'DOI:\s*\S+',        # DOI: 10.xxxx
+            r'PMID:\s*\d+',       # PMID: 12345678
+        ]
+        evidence_citations = 0
+        for pattern in citation_patterns:
+            evidence_citations += len(re.findall(pattern, response_text, re.IGNORECASE))
+        turn.evidence_citations = evidence_citations
+        self._total_evidence_citations += evidence_citations
+        
+        # 3. New Evidence Count
+        turn.new_evidence_count = new_evidence_count
+        
+        # 4. Hypothesis Novelty: Semantic distance from previous hypotheses
+        if turn.claim and turn.claim.hypothesis:
+            novelty = self._compute_hypothesis_novelty(turn.claim.hypothesis)
+            turn.hypothesis_novelty = novelty
+            self._previous_hypotheses.append(turn.claim.hypothesis)
+        
+        # 5. Repetition Detection
+        turn.is_repetitive = self._is_turn_repetitive(turn, response_text)
+        if turn.is_repetitive:
+            self._repetitive_turns += 1
+        
+        # Update tracking sets
+        if turn.claim:
+            self._previous_evidence_refs.update(turn.claim.evidence_refs)
+
+    def _compute_hypothesis_novelty(self, hypothesis: str) -> float:
+        """Compute semantic novelty of a hypothesis vs previous ones (0-1 scale)."""
+        if not self._previous_hypotheses:
+            return 1.0  # First hypothesis is maximally novel
+        
+        # Simple word-overlap based novelty (can be replaced with embeddings)
+        hyp_words = set(hypothesis.lower().split())
+        max_overlap = 0.0
+        for prev_hyp in self._previous_hypotheses:
+            prev_words = set(prev_hyp.lower().split())
+            if hyp_words and prev_words:
+                overlap = len(hyp_words & prev_words) / len(hyp_words | prev_words)
+                max_overlap = max(max_overlap, overlap)
+        return 1.0 - max_overlap  # Inverse: low overlap = high novelty
+
+    def _is_turn_repetitive(self, turn: DebateTurn, response_text: str) -> bool:
+        """Detect if a turn repeats prior ideas without new evidence."""
+        if not self._turns:
+            return False
+        
+        # Check if the claim hypothesis is nearly identical to a previous one
+        if turn.claim and turn.claim.hypothesis:
+            for prev_turn in self._turns:
+                if prev_turn.claim and prev_turn.claim.hypothesis:
+                    # High word overlap indicates repetition
+                    hyp_words = set(turn.claim.hypothesis.lower().split())
+                    prev_words = set(prev_turn.claim.hypothesis.lower().split())
+                    if hyp_words and prev_words:
+                        overlap = len(hyp_words & prev_words) / len(hyp_words | prev_words)
+                        if overlap > 0.8:  # 80% similarity threshold
+                            return True
+        
+        # Check for repetitive phrasing in response text
+        # (simplified: check if response is very similar to previous responses)
+        for prev_turn in self._turns[-3:]:  # Last 3 turns
+            if prev_turn.response_text:
+                resp_words = set(response_text.lower().split())
+                prev_words = set(prev_turn.response_text.lower().split())
+                if resp_words and prev_words:
+                    overlap = len(resp_words & prev_words) / len(resp_words | prev_words)
+                    if overlap > 0.7 and turn.new_evidence_count == 0:
+                        return True
+        
+        return False
+
+    def _compute_hypothesis_evolution_score(self) -> float:
+        """Compute how much hypotheses have evolved/progressed over the debate.
+        
+        Returns a score 0-1 where:
+        - 0 = no progress, all hypotheses are similar
+        - 1 = clear progression, each hypothesis builds on previous
+        """
+        if len(self._previous_hypotheses) < 2:
+            return 0.0
+        
+        # Measure semantic distance between first and last hypothesis
+        first = self._previous_hypotheses[0]
+        last = self._previous_hypotheses[-1]
+        
+        first_words = set(first.lower().split())
+        last_words = set(last.lower().split())
+        
+        if not first_words or not last_words:
+            return 0.0
+        
+        # Evolution = how different the last hypothesis is from the first
+        # but also check if intermediate hypotheses form a chain
+        total_distance = 0.0
+        for i in range(len(self._previous_hypotheses) - 1):
+            hyp_a = set(self._previous_hypotheses[i].lower().split())
+            hyp_b = set(self._previous_hypotheses[i + 1].lower().split())
+            if hyp_a and hyp_b:
+                distance = 1.0 - (len(hyp_a & hyp_b) / len(hyp_a | hyp_b))
+                total_distance += distance
+        
+        # Normalize by number of transitions
+        avg_transition = total_distance / (len(self._previous_hypotheses) - 1)
+        
+        # Also consider overall first-to-last distance
+        first_last_distance = 1.0 - (len(first_words & last_words) / len(first_words | last_words))
+        
+        return min(1.0, (avg_transition + first_last_distance) / 2.0)
+
     def step(self, speaker_id: str, response_text: str, model_used: str = "",
              provider: ProviderType = ProviderType.MOCK, new_evidence_count: int = 1) -> DebateTurn:
         """Execute one turn of the debate."""
@@ -1082,6 +1230,10 @@ class DebateEngine:
             provider=provider,
             latency_ms=0.0,
         )
+
+        # Compute quality metrics for this turn
+        self._compute_turn_metrics(turn, response_text, new_evidence_count)
+        
         self._turns.append(turn)
 
         # Log round start
@@ -1324,6 +1476,12 @@ class DebateEngine:
             "routing_method": self._config.routing_method,
             "task_type": self.task_type.value,
             "trace_id": self._trace_id,
+            # Quality metrics
+            "memory_recall_avg": self._total_memory_recall / max(1, len(self._turns)),
+            "evidence_accuracy_rate": self._total_evidence_citations / max(1, len(self._turns)),
+            "contradiction_rate": len(self._contradictions) / max(1, len(self._turns)),
+            "hypothesis_evolution_score": self._compute_hypothesis_evolution_score(),
+            "repetition_rate": self._repetitive_turns / max(1, len(self._turns)),
         }
 
         return DebateResult(

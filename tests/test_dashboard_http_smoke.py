@@ -15,8 +15,10 @@ instead of crashing the server, and that RAW records the runtime execution_mode.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
+import urllib.parse
 import urllib.request
 import urllib.error
 from http.server import ThreadingHTTPServer
@@ -43,11 +45,37 @@ def server():
     srv.server_close()
 
 
-def _req(base, path, method="GET", body=None):
+_csrf_token = {"value": None}
+_csrf_cookie = {"value": ""}
+
+
+def _bootstrap_csrf(base):
+    """GET /dashboard to capture the issued CSRF cookie (Set-Cookie), so
+    subsequent state-changing requests can echo the matching token header."""
+    if _csrf_token["value"] is not None:
+        return
+    req = urllib.request.Request(base + "/dashboard")
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        set_cookie = resp.headers.get("Set-Cookie", "")
+    m = re.search(r"lifemean_csrf=([^;]+)", set_cookie)
+    if m:
+        _csrf_cookie["value"] = "lifemean_csrf=" + m.group(1)
+        _csrf_token["value"] = urllib.parse.unquote(m.group(1))
+    else:
+        _csrf_token["value"] = ""  # no cookie issued -> CSRF disabled in this env
+
+
+def _req(base, path, method="GET", body=None, authed=True):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(base + path, data=data, method=method)
     if data is not None:
         req.add_header("Content-Type", "application/json")
+    if authed and method in ("POST", "PUT", "DELETE"):
+        _bootstrap_csrf(base)
+        if _csrf_cookie["value"]:
+            req.add_header("Cookie", _csrf_cookie["value"])
+        if _csrf_token["value"]:
+            req.add_header("X-Lifemean-CSRF", _csrf_token["value"])
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status, json.loads(resp.read().decode())
@@ -74,12 +102,18 @@ def test_served_dashboard_is_canonical(server):
 def test_malformed_json_returns_controlled_400(server):
     base, _ = server
     # Invalid JSON body -> 400 JSON error, server keeps running.
+    # (Send the CSRF token so we exercise the JSON parse path, not CSRF 403.)
+    _bootstrap_csrf(base)
+    token = _csrf_token["value"] or "00000000000000000000000000000000"
+    cook = _csrf_cookie["value"] or "lifemean_csrf=" + token
     req = urllib.request.Request(
         base + "/api/experiments",
         data=b"{not valid json",
         method="POST",
     )
     req.add_header("Content-Type", "application/json")
+    req.add_header("Cookie", cook)
+    req.add_header("X-Lifemean-CSRF", token)
     with pytest.raises(urllib.error.HTTPError) as ei:
         urllib.request.urlopen(req, timeout=15)
     assert ei.value.code == 400

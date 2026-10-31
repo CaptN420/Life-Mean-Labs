@@ -143,7 +143,7 @@ class SentinelConfig:
 
     enabled: bool = True
     provider: str = "local"  # "local" or "openrouter"
-    model_id: str = ""
+    model_id: str = "qwen3.5-2b"  # Default Sentinel analysis model
     analysis_mode: str = "hybrid"  # "deterministic", "llm", "hybrid"
     external_log_upload: bool = False
     pause_on_high_risk: bool = True

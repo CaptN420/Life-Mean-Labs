@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life_mean — Dashboard Combiné</title>
+    <style>
+        :root {
+            --foreground: #f8fafc;
+            --muted-foreground: #94a3b8;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --border: #334155;
+            --card: #1e293b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Top Navigation ─────────────────────────────────── */
+        .topbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 1rem;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-shrink: 0;
+        }
+
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .brand-icon { font-size: 1.3rem; }
+
+        .topbar-nav { display: flex; gap: 0.25rem; margin-left: 2rem; }
+
+        .nav-btn {
+            background: transparent;
+            color: var(--muted-foreground);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .nav-btn:hover { background: var(--border); color: var(--text-primary); }
+        .nav-btn.active { background: var(--accent); color: white; }
+
+        /* ── Main Layout ────────────────────────────────────── */
+        .main-layout {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin: 1rem;
+        }
+
+        .panel-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-body {
+            padding: 1rem;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* ── Buttons ────────────────────────────────────────── */
+        .btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.4rem 0.85rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn.btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+        .btn.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+        .btn.btn-danger { border-color: var(--error); color: var(--error); }
+        .btn.btn-danger:hover:not(:disabled) { background: #4a1c1c; }
+        .btn.btn-success { background: var(--success); border-color: var(--success); color: white; }
+
+        /* ── Status badges ──────────────────────────────────── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-badge.pending   { background: #334155; color: var(--muted-foreground); }
+        .status-badge.running   { background: #1e3a5f; color: #60a5fa; }
+        .status-badge.completed { background: #0d4f3a; color: var(--success); }
+        .status-badge.stopped   { background: #4a1c1c; color: var(--error); }
+
+        /* ── Forms ──────────────────────────────────────────── */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            color: var(--muted-foreground);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        /* ── Cards ──────────────────────────────────────────── */
+        .card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .card h3 {
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        /* ── Empty state ────────────────────────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--muted-foreground);
+        }
+
+        .empty-state .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .empty-state p { font-size: 0.85rem; }
+
+        /* ── Stats grid ─────────────────────────────────────── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+            text-transform: uppercase;
+            margin-top: 0.25rem;
+        }
+
+        /* ── Tables ─────────────────────────────────────────── */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.625rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table th {
+            color: var(--muted-foreground);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(255,255,255,0.03);
+        }
+
+        /* ── Scrollbar ──────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* ── Agent panels ───────────────────────────────────── */
+        .agent-panel.agent-a .panel-header { color: #60a5fa; }
+        .agent-panel.agent-b .panel-header { color: #f472b6; }
+        .arbiter-panel .panel-header { color: #fbbf24; }
+
+        .hypothesis-box {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .hypothesis-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted-foreground);
+            margin-bottom: 0.4rem;
+        }
+
+        .hypothesis-text {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* ── Debate conversation ────────────────────────────── */
+        .dl-conv {
+            max-height: 62vh;
+            min-height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            padding: 0.25rem 0.4rem 0.25rem 0.1rem;
+        }
+
+        .dl-msg {
+            border: 1px solid var(--border);
+            border-radius: 0.6rem;
+            padding: 0.6rem 0.8rem;
+            background: var(--card);
+        }
+
+        .dl-msg.mod-message { border-left: 3px solid var(--accent); }
+        .dl-msg.agent-argument { border-left: 3px solid #4f8cc9; }
+        .dl-msg.agent-hypothesis { border-left: 3px solid #7cbf5a; }
+        .dl-msg.agent-critique { border-left: 3px solid #d9822b; }
+        .dl-msg.agent-revision { border-left: 3px solid #a47bd1; }
+        .dl-msg.error-message { border-left: 3px solid var(--error); }
+
+        .dl-msg-head {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.35rem;
+        }
+
+        .dl-msg-speaker { font-weight: 700; }
+        .dl-msg-type {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--muted-foreground);
+        }
+
+        .dl-msg-body {
+            font-size: 0.88rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            margin-top: 0.2rem;
+        }
+
+        /* ── Workspace layout ───────────────────────────────── */
+        .workspace-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr 280px;
+            gap: 1rem;
+            padding: 1rem;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        @media (max-width: 1100px) {
+            .workspace-layout { grid-template-columns: 1fr; }
+        }
+
+        /* ── Code editor ────────────────────────────────────── */
+        .code-editor {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: none;
+            padding: 1rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+        }
+
+        /* ── Console ────────────────────────────────────────── */
+        .console-output {
+            flex: 1;
+            overflow: auto;
+            padding: 0.75rem;
+        }
+
+        #consoleOutput {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8125rem;
+            color: var(--muted-foreground);
+            white-space: pre-wrap;
+        }
+
+        /* ── Tabs ───────────────────────────────────────────── */
+        .tabs-bar {
+            display: flex;
+            gap: 0.25rem;
+            border-bottom: 1px solid var(--border);
+            padding: 0 1rem;
+            background: var(--bg-secondary);
+            flex-shrink: 0;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--muted-foreground);
+            padding: 0.6rem 1.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.15s ease;
+        }
+
+        .tab-btn:hover { color: var(--text-primary); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ── Experiment list ────────────────────────────────── */
+        .experiment-list { margin-top: 1rem; }
+
+        .experiment-item {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+        }
+
+        .experiment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .experiment-id { font-weight: 600; }
+
+        /* ── Settings table ─────────────────────────────────── */
+        .settings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.5rem 0;
+            font-size: 0.85rem;
+        }
+
+        .settings-table th {
+            font-weight: 600;
+            text-align: left;
+            color: var(--muted-foreground);
+            padding: 0.5rem 0.65rem;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .settings-table td {
+            padding: 0.5rem 0.65rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .settings-table .settings-key { width: 44%; color: var(--muted-foreground); font-weight: 500; }
+        .settings-table .settings-num { text-align: right; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <header class="topbar">
+        <div class="topbar-brand">
+            <span class="brand-icon">⚡</span>
+            <span>Life_mean Dashboard</span>
+        </div>
+        <nav class="topbar-nav">
+            <button class="nav-btn active" data-tab="experiments">Experiments</button>
+            <button class="nav-btn" data-tab="autopilot">Autopilot</button>
+            <button class="nav-btn" data-tab="debate">Debate</button>
+            <button class="nav-btn" data-tab="code-lab">Code Lab</button>
+            <button class="nav-btn" data-tab="agent-builder">Agent Builder</button>
+            <button class="nav-btn" data-tab="workspace">Workspace</button>
+            <button class="nav-btn" data-tab="skills">Skills & Tools</button>
+            <button class="nav-btn" data-tab="compare">Compare</button>
+            <button class="nav-btn" data-tab="clustertree">Cluster Tree</button>
+            <button class="nav-btn" data-tab="experimental">Experimental</button>
+            <button class="nav-btn" data-tab="settings">Settings</button>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-layout">
+        <!-- Experiments Tab -->
+        <div id="panel-experiments" class="tab-panel active">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>🧪</span>
+                    <span>Create Experiment</span>
+                </div>
+                <div class="panel-body">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
+                        <div>
+                            <h3 style="margin-bottom:1rem;">Configuration</h3>
+                            <div class="form-group">
+                                <label for="exp-domain">Domain</label>
+                                <select id="exp-domain">
+                                    <option value="math">Math</option>
+                                    <option value="physics">Physics</option>
+                                    <option value="chemistry">Chemistry</option>
+                                    <option value="biology">Biology</option>
+                                    <option value="philosophy">Philosophy</option>
+                                    <option value="ethics">Ethics</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="exp-difficulty">Difficulty Range</label>
+                                <input type="text" id="exp-difficulty" value="[1, 5]">
+                            </div>
+                            <div class="form-group">
+                                <label for="exp-num-tasks">Number of Tasks</label>
+                                <input type="number" id="exp-num-tasks" value="100" min="1" max="1000">
+                            </div>
+                            <div class="form-group">
+                                <label for="exp-seed">Seed</label>
+                                <input type="number" id="exp-seed" value="42" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="exp-execution-mode">Execution mode</label>
+                                <select id="exp-execution-mode">
+                                    <option value="deterministic">Deterministic</option>
+                                    <option value="multi_agent">Multi-Agent</option>
+                                    <option value="general_reasoning">General Reasoning</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="exp-prompt">Custom Prompt (optional)</label>
+                                <textarea id="exp-prompt" placeholder="Enter custom prompt for the experiment..."></textarea>
+                            </div>
+                            <button class="btn btn-primary" onclick="createExperiment()" style="margin-top:1rem;">Create & Start Experiment</button>
+                        </div>
+                        <div>
+                            <h3 style="margin-bottom:1rem;">Pipeline Statistics</h3>
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-experiments">0</div>
+                                    <div class="stat-label">Experiments</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-running">0</div>
+                                    <div class="stat-label">Running</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-tasks">0</div>
+                                    <div class="stat-label">Tasks Generated</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-pass-rate">0%</div>
+                                    <div class="stat-label">Pass Rate</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="experiment-list" id="experiment-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Autopilot Tab -->
+        <div id="panel-autopilot" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>🤖</span>
+                    <span>Autopilot Control</span>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="autopilot-prompt">Prompt</label>
+                        <textarea id="autopilot-prompt" placeholder="Enter your prompt here..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="autopilot-executor">Executor</label>
+                        <select id="autopilot-executor">
+                            <option value="deterministic">Deterministic</option>
+                            <option value="multi_agent">Multi-Agent</option>
+                            <option value="code_lab">Code Lab</option>
+                            <option value="debate">Debate</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="autopilot-num-tasks">Number of Tasks</label>
+                        <input type="number" id="autopilot-num-tasks" value="10" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary" onclick="startAutopilot()">Start Autopilot</button>
+                    <div id="autopilot-status" style="margin-top:1rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debate Tab -->
+        <div id="panel-debate" class="tab-panel">
+            <div class="workspace-layout">
+                <!-- Agent A -->
+                <section class="panel agent-panel agent-a">
+                    <div class="panel-header">
+                        <span>🔵</span>
+                        <span>Agent A — Hypothèse</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="hypothesis-box">
+                            <div class="hypothesis-label">Hypothèse principale</div>
+                            <div class="hypothesis-text" id="agentAHypothesis">En attente du débat...</div>
+                        </div>
+                        <div class="section-title">Arguments</div>
+                        <div id="agentAArguments">
+                            <div class="empty-state"><p>Aucun argument enregistré</p></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Center: Conversation -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <span>📜</span>
+                        <span>Conversation du débat</span>
+                    </div>
+                    <div class="panel-body">
+                        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+                            <button class="btn btn-primary" onclick="startDebate()">▶ Start</button>
+                            <button class="btn btn-danger" onclick="stopDebate()" id="debate-stop-btn" disabled>■ Stop</button>
+                        </div>
+                        <div id="debate-status" class="status-badge status-stopped">Stopped</div>
+                        <div id="debate-conv" class="dl-conv" style="margin-top:1rem;">
+                            <div class="empty-state"><p>Le débat n'a pas encore commencé</p></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Agent B -->
+                <section class="panel agent-panel agent-b">
+                    <div class="panel-header">
+                        <span>🟣</span>
+                        <span>Agent B — Contre-hypothèse</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="hypothesis-box">
+                            <div class="hypothesis-label">Contre-hypothèse</div>
+                            <div class="hypothesis-text" id="agentBHypothesis">En attente du débat...</div>
+                        </div>
+                        <div class="section-title">Arguments</div>
+                        <div id="agentBArguments">
+                            <div class="empty-state"><p>Aucun argument enregistré</p></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Code Lab Tab -->
+        <div id="panel-code-lab" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>💻</span>
+                    <span>Code Lab</span>
+                </div>
+                <div class="panel-body">
+                    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+                        <input type="text" id="cl-prompt" placeholder="Create a Python function..." style="flex:1;padding:0.375rem;border:1px solid var(--border);border-radius:0.25rem;background:var(--bg-primary);color:var(--text-primary);">
+                        <button class="btn btn-primary" onclick="buildCodeLab()">▶ Build</button>
+                    </div>
+                    <div id="code-lab-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Builder Tab -->
+        <div id="panel-agent-builder" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>🏗️</span>
+                    <span>Agent Builder</span>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="agent-name">Agent Name</label>
+                        <input type="text" id="agent-name" placeholder="my_agent">
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-type">Agent Type</label>
+                        <select id="agent-type">
+                            <option value="code_lab">Code Lab Agent</option>
+                            <option value="debate">Debate Agent</option>
+                            <option value="researcher">Researcher Agent</option>
+                            <option value="validator">Validator Agent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-prompt">System Prompt</label>
+                        <textarea id="agent-prompt" placeholder="Enter the system prompt for this agent..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-config">JSON Config (optional)</label>
+                        <textarea id="agent-config" placeholder='{"temperature": 0.7, "max_tokens": 1024}' style="font-family:monospace;"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="createAgent()">Create Agent</button>
+                    <button class="btn" onclick="testAgent()" style="margin-left:0.5rem;">Test Agent</button>
+                    
+                    <div id="agent-builder-status" style="margin-top:1rem;"></div>
+                    
+                    <div style="margin-top:2rem;">
+                        <h3 style="margin-bottom:1rem;">Created Agents</h3>
+                        <div id="agents-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workspace Tab -->
+        <div id="panel-workspace" class="tab-panel">
+            <div class="workspace-layout">
+                <!-- Left: Tools -->
+                <aside class="panel">
+                    <div class="panel-header">
+                        <span>🛠️</span>
+                        <span>Tools</span>
+                    </div>
+                    <div class="panel-body">
+                        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                            <button class="btn" onclick="openTool('file-explorer')">📁 File Explorer</button>
+                            <button class="btn" onclick="openTool('code-editor')">✏️ Code Editor</button>
+                            <button class="btn" onclick="openTool('prompt-zone')">💬 Prompt Zone</button>
+                            <button class="btn" onclick="openTool('json-viewer')">📋 JSON Viewer</button>
+                            <button class="btn" onclick="openTool('params-editor')">⚙️ Params Editor</button>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Center: Editor -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <span>📝</span>
+                        <span id="ws-title">Workspace</span>
+                    </div>
+                    <div class="editor-container" style="flex:1;overflow:hidden;">
+                        <textarea id="ws-editor" class="code-editor" placeholder="# Write your code here..."></textarea>
+                    </div>
+                </section>
+
+                <!-- Right: Context -->
+                <aside class="panel">
+                    <div class="panel-header">
+                        <span>📊</span>
+                        <span>Context</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label>State</label>
+                            <pre id="ws-state" style="background:var(--bg-primary);padding:0.75rem;border-radius:0.25rem;font-size:0.75rem;color:var(--muted-foreground);max-height:200px;overflow-y:auto;">{}</pre>
+                        </div>
+                        <div class="form-group">
+                            <label>Params</label>
+                            <table class="settings-table">
+                                <tbody id="ws-params-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <!-- Skills & Tools Tab -->
+        <div id="panel-skills" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>🧩</span>
+                    <span>Skills & Tools</span>
+                </div>
+                <div class="panel-body">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="st-skills-active">0</div>
+                            <div class="stat-label">Skills actifs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="st-tools-active">0</div>
+                            <div class="stat-label">Tools actifs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="st-needs-pending">0</div>
+                            <div class="stat-label">Besoins en attente</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="st-pipeline-waiting">0</div>
+                            <div class="stat-label">Pipeline en attente</div>
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+                        <div>
+                            <h3 style="margin-bottom:1rem;">Skills</h3>
+                            <div id="skills-list"></div>
+                        </div>
+                        <div>
+                            <h3 style="margin-bottom:1rem;">Tools</h3>
+                            <div id="tools-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compare Tab -->
+        <div id="panel-compare" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>⚖️</span>
+                    <span>Compare Experiments</span>
+                </div>
+                <div class="panel-body">
+                    <div id="compare-content">
+                        <div class="empty-state"><p>Select experiments to compare</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cluster Tree Tab -->
+        <div id="panel-clustertree" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>🌲</span>
+                    <span>Cluster Tree</span>
+                </div>
+                <div class="panel-body">
+                    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+                        <button class="btn" onclick="switchClusterView('tree')">🌲 Tree</button>
+                        <button class="btn" onclick="switchClusterView('graph')">🕸 Graph</button>
+                        <button class="btn" onclick="loadClusterTree()">↻ Refresh</button>
+                    </div>
+                    <div id="ct-view-tree">
+                        <div id="ct-subject" style="color:var(--muted-foreground);">Chargement…</div>
+                    </div>
+                    <div id="ct-view-graph" style="display:none;">
+                        <svg id="ct-svg" viewBox="0 0 1000 600" style="width:100%;height:400px;background:var(--bg-primary);border-radius:0.5rem;"></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Experimental Tab -->
+        <div id="panel-experimental" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>🧪</span>
+                    <span>Experimental Harness</span>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="exp-executor">Executor</label>
+                        <select id="exp-executor"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="exp-prompt-input">Prompt</label>
+                        <textarea id="exp-prompt-input" placeholder="Enter prompt..."></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="runHarness()">RUN</button>
+                    <pre id="exp-output" style="margin-top:1rem;background:var(--bg-primary);padding:1rem;border-radius:0.5rem;font-size:0.8rem;white-space:pre-wrap;max-height:400px;overflow:auto;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="panel-settings" class="tab-panel">
+            <div class="panel" style="flex:1;">
+                <div class="panel-header">
+                    <span>⚙️</span>
+                    <span>Settings</span>
+                </div>
+                <div class="panel-body">
+                    <div id="settings-body"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ── Global State ────────────────────────────────────────
+        const API_BASE = '/api';
+        let cgData = null;
+        let cgPos = {};
+        let cgZoom = 1.0;
+
+        // ── DOM Helper (FIXED) ──────────────────────────────────
+        function el(id) { return document.getElementById(id); }
+
+        // ── Escape HTML ─────────────────────────────────────────
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        // ── Tab Navigation ──────────────────────────────────────
+        function switchTab(name) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            const panel = el('panel-' + name);
+            if (panel) panel.classList.add('active');
+            document.querySelector(`[data-tab="${name}"]`)?.classList.add('active');
+            
+            // Load tab-specific data
+            if (name === 'experiments') loadExperiments();
+            if (name === 'debate') loadDebateLab();
+            if (name === 'code-lab') loadCodeLab();
+            if (name === 'agent-builder') loadAgents();
+            if (name === 'skills') loadSkillsPanel();
+            if (name === 'compare') loadCompare();
+            if (name === 'clustertree') loadClusterTree();
+            if (name === 'experimental') loadExperimental();
+            if (name === 'settings') loadSettings();
+        }
+
+        // ── Experiments ─────────────────────────────────────────
+        async function loadExperiments() {
+            try {
+                const resp = await fetch(`${API_BASE}/experiments`);
+                const data = await resp.json();
+                const experiments = data.experiments || {};
+                
+                // Update stats
+                el('stat-experiments').textContent = Object.keys(experiments).length;
+                
+                // Render list
+                const list = el('experiment-list');
+                if (!list) return;
+                
+                const exps = Object.entries(experiments).map(([id, exp]) => ({
+                    id,
+                    ...exp
+                }));
+                
+                if (exps.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><p>No experiments yet</p></div>';
+                    return;
+                }
+                
+                list.innerHTML = exps.map(e => `
+                    <div class="experiment-item" onclick="inspectExperiment('${e.id}')">
+                        <div class="experiment-header">
+                            <span class="experiment-id">${esc(e.id)}</span>
+                            <span class="status-badge status-${(e.status || 'stopped').toLowerCase()}">${e.status || 'stopped'}</span>
+                        </div>
+                        <div style="font-size:0.85rem;color:var(--muted-foreground);">
+                            ${esc(e.subject || '')} · ${esc(e.domain || '')}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load experiments:', err);
+            }
+        }
+
+        async function createExperiment() {
+            const domain = el('exp-domain')?.value || 'math';
+            const difficulty = el('exp-difficulty')?.value || '[1, 5]';
+            const numTasks = parseInt(el('exp-num-tasks')?.value || '100');
+            const seed = parseInt(el('exp-seed')?.value || '42');
+            const executionMode = el('exp-execution-mode')?.value || 'deterministic';
+            const prompt = el('exp-prompt')?.value || '';
+            
+            try {
+                const resp = await fetch(`${API_BASE}/experiments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        domain,
+                        difficulty_range: difficulty,
+                        num_tasks: numTasks,
+                        seed,
+                        execution_mode: executionMode,
+                        prompt: prompt
+                    })
+                });
+                const data = await resp.json();
+                if (data.experiment_id) {
+                    alert('Experiment created: ' + data.experiment_id);
+                    loadExperiments();
+                }
+            } catch (err) {
+                alert('Failed to create experiment: ' + err.message);
+            }
+        }
+
+        // ── Autopilot ───────────────────────────────────────────
+        async function startAutopilot() {
+            const prompt = el('autopilot-prompt')?.value || '';
+            const executor = el('autopilot-executor')?.value || 'deterministic';
+            const numTasks = parseInt(el('autopilot-num-tasks')?.value || '10');
+            
+            if (!prompt) {
+                alert('Please enter a prompt');
+                return;
+            }
+            
+            try {
+                const resp = await fetch(`${API_BASE}/autopilot/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, executor, num_tasks: numTasks })
+                });
+                const data = await resp.json();
+                if (data.run_id) {
+                    el('autopilot-status').innerHTML = `<div class="status-badge status-running">Running: ${data.run_id}</div>`;
+                }
+            } catch (err) {
+                alert('Failed to start autopilot: ' + err.message);
+            }
+        }
+
+        // ── Debate Lab ──────────────────────────────────────────
+        async function loadDebateLab() {
+            // Load debate data if available
+        }
+
+        async function startDebate() {
+            try {
+                const resp = await fetch(`${API_BASE}/debate-lab/runs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domain: 'philosophy', num_tasks: 10, seed: 42 })
+                });
+                const data = await resp.json();
+                if (data.run_id) {
+                    el('debate-status').textContent = 'Running';
+                    el('debate-status').className = 'status-badge status-running';
+                    el('debate-stop-btn').disabled = false;
+                }
+            } catch (err) {
+                alert('Failed to start debate: ' + err.message);
+            }
+        }
+
+        async function stopDebate() {
+            el('debate-status').textContent = 'Stopped';
+            el('debate-status').className = 'status-badge status-stopped';
+            el('debate-stop-btn').disabled = true;
+        }
+
+        // ── Code Lab ────────────────────────────────────────────
+        async function loadCodeLab() {
+            try {
+                const resp = await fetch(`${API_BASE}/code-lab/runs`);
+                const data = await resp.json();
+                const runs = data.runs || [];
+                
+                const list = el('code-lab-list');
+                if (!list) return;
+                
+                if (runs.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><p>No code lab runs yet</p></div>';
+                    return;
+                }
+                
+                list.innerHTML = runs.map(r => `
+                    <div class="experiment-item">
+                        <div class="experiment-header">
+                            <span class="experiment-id">${esc(r.run_id)}</span>
+                            <span class="status-badge status-${(r.status || 'stopped').toLowerCase()}">${r.status || 'stopped'}</span>
+                        </div>
+                        <div style="font-size:0.85rem;color:var(--muted-foreground);">
+                            ${esc((r.config?.prompt || '').slice(0, 60))}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load code lab runs:', err);
+            }
+        }
+
+        async function buildCodeLab() {
+            const prompt = el('cl-prompt')?.value || '';
+            if (!prompt) {
+                alert('Please enter a prompt');
+                return;
+            }
+            
+            try {
+                const resp = await fetch(`${API_BASE}/code-lab/runs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                const data = await resp.json();
+                if (data.run_id) {
+                    alert('Code lab run started: ' + data.run_id);
+                    loadCodeLab();
+                }
+            } catch (err) {
+                alert('Failed to build code lab: ' + err.message);
+            }
+        }
+
+        // ── Agent Builder ───────────────────────────────────────
+        async function loadAgents() {
+            try {
+                const resp = await fetch(`${API_BASE}/agents`);
+                const data = await resp.json();
+                const agents = data.agents || [];
+                
+                const list = el('agents-list');
+                if (!list) return;
+                
+                if (agents.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><p>No agents created yet</p></div>';
+                    return;
+                }
+                
+                list.innerHTML = agents.map(a => `
+                    <div class="experiment-item">
+                        <div class="experiment-header">
+                            <span class="experiment-id">${esc(a.name || a.id)}</span>
+                            <span class="status-badge status-running">${esc(a.type || 'unknown')}</span>
+                        </div>
+                        <div style="font-size:0.85rem;color:var(--muted-foreground);">
+                            ${esc((a.system_prompt || '').slice(0, 100))}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load agents:', err);
+            }
+        }
+
+        async function createAgent() {
+            const name = el('agent-name')?.value || '';
+            const type = el('agent-type')?.value || 'code_lab';
+            const prompt = el('agent-prompt')?.value || '';
+            const configStr = el('agent-config')?.value || '{}';
+            
+            if (!name) {
+                alert('Please enter an agent name');
+                return;
+            }
+            
+            let config = {};
+            try {
+                config = JSON.parse(configStr);
+            } catch (e) {
+                alert('Invalid JSON config');
+                return;
+            }
+            
+            try {
+                const resp = await fetch(`${API_BASE}/agents`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, type, system_prompt: prompt, config })
+                });
+                const data = await resp.json();
+                if (data.id) {
+                    alert('Agent created: ' + data.id);
+                    loadAgents();
+                }
+            } catch (err) {
+                alert('Failed to create agent: ' + err.message);
+            }
+        }
+
+        async function testAgent() {
+            const name = el('agent-name')?.value || '';
+            if (!name) {
+                alert('Please enter an agent name first');
+                return;
+            }
+            
+            try {
+                const resp = await fetch(`${API_BASE}/agents/${name}/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: 'Hello, test prompt' })
+                });
+                const data = await resp.json();
+                el('agent-builder-status').innerHTML = `<pre style="background:var(--bg-primary);padding:1rem;border-radius:0.5rem;font-size:0.8rem;">${esc(JSON.stringify(data, null, 2))}</pre>`;
+            } catch (err) {
+                alert('Failed to test agent: ' + err.message);
+            }
+        }
+
+        // ── Skills & Tools ──────────────────────────────────────
+        async function loadSkillsPanel() {
+            await Promise.all([
+                loadCapabilities(),
+                loadSkills(),
+                loadTools(),
+                loadPipeline()
+            ]);
+        }
+
+        async function loadCapabilities() {
+            try {
+                const resp = await fetch(`${API_BASE}/extensions/capabilities`);
+                const data = await resp.json();
+                const stats = data.stats || {};
+                
+                if (el('st-needs-pending')) el('st-needs-pending').textContent = stats.pending || 0;
+            } catch (e) {
+                console.error('Failed to load capabilities:', e);
+            }
+        }
+
+        async function loadSkills() {
+            try {
+                const resp = await fetch(`${API_BASE}/extensions/skills`);
+                const data = await resp.json();
+                const skills = data.all || [];
+                const stats = data.stats || {};
+                
+                if (el('st-skills-active')) el('st-skills-active').textContent = stats.active || 0;
+                
+                const list = el('skills-list');
+                if (!list) return;
+                
+                if (skills.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><p>No skills registered</p></div>';
+                    return;
+                }
+                
+                list.innerHTML = skills.map(s => `
+                    <div class="card" style="margin-bottom:.5rem;">
+                        <strong>${esc(s.name || s.id)}</strong>
+                        <span style="font-size:.75rem;color:var(--muted-foreground);"> #${esc(s.id)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to load skills:', e);
+            }
+        }
+
+        async function loadTools() {
+            try {
+                const resp = await fetch(`${API_BASE}/extensions/tools`);
+                const data = await resp.json();
+                const tools = data.all || [];
+                const stats = data.stats || {};
+                
+                if (el('st-tools-active')) el('st-tools-active').textContent = stats.active || 0;
+                
+                const list = el('tools-list');
+                if (!list) return;
+                
+                if (tools.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><p>No tools registered</p></div>';
+                    return;
+                }
+                
+                list.innerHTML = tools.map(t => `
+                    <div class="card" style="margin-bottom:.5rem;">
+                        <strong>${esc(t.name || t.id)}</strong>
+                        <span style="font-size:.75rem;color:var(--muted-foreground);"> #${esc(t.id)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to load tools:', e);
+            }
+        }
+
+        async function loadPipeline() {
+            try {
+                const resp = await fetch(`${API_BASE}/extensions/pipeline`);
+                const data = await resp.json();
+                const stats = data.stats || {};
+                
+                if (el('st-pipeline-waiting')) el('st-pipeline-waiting').textContent = stats.waiting || 0;
+            } catch (e) {
+                console.error('Failed to load pipeline:', e);
+            }
+        }
+
+        // ── Compare ─────────────────────────────────────────────
+        async function loadCompare() {
+            try {
+                const resp = await fetch(`${API_BASE}/compare`);
+                const data = await resp.json();
+                el('compare-content').innerHTML = `<pre style="background:var(--bg-primary);padding:1rem;border-radius:0.5rem;font-size:0.8rem;">${esc(JSON.stringify(data, null, 2))}</pre>`;
+            } catch (err) {
+                console.error('Failed to load compare:', err);
+            }
+        }
+
+        // ── Cluster Tree ────────────────────────────────────────
+        async function loadClusterTree() {
+            try {
+                const resp = await fetch(`${API_BASE}/cluster/tree`);
+                const data = await resp.json();
+                
+                if (el('ct-subject')) {
+                    el('ct-subject').innerHTML = renderSubjectNode((data.subject_tree?.tree) || {}, 0);
+                }
+            } catch (err) {
+                console.error('Failed to load cluster tree:', err);
+                if (el('ct-subject')) el('ct-subject').textContent = 'Erreur: ' + err.message;
+            }
+        }
+
+        function renderSubjectNode(node, depth) {
+            const subjects = (node?.subjects) || {};
+            const exps = (node?.experiments) || [];
+            let html = '';
+            for (const k of Object.keys(subjects)) {
+                html += `<details ${depth === 0 ? 'open' : ''}><summary>📁 ${esc(k)}</summary>` +
+                      renderSubjectNode(subjects[k], depth + 1) + `</details>`;
+            }
+            if (exps.length) {
+                html += `<ul style="margin:0.2rem 0 0.4rem 1rem;font-size:0.85rem;">` +
+                      exps.map(e => `<li>🟦 ${esc(e)}</li>`).join('') + `</ul>`;
+            }
+            if (depth === 0 && !Object.keys(subjects).length && !exps.length) html = '<em>Aucun sujet enregistré.</em>';
+            return html;
+        }
+
+        function switchClusterView(v) {
+            const tree = el('ct-view-tree');
+            const graph = el('ct-view-graph');
+            if (tree) tree.style.display = (v === 'tree' ? 'block' : 'none');
+            if (graph) graph.style.display = (v === 'graph' ? 'block' : 'none');
+            if (v === 'graph') loadClusterGraph();
+        }
+
+        async function loadClusterGraph() {
+            try {
+                const resp = await fetch(`${API_BASE}/cluster/graph`);
+                const data = await resp.json();
+                cgData = data;
+                renderClusterGraph();
+            } catch (err) {
+                console.error('cluster graph:', err);
+            }
+        }
+
+        function renderClusterGraph() {
+            const svg = el('ct-svg');
+            if (!svg || !cgData) return;
+            
+            let list = (cgData.nodes) || [];
+            const pos = {};
+            const cx = 500, cy = 280, R = 200;
+            list.forEach((n, i) => {
+                const ang = (i / Math.max(list.length, 1)) * 2 * Math.PI;
+                pos[n.node_id] = { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang) };
+            });
+            
+            let s = `<g>`;
+            const edges = (cgData.edges) || [];
+            const idSet = new Set(list.map(n => n.node_id));
+            for (const e of edges) {
+                if (!idSet.has(e.source) || !idSet.has(e.target)) continue;
+                const p1 = pos[e.source], p2 = pos[e.target];
+                if (!p1 || !p2) continue;
+                s += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="#4a90d9" stroke-width="1.5" opacity="0.6"/>`;
+            }
+            for (const n of list) {
+                const p = pos[n.node_id];
+                if (!p) continue;
+                const r = n.kind === 'SUBJECT' ? 20 : 12;
+                s += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${n.kind === 'SUBJECT' ? '#4a90d9' : '#2aa899'}" opacity="0.8"/>`;
+                s += `<text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="10" fill="#f8fafc">${esc(n.label || n.node_id)}</text>`;
+            }
+            s += `</g>`;
+            svg.innerHTML = s;
+        }
+
+        // ── Experimental ────────────────────────────────────────
+        async function loadExperimental() {
+            try {
+                const resp = await fetch(`${API_BASE}/experimental/executors`);
+                const data = await resp.json();
+                const sel = el('exp-executor');
+                if (sel) {
+                    sel.innerHTML = (data.executors || []).map(e =>
+                        `<option value="${esc(e.id)}">${esc(e.id)} ${e.connected ? '●' : '○'}</option>`).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load experimental:', err);
+            }
+        }
+
+        async function runHarness() {
+            const executor = el('exp-executor')?.value || '';
+            const prompt = el('exp-prompt-input')?.value || '';
+            const out = el('exp-output');
+            
+            if (!executor || !prompt) {
+                alert('Select executor and enter prompt');
+                return;
+            }
+            
+            out.textContent = 'Running…';
+            try {
+                const resp = await fetch(`${API_BASE}/experimental/harness`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ executor, prompt })
+                });
+                const j = await resp.json().catch(() => ({ error: '(non-JSON response)' }));
+                if (!resp.ok) {
+                    out.textContent = 'Error: ' + JSON.stringify(j);
+                    return;
+                }
+                out.textContent = JSON.stringify(j, null, 2);
+            } catch (err) {
+                out.textContent = 'Error: ' + String(err);
+            }
+        }
+
+        // ── Settings ────────────────────────────────────────────
+        async function loadSettings() {
+            try {
+                const resp = await fetch(`${API_BASE}/settings`);
+                const data = await resp.json();
+                renderSettings(data.settings || data);
+            } catch (err) {
+                console.error('Failed to load settings:', err);
+            }
+        }
+
+        function renderSettings(s) {
+            const bodyEl = el('settings-body');
+            if (!bodyEl) return;
+            
+            const inf = s.inference || {};
+            const models = s.models || {};
+            const d = s.debate || {};
+            
+            bodyEl.innerHTML = `
+                <h3 style="margin-top:1rem;">Inference</h3>
+                <table class="settings-table">
+                    ${[['Backend', inf.base_url || 'http://localhost:1234/v1'],
+                       ['API key configured', typeof inf.api_key_configured === 'boolean' ? (inf.api_key_configured ? 'yes' : 'no') : '—'],
+                       ['Backend reachable', inf.backend_reachable === true ? 'yes' : 'no']].map(([k, v]) =>
+                        `<tr><td class="settings-key">${esc(k)}</td><td>${esc(String(v))}</td></tr>`).join('')}
+                </table>
+                <h3 style="margin-top:1rem;">Models</h3>
+                <table class="settings-table">
+                    ${Object.keys(models).map(m => `<tr><td class="settings-key">${esc(m)}</td><td>${esc(models[m])}</td></tr>`).join('')}
+                </table>
+                <h3 style="margin-top:1rem;">Debate</h3>
+                <table class="settings-table">
+                    ${[['temperature', d.temperature], ['max_tokens', d.max_tokens]].map(([k, v]) =>
+                        `<tr><td class="settings-key">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}
+                </table>
+            `;
+        }
+
+        // ── Tool Openers ────────────────────────────────────────
+        function openTool(toolId) {
+            console.log('Opening tool:', toolId);
+        }
+
+        // ── Init ─────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wire up nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+            });
+            
+            // Load initial data
+            loadExperiments();
+        });
+    </script>
+</body>
+</html>

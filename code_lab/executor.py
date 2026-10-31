@@ -134,10 +134,19 @@ class CodeExecutor:
 
     def _safe_env(self) -> Dict[str, str]:
         """Return a safe environment for execution."""
-        env = dict(sys.environ)
-        # Remove sensitive vars
+        import os as _os
+        env = dict(_os.environ)  # not sys.environ: some embedded Pythons strip it
+        # Remove sensitive vars. Match by BOTH dangerous prefixes AND sensitive
+        # suffixes: the real secrets are LIFE_MEAN_LLM_API_KEY and
+        # OPENROUTER_API_KEY — neither starts with "API_KEY", so a prefix-only
+        # filter silently leaks them into LLM-generated code subprocesses.
         for key in list(env.keys()):
-            if key.startswith("API_KEY") or key.startswith("SECRET") or key == "TOKEN":
+            upper = key.upper()
+            if (upper.startswith("API_KEY") or upper.startswith("SECRET")
+                    or upper.startswith("TOKEN")
+                    or upper.endswith("API_KEY") or upper.endswith("_KEY")
+                    or upper.endswith("SECRET") or upper.endswith("_TOKEN")
+                    or upper == "TOKEN"):
                 del env[key]
         # Set sandbox vars
         env["PYTHONUNBUFFERED"] = "1"

@@ -458,8 +458,11 @@ class DebateEngine:
             message_type = infer_message_type(sections, agent.role)
 
             # Complete the turn (transcript records the parsed sections too)
+            provider = self._derive_provider()
             self.turn_manager.complete_turn(turn.turn_id, response, duration,
-                                            sections=sections or None)
+                                            sections=sections or None,
+                                            model=resolved_actual,
+                                            provider=provider)
             agent.add_to_history(response)
             self._emit_lab("TURN_COMMITTED", turn=turn.turn_id, round=turn.round_num,
                            speaker=selected_name, role=agent.role,
@@ -1059,6 +1062,30 @@ Example: {{"selected_speaker": "{example_speaker}", "challenge": "The previous s
             return registered[0]
         known = sorted(self._valid_speakers)
         return known[0] if known else "Existentialist"
+
+    def _derive_provider(self) -> Optional[str]:
+        """Derive the provider name from the LLM client's base_url.
+
+        Returns None when the client is not wired (unit-test seams).
+        """
+        client = getattr(self, "llm", None)
+        if client is None:
+            return None
+        url = getattr(client, "base_url", "") or ""
+        if "localhost" in url or "127.0.0.1" in url:
+            return "lm-studio"
+        if "openai" in url or "api.openai" in url:
+            return "openai"
+        if "anthropic" in url:
+            return "anthropic"
+        if "azure" in url:
+            return "azure"
+        if "groq" in url:
+            return "groq"
+        # Generic: strip scheme and path to get the host as provider hint.
+        if url:
+            return url.split("://")[-1].split("/")[0].split(":")[0]
+        return None
 
     def _has_dynamic_router(self) -> bool:
         """True when a dynamic model router with a non-empty pool is wired.

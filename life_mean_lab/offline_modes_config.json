@@ -1,0 +1,38 @@
+{
+  "MODE_A_PURE_REASONING": {
+    "description": "Aucun Internet, aucun outil, aucun code. Raisonnement pur.",
+    "internet": false,
+    "external_db": false,
+    "llm_required": true,
+    "code_execution": false,
+    "sandbox": false,
+    "provider": "lm_studio",
+    "status": "READY"
+  },
+  "MODE_B_AUTONOMOUS_TOOL": {
+    "description": "LM Studio + outils locaux (RDKit) + sandbox isolé. Code généré et testé.",
+    "internet": false,
+    "external_db": false,
+    "llm_required": true,
+    "code_execution": true,
+    "sandbox": true,
+    "provider": "lm_studio",
+    "allowed_local_libraries": [
+      "rdkit",
+      "numpy",
+      "pandas"
+    ],
+    "status": "READY"
+  },
+  "MODE_C_AUGMENTED_RESEARCH": {
+    "description": "Internet + bases externes + LM Studio/OpenRouter. Nécessite autorisation.",
+    "internet": true,
+    "external_db": true,
+    "llm_required": true,
+    "code_execution": false,
+    "sandbox": false,
+    "provider": "openrouter",
+    "requires_authorization": true,
+    "status": "BLOCKED (token LM Studio manquant, réseau non testé)"
+  }
+}

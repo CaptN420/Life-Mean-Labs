@@ -22,6 +22,7 @@ class Turn:
     moderator_reason: Optional[str] = None
     response: str = ""
     model: Optional[str] = None
+    provider: Optional[str] = None
     duration_seconds: Optional[float] = None
     timestamp: Optional[str] = None
     sections: Optional[dict] = None
@@ -37,6 +38,7 @@ class Turn:
             "moderator_reason": self.moderator_reason,
             "response": self.response,
             "model": self.model,
+            "provider": self.provider,
             "duration_seconds": self.duration_seconds,
             "sections": self.sections,
         }
@@ -86,15 +88,23 @@ class TurnManager:
         return turn
 
     def complete_turn(self, turn_id: int, response: str, duration: float,
-                      sections: Optional[dict] = None) -> None:
+                      sections: Optional[dict] = None,
+                      model: Optional[str] = None,
+                      provider: Optional[str] = None) -> None:
         """Mark a turn as completed with its response (and optional parsed
-        visible-response sections, §78)."""
+        visible-response sections, §78). Also stores the actual model and
+        provider used for provenance so to_dict() never serializes them as
+        None when a real LLM call occurred."""
         for turn in self._turns:
             if turn.turn_id == turn_id:
                 turn.response = response
                 turn.duration_seconds = duration
                 if sections is not None:
                     turn.sections = sections
+                if model is not None:
+                    turn.model = model
+                if provider is not None:
+                    turn.provider = provider
                 return
         logger.warning("Turn %d not found for completion", turn_id)
 

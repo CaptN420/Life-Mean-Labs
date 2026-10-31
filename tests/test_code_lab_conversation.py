@@ -10,8 +10,10 @@ response no text is fabricated.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
+import urllib.parse
 import urllib.request
 import urllib.error
 from http.server import ThreadingHTTPServer
@@ -187,11 +189,35 @@ class TestRawReadback:
 
 
 # ── HTTP routes: conversation / raw / files / delete ────────────────────────
+_csrf_token = {"value": None}
+_csrf_cookie = {"value": ""}
+
+
+def _bootstrap_csrf(base):
+    if _csrf_token["value"] is not None:
+        return
+    req = urllib.request.Request(base + "/dashboard")
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        set_cookie = resp.headers.get("Set-Cookie", "")
+    m = re.search(r"lifemean_csrf=([^;]+)", set_cookie)
+    if m:
+        _csrf_cookie["value"] = "lifemean_csrf=" + m.group(1)
+        _csrf_token["value"] = urllib.parse.unquote(m.group(1))
+    else:
+        _csrf_token["value"] = ""
+
+
 def _req(base, path, method="GET", body=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(base + path, data=data, method=method)
     if data is not None:
         req.add_header("Content-Type", "application/json")
+    if method in ("POST", "PUT", "DELETE"):
+        _bootstrap_csrf(base)
+        if _csrf_cookie["value"]:
+            req.add_header("Cookie", _csrf_cookie["value"])
+        if _csrf_token["value"]:
+            req.add_header("X-Lifemean-CSRF", _csrf_token["value"])
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status, json.loads(resp.read().decode())

@@ -522,6 +522,7 @@ def test_http_debate_api_full_flow(tmp_path):
     """A Debate run is created DIRECTLY through the Debate HTTP API (spec §37 #2)."""
     import json
     import threading
+    import urllib.parse
     import urllib.request
     import urllib.error
     from http.server import ThreadingHTTPServer
@@ -541,11 +542,29 @@ def test_http_debate_api_full_flow(tmp_path):
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     try:
+        csrf_cookie, csrf_token = "", ""
+        try:
+            import re as _re
+            _r = urllib.request.Request(base + "/dashboard")
+            with urllib.request.urlopen(_r, timeout=15) as _resp:
+                _sc = _resp.headers.get("Set-Cookie", "")
+            _m = _re.search(r"lifemean_csrf=([^;]+)", _sc)
+            if _m:
+                csrf_cookie = "lifemean_csrf=" + _m.group(1)
+                csrf_token = urllib.parse.unquote(_m.group(1))
+        except Exception:
+            pass
+
         def req(path, method="GET", body=None):
             data = json.dumps(body).encode() if body is not None else None
             r = urllib.request.Request(base + path, data=data, method=method)
             if data is not None:
                 r.add_header("Content-Type", "application/json")
+            if method in ("POST", "PUT", "DELETE"):
+                if csrf_cookie:
+                    r.add_header("Cookie", csrf_cookie)
+                if csrf_token:
+                    r.add_header("X-Lifemean-CSRF", csrf_token)
             try:
                 with urllib.request.urlopen(r, timeout=30) as resp:
                     return resp.status, json.loads(resp.read().decode())

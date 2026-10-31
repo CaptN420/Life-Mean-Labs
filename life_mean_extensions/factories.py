@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,6 +12,28 @@ from typing import Any, Dict, List, Optional
 from .registries import CapabilityNeed, ResourceStatus, SkillDef, ToolDef, Version
 
 logger = logging.getLogger("life_mean_extensions.factories")
+
+# Ids derived from caller-supplied `need_id` MUST be constrained to a safe
+# character set before use as a registry key or filesystem component — an
+# unbounded need_id ("../../pwn") escapes the sandbox and turns
+# propose_from_need into an arbitrary file write (confirmed during the
+# dashboard security audit). Whitelist, never blacklist.
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+_FALLBACK_ID = "generated-tool"
+
+
+def _sanitize_id(raw: str, prefix: str) -> str:
+    """Return a filesystem/registry-safe id derived from caller input.
+
+    The raw id is only ever a hint; an invalid character set silently falls
+    back to a safe canonical id instead of propagating attacker input. This
+    also neutralizes the stored-XSS vector where an id containing quotes/spaces
+    was echoed into inline handlers on the dashboard.
+    """
+    s = str(raw or "").strip()
+    if not s or not _SAFE_ID_RE.match(s):
+        return f"{prefix}-{_FALLBACK_ID}"
+    return s
 
 
 # --------------------------------------------------------------------------
@@ -37,7 +60,7 @@ class SkillFactory:
         if spec is None:
             spec = SkillSpec(need_id=need.id, description=f"Auto-generated skill for: {need.evidence[:100]}")
         skill = SkillDef(
-            id=spec.need_id.replace("need-", "skill-"),
+            id=_sanitize_id(spec.need_id.replace("need-", "skill-"), "skill"),
             description=spec.description,
             input_schema=spec.input_schema,
             output_schema=spec.output_schema,
@@ -102,7 +125,7 @@ class ToolFactory:
     def propose_from_need(self, need: CapabilityNeed, spec: Optional[ToolSpec] = None) -> ToolDef:
         if spec is None:
             spec = ToolSpec(need_id=need.id, description=f"Auto-generated tool for: {need.evidence[:100]}")
-        tool_id = spec.need_id.replace("need-", "tool-")
+        tool_id = _sanitize_id(spec.need_id.replace("need-", "tool-"), "tool")
         sandbox_path = self.sandbox_root / tool_id
         sandbox_path.mkdir(parents=True, exist_ok=True)
 

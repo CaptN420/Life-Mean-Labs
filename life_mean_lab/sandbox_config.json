@@ -1,0 +1,19 @@
+{
+  "sandbox_available": true,
+  "sandbox_type": "docker",
+  "isolation_real": true,
+  "network_disabled": true,
+  "secrets_access": false,
+  "file_access": "restricted_workdir",
+  "resource_limits": {
+    "cpu_cores": 1,
+    "memory_mb": 512,
+    "timeout_seconds": 60,
+    "max_output_bytes": 10240
+  },
+  "work_directory": "sandbox_work",
+  "allowed_modules_local": ["rdkit", "numpy", "pandas"],
+  "execution_log_path": "sandbox_logs/",
+  "approval_required_for_sensitive_tools": true,
+  "provider_for_sandbox": "lm_studio_local"
+}
