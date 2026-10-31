@@ -148,44 +148,236 @@ class TelemetryEvent:
 
 
 class ModelRouter:
-    """Routes queries to appropriate models based on task type."""
+    """Routes queries to appropriate models based on task type.
+
+    Enhanced with:
+    - Difficulty classification (0-4)
+    - Opposition mode for diversity
+    - Fairness boost for underused workers
+    - Domain-specific routing tables
+    """
+
+    # ── Worker Definitions ───────────────────────────────────────────────
+
+    WORKER_CAPABILITIES = {
+        "deepseek_coder_v2": {
+            "tags": ["code", "python", "generate", "function", "implement"],
+            "domain": "coding",
+            "description": "DeepSeek Coder v2 — expert code generation",
+        },
+        "deepseek_v4_flash": {
+            "tags": ["analysis", "explain", "compare", "general"],
+            "domain": "analysis",
+            "description": "DeepSeek v4 Flash — fast analysis and reasoning",
+        },
+        "gpt_4": {
+            "tags": ["math", "calculate", "equation", "code", "quality"],
+            "domain": "quality",
+            "description": "GPT-4 — high-quality code and math",
+        },
+        "claude_sonnet": {
+            "tags": ["creative", "write", "analyze", "compare"],
+            "domain": "creative",
+            "description": "Claude Sonnet — creative and analytical",
+        },
+        "claude_haiku": {
+            "tags": ["fast", "simple", "quick", "summary"],
+            "domain": "speed",
+            "description": "Claude Haiku — fast and lightweight",
+        },
+        "deepseek_math": {
+            "tags": ["math", "calculus", "algebra", "equation", "calculate"],
+            "domain": "math",
+            "description": "DeepSeek Math — specialized mathematics",
+        },
+    }
+
+    # ── Routing Tables ───────────────────────────────────────────────────
+
+    WORKER_ROUTES = {
+        "code": ["deepseek_coder_v2", "gpt_4"],
+        "python": ["deepseek_coder_v2"],
+        "generate": ["deepseek_coder_v2", "gpt_4"],
+        "function": ["deepseek_coder_v2"],
+        "debug": ["deepseek_v4_flash", "gpt_4"],
+        "fix": ["deepseek_v4_flash", "gpt_4"],
+        "bug": ["deepseek_v4_flash", "gpt_4"],
+        "error": ["deepseek_v4_flash", "gpt_4"],
+        "lint": ["gpt_4"],
+        "analyse": ["deepseek_v4_flash", "claude_sonnet"],
+        "analysis": ["deepseek_v4_flash", "claude_sonnet"],
+        "validate": ["gpt_4"],
+        "quality": ["gpt_4"],
+        "math": ["deepseek_math", "gpt_4"],
+        "equation": ["deepseek_math", "gpt_4"],
+        "algebra": ["deepseek_math", "gpt_4"],
+        "calculus": ["deepseek_math", "gpt_4"],
+        "physics": ["deepseek_v4_flash", "gpt_4"],
+        "chemistry": ["deepseek_v4_flash", "gpt_4"],
+        "logic": ["deepseek_v4_flash", "claude_sonnet"],
+        "creative": ["claude_sonnet", "claude_haiku"],
+        "write": ["claude_sonnet", "claude_haiku"],
+        "summary": ["claude_haiku", "deepseek_v4_flash"],
+        "fast": ["claude_haiku", "deepseek_v4_flash"],
+        "general": ["deepseek_v4_flash", "gpt_4"],
+    }
+
+    # ── Opposition Domains ───────────────────────────────────────────────
+
+    OPPOSITION_DOMAINS = {
+        "coding": "quality",
+        "quality": "coding",
+        "analysis": "creative",
+        "creative": "analysis",
+        "math": "general",
+        "general": "math",
+    }
+
+    # ── Difficulty Keywords ──────────────────────────────────────────────
+
+    _DIFFICULTY_KEYWORDS = {
+        0: [],
+        1: [],
+        2: ["complex", "analyse", "debug", "multi-step", "workflow"],
+        3: ["complex", "multi-step", "debug", "analyse", "pipeline", "critical"],
+        4: ["very complex", "critical", "production", "enterprise", "large-scale"],
+    }
+
+    _ADAPTIVE_TOP_K = {0: 1, 1: 1, 2: 2, 3: 3, 4: 4}
 
     def __init__(self):
-        self._routes: Dict[str, List[str]] = {
-            "coding": ["deepseek/deepseek-coder-v2", "openai/gpt-4"],
-            "analysis": ["deepseek/deepseek-v4-flash", "anthropic/claude-3-sonnet"],
-            "creative": ["openai/gpt-4o", "anthropic/claude-3-haiku"],
-            "math": ["deepseek/deepseek-math", "openai/gpt-4"],
-            "general": ["deepseek/deepseek-v4-flash", "openai/gpt-4o-mini"],
+        self.usage: Dict[str, int] = {name: 0 for name in self.WORKER_CAPABILITIES}
+        self._rotation: Dict[str, int] = {}
+
+    @staticmethod
+    def classify_difficulty(description: str) -> int:
+        """Classify task difficulty Level 0-4 based on description."""
+        if not description or len(description.strip()) < 5:
+            return 0
+
+        low_desc = description.lower()
+        word_count = len(low_desc.split())
+
+        # Level 4: very complex
+        severe = ModelRouter._DIFFICULTY_KEYWORDS[4]
+        severe_hits = sum(1 for kw in severe if kw in low_desc)
+        if severe_hits >= 3 and word_count > 15:
+            return 4
+
+        # Level 3: complex
+        complex_words = ModelRouter._DIFFICULTY_KEYWORDS[3]
+        complex_hits = sum(1 for kw in complex_words if kw in low_desc)
+        if complex_hits >= 2 or (complex_hits >= 1 and word_count > 20):
+            return 3
+
+        # Level 1: simple (short descriptions without complex keywords)
+        if word_count <= 5:
+            return 1
+
+        # Level 2: medium (default)
+        return 2
+
+    def score_worker(self, name: str, description: str) -> float:
+        """Score a worker for a task description."""
+        cap = self.WORKER_CAPABILITIES.get(name)
+        if not cap:
+            return 0.0
+
+        low_desc = (description or "").lower()
+
+        # 1. Route table (keyword match)
+        score = 0.0
+        for key, targets in self.WORKER_ROUTES.items():
+            if name in targets:
+                if key in low_desc:
+                    score += 5.0
+
+        # 2. Worker tags in description
+        tag_hits = sum(1 for tag in cap.get("tags", []) if tag in low_desc)
+        score += tag_hits * 1.5
+
+        # 3. Fairness boost (underused workers)
+        total = sum(self.usage.values()) or 1
+        avg = total / max(1, len(self.usage))
+        underuse = max(0.0, (avg - self.usage[name]) * 0.1)
+        score += int(underuse * 10) / 10.0
+
+        return round(score, 3)
+
+    def route(
+        self,
+        query: str,
+        task_type: Optional[str] = None,
+        top_k: int = 1,
+        opposition_mode: bool = False,
+    ) -> Dict[str, Any]:
+        """Select the best model(s) for a query.
+
+        Args:
+            query: The user query or task description.
+            task_type: Optional explicit task type override.
+            top_k: Number of models to return.
+            opposition_mode: If True, add a model from opposite domain.
+
+        Returns:
+            Dict with selected models, scores, difficulty, etc.
+        """
+        # Classify difficulty
+        difficulty = self.classify_difficulty(query)
+        adaptive_top_k = self._ADAPTIVE_TOP_K.get(difficulty, top_k)
+        effective_top_k = max(adaptive_top_k, top_k)
+
+        # Score all workers
+        scored = [
+            (name, self.score_worker(name, query))
+            for name in self.WORKER_CAPABILITIES
+        ]
+        scored = [(n, s) for n, s in scored if s > 0]
+        scored.sort(key=lambda x: -x[1])
+
+        # Fallback: generic workers
+        if not scored:
+            scored = [(name, 0.1) for name in self.WORKER_CAPABILITIES]
+
+        # Select top_k
+        chosen = scored[:effective_top_k]
+        for name, _ in chosen:
+            self.usage[name] = self.usage.get(name, 0) + 1
+
+        # Opposition mode
+        opposing = []
+        if opposition_mode and chosen:
+            primary_domain = self.WORKER_CAPABILITIES.get(chosen[0][0], {}).get("domain", "")
+            opp_domain = self.OPPOSITION_DOMAINS.get(primary_domain)
+            if opp_domain:
+                for name, cap in self.WORKER_CAPABILITIES.items():
+                    if (cap.get("domain") == opp_domain
+                            and name not in {n for n, _ in chosen}):
+                        opp_score = self.score_worker(name, query)
+                        opposing.append((name, round(opp_score + 0.01, 3)))
+                        if len(opposing) >= effective_top_k:
+                            break
+
+        combined = chosen + opposing
+        final_selection = combined[:max(effective_top_k, len(chosen) + len(opposing))]
+
+        return {
+            "query": query,
+            "selected": [name for name, _ in final_selection],
+            "scores": dict(final_selection),
+            "usage": dict(self.usage),
+            "difficulty": difficulty,
+            "adaptive_top_k": effective_top_k,
+            "opposition_mode": opposition_mode,
+            "opposition_count": len(opposing),
         }
-        self._usage: Dict[str, int] = {}
-
-    def route(self, query: str, task_type: Optional[str] = None) -> str:
-        """Select the best model for a query."""
-        if task_type and task_type in self._routes:
-            models = self._routes[task_type]
-        else:
-            # Auto-classify based on keywords
-            query_lower = query.lower()
-            if any(kw in query_lower for kw in ["code", "function", "implement"]):
-                models = self._routes["coding"]
-            elif any(kw in query_lower for kw in ["analyze", "explain", "compare"]):
-                models = self._routes["analysis"]
-            elif any(kw in query_lower for kw in ["math", "calculate", "equation"]):
-                models = self._routes["math"]
-            else:
-                models = self._routes["general"]
-
-        # Select model with lowest usage (fairness)
-        selected = min(models, key=lambda m: self._usage.get(m, 0))
-        self._usage[selected] = self._usage.get(selected, 0) + 1
-        return selected
 
     def stats(self) -> Dict[str, Any]:
         """Get routing statistics."""
         return {
-            "routes": dict(self._routes),
-            "usage": dict(self._usage),
+            "workers": sorted(self.WORKER_CAPABILITIES.keys()),
+            "routes": len(self.WORKER_ROUTES),
+            "usage": dict(self.usage),
         }
 
 
