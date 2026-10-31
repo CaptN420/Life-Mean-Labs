@@ -26,6 +26,7 @@ from life_mean_studio.workflows import WorkflowConfig, AgentConfig
 from life_mean_studio.prompts.collection import PromptCollection
 from life_mean_studio.engine.python_executor import get_executor, PythonEnvironment
 from life_mean_studio.engine.agent_manager import AgentManager, TestResult
+from life_mean_studio.engine.package_manager import PackageManager
 
 import json
 import os
@@ -71,6 +72,7 @@ class LifeMeanStudioApp(QMainWindow):
 
         # Initialize agent manager
         self.agent_manager = AgentManager(self.storage)
+        self.package_manager = PackageManager(self.storage, self.agent_manager, self.workflow_manager)
 
         # UI state
         self.current_mode = "simple"  # simple or dev
@@ -1017,27 +1019,110 @@ Note: RUN/STOP pilotent le vrai moteur (StudioRunner → ExperimentUIController)
         """Create the packages page."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        
+
         title = QLabel("Packages")
         title.setFont(QFont("Segoe UI", 16, QFont.Bold))
         layout.addWidget(title)
-        
+
         # Info label
-        info = QLabel(".lmpack format - Not Implemented\nImport/Export buttons are disabled.")
-        info.setStyleSheet("color: #888888;")
-        layout.addWidget(info)
-        
-        # Buttons (disabled)
+        self.package_info_label = QLabel(".lmpack format v1.0 — Import and export agents & workflows")
+        self.package_info_label.setStyleSheet("color: #888888;")
+        layout.addWidget(self.package_info_label)
+
+        # Agent selection list
+        agent_label = QLabel("Export these agents (leave empty = all):")
+        layout.addWidget(agent_label)
+        self.package_agent_list = QListWidget()
+        self._refresh_package_agent_list()
+        layout.addWidget(self.package_agent_list)
+
+        # Workflow selection list
+        wf_label = QLabel("Export these workflows (leave empty = all):")
+        layout.addWidget(wf_label)
+        self.package_workflow_list = QListWidget()
+        self._refresh_package_workflow_list()
+        layout.addWidget(self.package_workflow_list)
+
+        # Buttons
         btn_layout = QHBoxLayout()
-        import_btn = QPushButton("Import Package")
-        import_btn.setEnabled(False)
-        export_btn = QPushButton("Export Package")
-        export_btn.setEnabled(False)
-        btn_layout.addWidget(import_btn)
-        btn_layout.addWidget(export_btn)
+        self.import_btn = QPushButton("Import Package")
+        self.import_btn.clicked.connect(self._on_import_package)
+        self.export_btn = QPushButton("Export Package")
+        self.export_btn.clicked.connect(self._on_export_package)
+        btn_layout.addWidget(self.import_btn)
+        btn_layout.addWidget(self.export_btn)
         layout.addLayout(btn_layout)
-        
+
+        # Status label
+        self.package_status_label = QLabel("")
+        self.package_status_label.setStyleSheet("color: #4caf50;")
+        layout.addWidget(self.package_status_label)
+
         return widget
+
+    def _refresh_package_agent_list(self):
+        """Populate the agent selection list."""
+        self.package_agent_list.clear()
+        for agent in self.agent_manager.list_all():
+            item = QListWidgetItem(f"{agent['name']} ({agent['persona']})")
+            item.setData(Qt.UserRole, agent["id"])
+            self.package_agent_list.addItem(item)
+
+    def _refresh_package_workflow_list(self):
+        """Populate the workflow selection list."""
+        self.package_workflow_list.clear()
+        for wf in self.workflow_manager.list_all():
+            item = QListWidgetItem(f"{wf['name']} ({wf['version']})")
+            item.setData(Qt.UserRole, wf["id"])
+            self.package_workflow_list.addItem(item)
+
+    def _on_import_package(self):
+        """Import a .lmpack package."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import Package", "", "Life_mean Packages (*.lmpack);;All Files (*)"
+        )
+        if not path:
+            return
+
+        self.package_status_label.setStyleSheet("color: #ffaa00;")
+        self.package_status_label.setText("Importing…")
+
+        result = self.package_manager.import_package(path)
+        if result.success:
+            self.package_status_label.setStyleSheet("color: #4caf50;")
+            self.package_status_label.setText(result.message)
+            self._refresh_package_agent_list()
+            self._refresh_package_workflow_list()
+        else:
+            self.package_status_label.setStyleSheet("color: #cc0000;")
+            errors = "\\n".join(f"  • {e}" for e in result.errors)
+            QMessageBox.critical(self, "Import Error", f"Could not import package:\\n{errors}")
+
+    def _on_export_package(self):
+        """Export agents/workflows to a .lmpack package."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Package", "", "Life_mean Packages (*.lmpack);;All Files (*)"
+        )
+        if not path:
+            return
+
+        # Collect selected agent IDs (empty selection = all)
+        agent_ids = [item.data(Qt.UserRole) for item in self.package_agent_list.selectedItems()]
+        workflow_ids = [item.data(Qt.UserRole) for item in self.package_workflow_list.selectedItems()]
+
+        result = self.package_manager.export_package(
+            output_path=path,
+            agent_ids=agent_ids if agent_ids else None,
+            workflow_ids=workflow_ids if workflow_ids else None,
+        )
+        if result.success:
+            self.package_status_label.setStyleSheet("color: #4caf50;")
+            self.package_status_label.setText(result.message)
+            QMessageBox.information(self, "Export OK", result.message)
+        else:
+            self.package_status_label.setStyleSheet("color: #cc0000;")
+            errors = "\\n".join(f"  • {e}" for e in result.errors)
+            QMessageBox.critical(self, "Export Error", f"Could not export package:\\n{errors}")
     
     def _create_settings_page(self):
         """Create the settings page."""
