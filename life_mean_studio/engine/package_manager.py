@@ -194,11 +194,21 @@ class PackageManager:
                             conflicts.append(f"Agent '{existing.get('name', agent_id)}' already exists — skipping")
                             continue
 
-                        # Find agent JSON file
+                        # Find agent JSON file (case-insensitive lookup)
                         agent_file = f"agents/{agent_id}.json"
                         if agent_file not in zf.namelist():
-                            errors.append(f"Agent file missing: {agent_file}")
-                            continue
+                            # Try case-insensitive lookup
+                            agent_file_lower = agent_file.lower()
+                            agent_file_found = None
+                            for existing in zf.namelist():
+                                if existing.lower() == agent_file_lower:
+                                    agent_file_found = existing
+                                    break
+                            if agent_file_found:
+                                agent_file = agent_file_found
+                            else:
+                                errors.append(f"Agent file missing: {agent_file}")
+                                continue
 
                         try:
                             agent_data = json.loads(zf.read(agent_file))
