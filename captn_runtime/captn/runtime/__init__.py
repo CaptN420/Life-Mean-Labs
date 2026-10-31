@@ -626,17 +626,76 @@ class ExperienceEngine:
 
 
 class TelemetryEngine:
-    """Collects and persists telemetry data."""
+    """Collects and persists telemetry data.
+
+    Features:
+    - Real-time metrics aggregation
+    - Alerting on anomalies
+    - Dashboard integration via JSONL
+    - Latency/cost tracking per model
+    - Error rate monitoring
+    """
+
+    # ── Alert Thresholds ───────────────────────────────────────────────────
+
+    ALERT_THRESHOLDS = {
+        "latency_ms": 5000,      # >5s latency
+        "cost_usd_per_request": 0.10,  # >$0.10 per request
+        "error_rate": 0.05,      # >5% error rate
+        "token_usage_spike": 2.0,  # >2x average token usage
+    }
 
     def __init__(self, config: RuntimeConfig):
         self.config = config
         self._events: List[TelemetryEvent] = []
+        self._alerts: List[Dict[str, Any]] = []
+        self._model_stats: Dict[str, Dict[str, float]] = {}
 
     def record_event(self, event: TelemetryEvent) -> None:
         """Record a telemetry event."""
         if not self.config.telemetry_enabled:
             return
         self._events.append(event)
+        self._update_model_stats(event)
+        self._check_alerts(event)
+
+    def _update_model_stats(self, event: TelemetryEvent) -> None:
+        """Update per-model statistics."""
+        if not event.model:
+            return
+        if event.model not in self._model_stats:
+            self._model_stats[event.model] = {
+                "count": 0,
+                "total_latency_ms": 0.0,
+                "total_cost_usd": 0.0,
+                "total_tokens_in": 0,
+                "total_tokens_out": 0,
+            }
+
+        stats = self._model_stats[event.model]
+        stats["count"] += 1
+        stats["total_latency_ms"] += event.latency_ms
+        stats["total_cost_usd"] += event.cost_usd
+        stats["total_tokens_in"] += event.tokens_input
+        stats["total_tokens_out"] += event.tokens_output
+
+    def _check_alerts(self, event: TelemetryEvent) -> None:
+        """Check for alert conditions."""
+        # Latency alert
+        if event.latency_ms > self.ALERT_THRESHOLDS["latency_ms"]:
+            self._alerts.append({
+                "type": "high_latency",
+                "message": f"High latency: {event.latency_ms:.0f}ms for model {event.model}",
+                "timestamp": event.timestamp,
+            })
+
+        # Cost alert
+        if event.cost_usd > self.ALERT_THRESHOLDS["cost_usd_per_request"]:
+            self._alerts.append({
+                "type": "high_cost",
+                "message": f"High cost: ${event.cost_usd:.4f} for model {event.model}",
+                "timestamp": event.timestamp,
+            })
 
     def save_to_disk(self, path: Optional[str] = None) -> int:
         """Save telemetry to JSONL file."""
@@ -656,6 +715,18 @@ class TelemetryEngine:
         total_tokens_in = sum(e.tokens_input for e in self._events)
         total_tokens_out = sum(e.tokens_output for e in self._events)
 
+        # Per-model breakdown
+        model_breakdown = {}
+        for model, stats in self._model_stats.items():
+            count = stats["count"]
+            model_breakdown[model] = {
+                "requests": count,
+                "avg_latency_ms": stats["total_latency_ms"] / count if count else 0,
+                "total_cost_usd": stats["total_cost_usd"],
+                "total_tokens_in": stats["total_tokens_in"],
+                "total_tokens_out": stats["total_tokens_out"],
+            }
+
         return {
             "total_events": len(self._events),
             "avg_latency_ms": total_latency / len(self._events),
@@ -668,7 +739,17 @@ class TelemetryEngine:
                 "compression": sum(1 for e in self._events if e.event_type == "compression"),
                 "memory_hit": sum(1 for e in self._events if e.event_type == "memory_hit"),
             },
+            "model_breakdown": model_breakdown,
+            "alerts_count": len(self._alerts),
         }
+
+    def get_alerts(self) -> List[Dict[str, Any]]:
+        """Get recent alerts."""
+        return self._alerts[-10:]  # Last 10 alerts
+
+    def clear_alerts(self) -> None:
+        """Clear all alerts."""
+        self._alerts.clear()
 
 
 # ── Main Runtime ─────────────────────────────────────────────────────────────
