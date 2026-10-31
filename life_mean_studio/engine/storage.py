@@ -144,13 +144,30 @@ class StudioStorage:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             
+            -- Agents table
+            CREATE TABLE IF NOT EXISTS agents (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                persona TEXT NOT NULL DEFAULT 'general',
+                system_prompt TEXT NOT NULL,
+                model TEXT,
+                provider TEXT,
+                config TEXT,
+                tools TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                version INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             -- Schema version tracking
             CREATE TABLE IF NOT EXISTS schema_version (
                 version INTEGER PRIMARY KEY,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        
+
         # Update schema version
         self._conn.execute("DELETE FROM schema_version")
         self._conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
@@ -565,6 +582,177 @@ class StudioStorage:
                 "event_type": row["event_type"],
                 "timestamp": row["timestamp"],
                 "payload_hash": row["payload_hash"],
+            }
+            for row in rows
+        ]
+
+    # ---- Agent operations ----
+
+    def create_agent(self, name: str, system_prompt: str, persona: str = "general",
+                     description: str = "", model: Optional[str] = None,
+                     provider: Optional[str] = None, config: Optional[Dict[str, Any]] = None,
+                     tools: Optional[List[str]] = None) -> str:
+        """Create a new agent."""
+        import uuid
+        agent_id = str(uuid.uuid4())
+
+        with self._transaction() as conn:
+            conn.execute(
+                """INSERT INTO agents (id, name, description, persona, system_prompt, model, provider,
+                   config, tools, enabled, version, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, datetime('now'), datetime('now'))""",
+                (agent_id, name, description, persona, system_prompt, model, provider,
+                 json.dumps(config, ensure_ascii=False) if config else None,
+                 json.dumps(tools, ensure_ascii=False) if tools else None)
+            )
+
+        logger.debug("Created agent: %s", agent_id)
+        return agent_id
+
+    def get_agent(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        """Get an agent by ID."""
+        conn = self.connect()
+        row = conn.execute("SELECT * FROM agents WHERE id = ?", (agent_id,)).fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "description": row["description"],
+            "persona": row["persona"],
+            "system_prompt": row["system_prompt"],
+            "model": row["model"],
+            "provider": row["provider"],
+            "config": json.loads(row["config"]) if row["config"] else {},
+            "tools": json.loads(row["tools"]) if row["tools"] else [],
+            "enabled": bool(row["enabled"]),
+            "version": row["version"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    def list_agents(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
+        """List all agents."""
+        conn = self.connect()
+        if enabled_only:
+            rows = conn.execute("SELECT * FROM agents WHERE enabled = 1 ORDER BY created_at DESC").fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM agents ORDER BY created_at DESC").fetchall()
+
+        return [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "description": row["description"],
+                "persona": row["persona"],
+                "system_prompt": row["system_prompt"],
+                "model": row["model"],
+                "provider": row["provider"],
+                "config": json.loads(row["config"]) if row["config"] else {},
+                "tools": json.loads(row["tools"]) if row["tools"] else [],
+                "enabled": bool(row["enabled"]),
+                "version": row["version"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            for row in rows
+        ]
+
+    def update_agent(self, agent_id: str, updates: Dict[str, Any]) -> bool:
+        """Update an agent."""
+        set_clauses = []
+        params = []
+
+        updatable = ["name", "description", "persona", "system_prompt", "model", "provider"]
+        for key in updatable:
+            if key in updates and updates[key] is not None:
+                set_clauses.append(f"{key} = ?")
+                params.append(updates[key])
+
+        if "config" in updates:
+            set_clauses.append("config = ?")
+            params.append(json.dumps(updates["config"], ensure_ascii=False))
+
+        if "tools" in updates:
+            set_clauses.append("tools = ?")
+            params.append(json.dumps(updates["tools"], ensure_ascii=False))
+
+        if "enabled" in updates:
+            set_clauses.append("enabled = ?")
+            params.append(1 if updates["enabled"] else 0)
+
+        if not set_clauses:
+            return False
+
+        set_clauses.append("version = version + 1")
+        set_clauses.append("updated_at = datetime('now')")
+        params.append(agent_id)
+
+        with self._transaction() as conn:
+            conn.execute(
+                f"UPDATE agents SET {', '.join(set_clauses)} WHERE id = ?",
+                params
+            )
+
+        return True
+
+    def delete_agent(self, agent_id: str) -> bool:
+        """Delete an agent."""
+        with self._transaction() as conn:
+            cursor = conn.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
+            return cursor.rowcount > 0
+
+    def duplicate_agent(self, agent_id: str, new_name: Optional[str] = None) -> Optional[str]:
+        """Duplicate an agent with a new name."""
+        original = self.get_agent(agent_id)
+        if not original:
+            return None
+
+        import uuid
+        new_id = str(uuid.uuid4())
+        display_name = new_name or f"{original['name']} (Copy)"
+
+        with self._transaction() as conn:
+            conn.execute(
+                """INSERT INTO agents (id, name, description, persona, system_prompt, model, provider,
+                   config, tools, enabled, version, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, datetime('now'), datetime('now'))""",
+                (new_id, display_name, original["description"], original["persona"],
+                 original["system_prompt"], original["model"], original["provider"],
+                 json.dumps(original["config"], ensure_ascii=False),
+                 json.dumps(original["tools"], ensure_ascii=False))
+            )
+
+        logger.debug("Duplicated agent %s to %s", agent_id, new_id)
+        return new_id
+
+    def search_agents(self, query: str) -> List[Dict[str, Any]]:
+        """Search agents by name or description."""
+        conn = self.connect()
+        rows = conn.execute(
+            """SELECT * FROM agents
+               WHERE name LIKE ? OR description LIKE ? OR system_prompt LIKE ?
+               ORDER BY created_at DESC""",
+            (f"%{query}%", f"%{query}%", f"%{query}%")
+        ).fetchall()
+
+        return [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "description": row["description"],
+                "persona": row["persona"],
+                "system_prompt": row["system_prompt"],
+                "model": row["model"],
+                "provider": row["provider"],
+                "config": json.loads(row["config"]) if row["config"] else {},
+                "tools": json.loads(row["tools"]) if row["tools"] else [],
+                "enabled": bool(row["enabled"]),
+                "version": row["version"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
             }
             for row in rows
         ]

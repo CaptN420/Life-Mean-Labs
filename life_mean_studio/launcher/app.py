@@ -25,6 +25,7 @@ from life_mean_studio.workflows.manager import WorkflowManager
 from life_mean_studio.workflows import WorkflowConfig, AgentConfig
 from life_mean_studio.prompts.collection import PromptCollection
 from life_mean_studio.engine.python_executor import get_executor, PythonEnvironment
+from life_mean_studio.engine.agent_manager import AgentManager, TestResult
 
 import json
 import os
@@ -67,7 +68,10 @@ class LifeMeanStudioApp(QMainWindow):
                     self.workflow_manager.seed_defaults()
             except Exception as exc:  # pragma: no cover - defensive
                 print(f"[Studio] could not seed workflows: {exc}")
-        
+
+        # Initialize agent manager
+        self.agent_manager = AgentManager(self.storage)
+
         # UI state
         self.current_mode = "simple"  # simple or dev
         self.preferences = self._load_preferences()
@@ -958,10 +962,7 @@ class LifeMeanStudioApp(QMainWindow):
         tabs = QTabWidget()
         
         # Agent Builder tab
-        agent_tab = QWidget()
-        agent_layout = QVBoxLayout(agent_tab)
-        agent_layout.addWidget(QLabel("Agent Builder - Not Implemented"))
-        agent_layout.addWidget(QLabel("Status: Phase D"))
+        agent_tab = self._create_agent_builder_page()
         tabs.addTab(agent_tab, "Agent Builder")
         
         # Workflow Builder tab
@@ -1241,9 +1242,311 @@ Note: RUN/STOP pilotent le vrai moteur (StudioRunner → ExperimentUIController)
         except Exception:
             pass
 
+    # ------------------------------------------------------------------ Agent Builder
+
+    def _create_agent_builder_page(self):
+        """Create the Agent Builder page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        title = QLabel("Agent Builder")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        layout.addWidget(title)
+
+        # Main splitter: list | form
+        splitter = QSplitter(Qt.Horizontal)
+
+        # Left panel: agent list
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.agent_list = QListWidget()
+        self._refresh_agent_list()
+        left_layout.addWidget(self.agent_list)
+
+        # Agent list buttons
+        btn_layout = QHBoxLayout()
+        dup_btn = QPushButton("Duplicate")
+        dup_btn.clicked.connect(self._duplicate_agent)
+        del_btn = QPushButton("Delete")
+        del_btn.clicked.connect(self._delete_agent)
+        btn_layout.addWidget(dup_btn)
+        btn_layout.addWidget(del_btn)
+        left_layout.addLayout(btn_layout)
+
+        splitter.addWidget(left_panel)
+
+        # Right panel: agent form
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Agent info
+        info_layout = QFormLayout()
+        self.agent_name_edit = QLineEdit()
+        self.agent_name_edit.setPlaceholderText("Agent name...")
+        info_layout.addRow("Name:", self.agent_name_edit)
+
+        self.agent_persona_combo = QComboBox()
+        self.agent_persona_combo.addItems(["general", "scientist", "researcher", "analyst", "writer", "coder"])
+        info_layout.addRow("Persona:", self.agent_persona_combo)
+
+        self.agent_model_combo = QComboBox()
+        self.agent_model_combo.setEditable(True)
+        self.agent_model_combo.setPlaceholderText("Select model...")
+        self._load_models_to_combo()
+        info_layout.addRow("Model:", self.agent_model_combo)
+
+        self.agent_provider_combo = QComboBox()
+        self.agent_provider_combo.addItems(["lm-studio", "openai", "anthropic", "azure", "groq"])
+        info_layout.addRow("Provider:", self.agent_provider_combo)
+
+        right_layout.addLayout(info_layout)
+
+        # System prompt
+        prompt_label = QLabel("System Prompt:")
+        right_layout.addWidget(prompt_label)
+        self.agent_prompt_edit = QTextEdit()
+        self.agent_prompt_edit.setMinimumHeight(150)
+        self.agent_prompt_edit.setPlaceholderText("Enter the system prompt for this agent...")
+        right_layout.addWidget(self.agent_prompt_edit)
+
+        # Config (JSON)
+        config_label = QLabel("Config (JSON, optional):")
+        right_layout.addWidget(config_label)
+        self.agent_config_edit = QTextEdit()
+        self.agent_config_edit.setMinimumHeight(80)
+        self.agent_config_edit.setPlaceholderText('{"temperature": 0.7, "max_tokens": 1024}')
+        right_layout.addWidget(self.agent_config_edit)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        create_btn = QPushButton("Create")
+        create_btn.setStyleSheet("background-color: #0e639c; color: white; font-weight: bold;")
+        create_btn.clicked.connect(self._create_agent)
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(self._save_agent)
+        test_btn = QPushButton("Test Agent")
+        test_btn.clicked.connect(self._test_agent)
+        btn_row.addWidget(create_btn)
+        btn_row.addWidget(save_btn)
+        btn_row.addWidget(test_btn)
+        right_layout.addLayout(btn_row)
+
+        # Test output
+        test_label = QLabel("Test Output:")
+        right_layout.addWidget(test_label)
+        self.agent_test_output = QTextEdit()
+        self.agent_test_output.setReadOnly(True)
+        self.agent_test_output.setMinimumHeight(100)
+        right_layout.addWidget(self.agent_test_output)
+
+        splitter.addWidget(right_panel)
+        splitter.setSizes([300, 500])
+
+        layout.addWidget(splitter)
+
+        # Search
+        search_layout = QHBoxLayout()
+        search_edit = QLineEdit()
+        search_edit.setPlaceholderText("Search agents...")
+        search_edit.textChanged.connect(self._search_agents)
+        search_layout.addWidget(search_edit)
+        layout.addLayout(search_layout)
+
+        return widget
+
+    def _load_models_to_combo(self):
+        """Load available models from LLM backend."""
+        try:
+            models = self.agent_manager.get_available_models()
+            self.agent_model_combo.clear()
+            if not models:
+                self.agent_model_combo.addItem("qwen3.5-2b (default)")
+            else:
+                for model in models:
+                    self.agent_model_combo.addItem(model)
+        except Exception:
+            self.agent_model_combo.addItem("qwen3.5-2b (default)")
+
+    def _refresh_agent_list(self):
+        """Refresh the agent list."""
+        self.agent_list.clear()
+        for agent in self.agent_manager.list_all():
+            status = "✓" if agent["enabled"] else "✗"
+            item = QListWidgetItem(f"{status} {agent['name']} ({agent['persona']})")
+            item.setData(Qt.UserRole, agent["id"])
+            self.agent_list.addItem(item)
+
+    def _select_agent(self):
+        """Load selected agent into the form."""
+        item = self.agent_list.currentItem()
+        if not item:
+            return
+        agent_id = item.data(Qt.UserRole)
+        agent = self.agent_manager.get(agent_id)
+        if not agent:
+            return
+
+        self.agent_name_edit.setText(agent["name"])
+        self.agent_persona_combo.setCurrentText(agent["persona"])
+        # Set model
+        model_text = agent.get("model") or "qwen3.5-2b"
+        idx = self.agent_model_combo.findText(model_text)
+        if idx >= 0:
+            self.agent_model_combo.setCurrentIndex(idx)
+        else:
+            self.agent_model_combo.setEditText(model_text)
+        # Set provider
+        provider_text = agent.get("provider") or "lm-studio"
+        idx = self.agent_provider_combo.findText(provider_text)
+        if idx >= 0:
+            self.agent_provider_combo.setCurrentIndex(idx)
+        # Set prompt
+        self.agent_prompt_edit.setPlainText(agent["system_prompt"])
+        # Set config
+        config_str = json.dumps(agent.get("config", {}), indent=2, ensure_ascii=False)
+        self.agent_config_edit.setPlainText(config_str)
+
+    def _create_agent(self):
+        """Create a new agent."""
+        name = self.agent_name_edit.text().strip()
+        system_prompt = self.agent_prompt_edit.toPlainText().strip()
+        persona = self.agent_persona_combo.currentText()
+        model = self.agent_model_combo.currentText()
+        if model == "(select model...)" or not model:
+            model = "qwen3.5-2b"
+        provider = self.agent_provider_combo.currentText()
+
+        config = {}
+        try:
+            config_str = self.agent_config_edit.toPlainText().strip()
+            if config_str:
+                config = json.loads(config_str)
+        except json.JSONDecodeError:
+            QMessageBox.warning(self, "Config Error", "Invalid JSON in config field")
+            return
+
+        result = self.agent_manager.create(
+            name=name,
+            system_prompt=system_prompt,
+            persona=persona,
+            model=model,
+            provider=provider,
+            config=config,
+        )
+        if result.success:
+            self._refresh_agent_list()
+            self.agent_test_output.append(f"✓ Agent '{name}' created.")
+        else:
+            QMessageBox.critical(self, "Error", f"Failed to create agent: {result.message}")
+
+    def _save_agent(self):
+        """Save changes to selected agent."""
+        item = self.agent_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No agent selected")
+            return
+        agent_id = item.data(Qt.UserRole)
+        name = self.agent_name_edit.text().strip()
+        system_prompt = self.agent_prompt_edit.toPlainText().strip()
+        persona = self.agent_persona_combo.currentText()
+        model = self.agent_model_combo.currentText() or "qwen3.5-2b"
+        provider = self.agent_provider_combo.currentText()
+
+        config = {}
+        try:
+            config_str = self.agent_config_edit.toPlainText().strip()
+            if config_str:
+                config = json.loads(config_str)
+        except json.JSONDecodeError:
+            QMessageBox.warning(self, "Config Error", "Invalid JSON in config field")
+            return
+
+        result = self.agent_manager.update(agent_id, {
+            "name": name,
+            "system_prompt": system_prompt,
+            "persona": persona,
+            "model": model,
+            "provider": provider,
+            "config": config,
+        })
+        if result.success:
+            self._refresh_agent_list()
+            self.agent_test_output.append(f"✓ Agent '{name}' saved.")
+        else:
+            QMessageBox.critical(self, "Error", f"Failed to save agent: {result.message}")
+
+    def _delete_agent(self):
+        """Delete selected agent."""
+        item = self.agent_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No agent selected")
+            return
+        agent_id = item.data(Qt.UserRole)
+        agent = self.agent_manager.get(agent_id)
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            f"Delete agent '{agent['name']}'?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            result = self.agent_manager.delete(agent_id)
+            if result.success:
+                self._refresh_agent_list()
+                self.agent_test_output.append(f"✓ Agent deleted.")
+            else:
+                QMessageBox.critical(self, "Error", f"Failed to delete agent: {result.message}")
+
+    def _duplicate_agent(self):
+        """Duplicate selected agent."""
+        item = self.agent_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No agent selected")
+            return
+        agent_id = item.data(Qt.UserRole)
+        result = self.agent_manager.duplicate(agent_id)
+        if result.success:
+            self._refresh_agent_list()
+            self.agent_test_output.append(f"✓ Agent duplicated.")
+        else:
+            QMessageBox.critical(self, "Error", f"Failed to duplicate agent: {result.message}")
+
+    def _test_agent(self):
+        """Test selected agent with a sample prompt."""
+        item = self.agent_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Warning", "No agent selected")
+            return
+        agent_id = item.data(Qt.UserRole)
+        agent = self.agent_manager.get(agent_id)
+
+        # Use the system prompt as context, send a test question
+        test_prompt = "Hello, please introduce yourself and describe your capabilities."
+
+        self.agent_test_output.append(f"\n// Testing agent '{agent['name']}'...")
+        self.agent_test_output.append("// Sending prompt to LLM backend...")
+
+        result = self.agent_manager.test_agent(agent_id, test_prompt)
+
+        if result.success:
+            self.agent_test_output.append(f"✓ Response ({result.latency_ms:.0f}ms):")
+            self.agent_test_output.append(result.response)
+        else:
+            self.agent_test_output.append(f"✗ Error: {result.error}")
+
+    def _search_agents(self, query: str):
+        """Search agents by query."""
+        self.agent_list.clear()
+        for agent in self.agent_manager.search(query):
+            status = "✓" if agent["enabled"] else "✗"
+            item = QListWidgetItem(f"{status} {agent['name']} ({agent['persona']})")
+            item.setData(Qt.UserRole, agent["id"])
+            self.agent_list.addItem(item)
+
     def closeEvent(self, event):
         """Handle window close."""
-        # Kill any pending health-check timer so it never fires after close.
         timer_id = getattr(self, "_health_timer_id", None)
         if timer_id is not None:
             try:
