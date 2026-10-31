@@ -43,6 +43,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -112,6 +113,23 @@ class RuntimeResult:
             f"🧠 Memory hits: {self.memory_hits}\n"
             f"💾 Experience replayed: {self.experience_replayed}"
         )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "success": self.success,
+            "response": self.response,
+            "model_used": self.model_used,
+            "tokens_input": self.tokens_input,
+            "tokens_output": self.tokens_output,
+            "latency_ms": self.latency_ms,
+            "cost_usd": self.cost_usd,
+            "context_reduction": self.context_reduction,
+            "compression_applied": self.compression_applied,
+            "memory_hits": self.memory_hits,
+            "experience_replayed": self.experience_replayed,
+            "error": self.error,
+        }
 
 
 @dataclass
@@ -795,7 +813,8 @@ class CaptNRuntime:
                 logger.info(f"Retrieved {memory_hits} memory entries")
 
         # 3. Route to appropriate model
-        model = self.router.route(query, task_type)
+        routing_result = self.router.route(query, task_type)
+        model_name = routing_result.get("selected", ["unknown"])[0] if routing_result else "unknown"
 
         # 4. Compress context if needed
         messages = [{"role": "user", "content": query}]
@@ -809,7 +828,7 @@ class CaptNRuntime:
         self.telemetry.record_event(TelemetryEvent(
             event_type="request",
             query_hash=hash(query),
-            model=model,
+            model=model_name,
             tokens_input=len(query.split()) * 2,  # Rough estimate
         ))
 
@@ -823,7 +842,7 @@ class CaptNRuntime:
         result = RuntimeResult(
             success=True,
             response=simulated_response,
-            model_used=model,
+            model_used=model_name,
             tokens_input=len(query.split()) * 2,
             tokens_output=50,
             latency_ms=elapsed_ms,
@@ -842,7 +861,7 @@ class CaptNRuntime:
         self.telemetry.record_event(TelemetryEvent(
             event_type="response",
             query_hash=hash(query),
-            model=model,
+            model=model_name,
             tokens_input=result.tokens_input,
             tokens_output=result.tokens_output,
             latency_ms=result.latency_ms,
