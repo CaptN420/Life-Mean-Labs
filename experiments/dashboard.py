@@ -216,7 +216,7 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
             self._sentinel_alerts_get()
         elif parsed.path == "/api/sentinel/confirm-upload":
             self._sentinel_confirm_upload()
-        elif parsed.path == "/dashboard":
+        elif parsed.path in ("/dashboard", "/dashboard.html"):
             self._serve_dashboard()
         else:
             self._send_error(404, "Not found")
