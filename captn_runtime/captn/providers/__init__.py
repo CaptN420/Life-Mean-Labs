@@ -67,6 +67,12 @@ class ProviderConfig:
     timeout_sec: float = 60.0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def get_api_key(self) -> str:
+        """Get API key from environment."""
+        if not self.api_key_env:
+            return ""
+        return os.environ.get(self.api_key_env, "")
+
 
 # ── Provider Base ────────────────────────────────────────────────────────────
 
@@ -148,7 +154,11 @@ class LmStudioProvider(LLMProvider):
             choice = response.choices[0]
             text = choice.message.content or ""
             finish_reason = choice.finish_reason or "stop"
-            tokens = getattr(choice.usage, 'total', 0) or 0
+
+            # Handle tokens - some providers don't return usage
+            tokens = 0
+            if hasattr(choice, 'usage') and choice.usage is not None:
+                tokens = getattr(choice.usage, 'total', 0) or 0
 
             latency_ms = (time.time() - start) * 1000
             self.record_success(latency_ms, tokens)
@@ -232,7 +242,11 @@ class OpenRouterProvider(LLMProvider):
             choice = response.choices[0]
             text = choice.message.content or ""
             finish_reason = choice.finish_reason or "stop"
-            tokens = getattr(choice.usage, 'total', 0) or 0
+
+            # Handle tokens - some providers don't return usage
+            tokens = 0
+            if hasattr(choice, 'usage') and choice.usage is not None:
+                tokens = getattr(choice.usage, 'total', 0) or 0
 
             latency_ms = (time.time() - start) * 1000
             self.record_success(latency_ms, tokens)
