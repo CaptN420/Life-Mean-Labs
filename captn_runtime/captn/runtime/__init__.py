@@ -503,11 +503,43 @@ class ContextEngine:
 
 
 class ExperienceEngine:
-    """Manages experience storage and retrieval."""
+    """Manages experience storage and retrieval.
+
+    Features:
+    - Immutable experience records with derivation trees
+    - Similarity-based retrieval
+    - Cross-session persistence via JSONL
+    - Query expansion for better matching
+    """
 
     def __init__(self, config: RuntimeConfig):
         self.config = config
         self._experiences: Dict[str, Dict[str, Any]] = {}
+        self._derivation_trees: Dict[str, List[Dict[str, Any]]] = {}
+        self._load_experiences()
+
+    def _load_experiences(self) -> None:
+        """Load experiences from disk at startup."""
+        try:
+            path = Path(self.config.experience_storage_path)
+            if path.exists():
+                with open(path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip():
+                            exp = json.loads(line)
+                            self._experiences[exp["id"]] = exp
+        except Exception as e:
+            logger.debug(f"Experience load failed: {e}")
+
+    def _save_experiences(self) -> None:
+        """Persist experiences to disk."""
+        try:
+            path = Path(self.config.experience_storage_path)
+            with open(path, "w", encoding="utf-8") as f:
+                for exp in self._experiences.values():
+                    f.write(json.dumps(exp, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.debug(f"Experience save failed: {e}")
 
     def store_experience(
         self,
@@ -526,18 +558,38 @@ class ExperienceEngine:
             "metadata": metadata or {},
             "timestamp": time.time(),
         }
+        self._save_experiences()
         return exp_id
 
+    def _expand_query(self, query: str) -> List[str]:
+        """Expand a query with related terms for better matching."""
+        expansions = {
+            "code": ["function", "implementation", "algorithm"],
+            "analysis": ["explanation", "compare", "evaluate"],
+            "math": ["calculate", "equation", "formula"],
+            "debug": ["fix", "error", "bug"],
+            "creative": ["write", "generate", "design"],
+        }
+        expanded = [query]
+        low_q = query.lower()
+        for term, related in expansions.items():
+            if term in low_q:
+                expanded.extend(related)
+        return expanded
+
     def find_similar(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """Find similar past experiences."""
+        """Find similar past experiences using keyword matching with expansion."""
         if not self.config.experience_enabled:
             return []
 
-        # Simple keyword matching (could be enhanced with embeddings)
-        query_words = set(query.lower().split())
+        expanded_terms = set(self._expand_query(query))
         scored = []
         for exp in self._experiences.values():
-            score = sum(1 for word in query_words if word in exp["query"].lower())
+            score = 0
+            exp_text = f"{exp['query']} {exp.get('metadata', {}).get('task_type', '')}".lower()
+            for term in expanded_terms:
+                if term in exp_text:
+                    score += 1
             if score > 0:
                 scored.append((score, exp))
 
@@ -548,10 +600,25 @@ class ExperienceEngine:
         """Get a specific experience."""
         return self._experiences.get(exp_id)
 
+    def add_derivation(self, exp_id: str, derived_from: str, derivation_type: str = "refinement") -> None:
+        """Add a derivation link to an experience."""
+        if exp_id not in self._derivation_trees:
+            self._derivation_trees[exp_id] = []
+        self._derivation_trees[exp_id].append({
+            "derived_from": derived_from,
+            "type": derivation_type,
+            "timestamp": time.time(),
+        })
+
+    def get_derivations(self, exp_id: str) -> List[Dict[str, Any]]:
+        """Get all derivations of an experience."""
+        return self._derivation_trees.get(exp_id, [])
+
     def stats(self) -> Dict[str, Any]:
         """Get experience statistics."""
         return {
             "total_experiences": len(self._experiences),
+            "total_derivations": sum(len(v) for v in self._derivation_trees.values()),
         }
 
 
