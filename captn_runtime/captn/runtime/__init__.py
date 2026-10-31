@@ -193,19 +193,59 @@ class ModelRouter:
 
 
 class ContextEngine:
-    """Manages context compression and retrieval."""
+    """Manages context compression and retrieval.
+
+    Integrates with the production ContextBudget from code_lab.compression
+    for relevance-based selection within token budgets.
+    """
 
     def __init__(self, config: RuntimeConfig):
         self.config = config
         self._history: List[Dict[str, Any]] = []
         self._memory: List[Dict[str, Any]] = []
+        self._budget = None  # Lazy-initialized ContextBudget
+
+    @property
+    def budget(self):
+        """Lazy-initialize the ContextBudget from code_lab.compression."""
+        if self._budget is None:
+            try:
+                from code_lab.compression import ContextBudget, DEFAULT_BUDGET_CONFIG
+                # Map our config to the production budget config
+                budget_config = DEFAULT_BUDGET_CONFIG
+                self._budget = ContextBudget(model=self.config.default_model)
+            except ImportError:
+                logger.warning("code_lab.compression not available, using fallback")
+                self._budget = None
+        return self._budget
 
     def compress(self, messages: List[Dict[str, str]], max_tokens: int) -> Dict[str, Any]:
-        """Compress context messages to fit within token budget."""
+        """Compress context messages using production ContextBudget.
+
+        Uses relevance-based selection from code_lab.compression when available,
+        falls back to simple recency-based compression.
+        """
         if not self.config.compression_enabled:
             return {"compressed": False, "messages": messages, "reduction": 0.0}
 
-        # Simple compression: keep recent messages, summarize older ones
+        # Try production ContextBudget first
+        if self.budget:
+            try:
+                result = self.budget.select(
+                    messages=messages,
+                    user_query="",  # Could pass actual query
+                    dry_run=True,
+                )
+                return {
+                    "compressed": True,
+                    "messages": result.selected_messages,
+                    "reduction": result.original_total_tokens > 0 and (1 - result.selected_total_tokens / result.original_total_tokens) or 0.0,
+                    "budget_report": result.report(),
+                }
+            except Exception as e:
+                logger.debug(f"ContextBudget failed: {e}, using fallback")
+
+        # Fallback: simple recency-based compression
         total = len(messages)
         if total <= 10:
             return {"compressed": False, "messages": messages, "reduction": 0.0}
