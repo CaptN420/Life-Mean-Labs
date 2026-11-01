@@ -30,6 +30,7 @@ from life_mean_studio.engine.package_manager import PackageManager
 
 import json
 import os
+import threading
 from pathlib import Path
 from datetime import datetime
 
@@ -157,6 +158,7 @@ class LifeMeanStudioApp(QMainWindow):
         self.packages_page = self._create_packages_page()
         self.settings_page = self._create_settings_page()
         self.code_playground_page = self._create_code_playground_page()
+        self.feature_pool_page = self._create_feature_pool_page()
 
         # Add pages to stack
         self.central_widget.addWidget(self.home_page)
@@ -168,6 +170,7 @@ class LifeMeanStudioApp(QMainWindow):
         self.central_widget.addWidget(self.packages_page)
         self.central_widget.addWidget(self.settings_page)
         self.central_widget.addWidget(self.code_playground_page)
+        self.central_widget.addWidget(self.feature_pool_page)
         
         # Setup toolbar
         self._setup_toolbar()
@@ -195,6 +198,7 @@ class LifeMeanStudioApp(QMainWindow):
             ("Packages", 6),
             ("Settings", 7),
             ("Code Playground", 8),
+            ("Feature Pool", 9),
         ]
         
         self._nav_actions = {}
@@ -485,6 +489,8 @@ class LifeMeanStudioApp(QMainWindow):
         # Initial status
         self.health_status_label = QLabel("Health: not yet checked")
         layout.addWidget(self.health_status_label)
+        # Worker-thread results are delivered back on the UI thread.
+        self.health_checks_ready.connect(self._apply_health_results)
         
         # Auto-run once on creation (non-blocking in UI thread via short timeout)
         # Skipped under pytest so tests don't make real network probes.
@@ -495,18 +501,43 @@ class LifeMeanStudioApp(QMainWindow):
         
         return widget
     
+    # Emitted from the health-probe worker thread; rendered on the UI thread.
+    health_checks_ready = Signal(object)
+
     def _run_health_check(self):
-        """Run real health checks and populate the services table."""
-        from life_mean_studio.engine.health import run_all_health_checks
-        
+        """Kick off the real probes on a worker thread.
+
+        Each probe has a 3 s network timeout; running them inline froze the
+        window right after launch (the dashboard port accepts the connection
+        but never answers, so it always burns the full timeout).
+        """
+        thread = getattr(self, "_health_thread", None)
+        if thread is not None and thread.is_alive():
+            return  # a probe is already in flight
+
         self.health_status_label.setText("Health: checking…")
-        
-        try:
-            summary = run_all_health_checks(self.storage)
-            checks = summary["checks"]
-        except Exception as e:
-            self.health_status_label.setText(f"Health: error — {e}")
+        storage = self.storage
+
+        def worker():
+            from life_mean_studio.engine.health import run_all_health_checks
+            try:
+                self.health_checks_ready.emit(run_all_health_checks(storage))
+            except Exception as exc:  # pragma: no cover - defensive
+                self.health_checks_ready.emit({"error": str(exc)})
+
+        self._health_thread = threading.Thread(
+            target=worker, name="studio-health-check", daemon=True)
+        self._health_thread.start()
+
+    @Slot(object)
+    def _apply_health_results(self, summary):
+        """Render probe results (always called on the UI thread)."""
+        if not isinstance(summary, dict) or "error" in summary:
+            detail = summary.get("error") if isinstance(summary, dict) else summary
+            self.health_status_label.setText(f"Health: error — {detail}")
             return
+        checks = summary["checks"]
+
         
         self.service_table.setRowCount(len(checks))
         status_colors = {
@@ -1629,6 +1660,183 @@ Note: RUN/STOP pilotent le vrai moteur (StudioRunner → ExperimentUIController)
             item = QListWidgetItem(f"{status} {agent['name']} ({agent['persona']})")
             item.setData(Qt.UserRole, agent["id"])
             self.agent_list.addItem(item)
+
+    def _create_feature_pool_page(self):
+        """Create the Feature Pool read-only dashboard page."""
+        from feature_pool import FeaturePool
+        from feature_pool.schemas import FeatureStatus, IntegrationStatus
+
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        title = QLabel("Feature Pool — Read-Only Registry")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        layout.addWidget(title)
+
+        # Stats row
+        stats_layout = QHBoxLayout()
+        self.fp_total_label = QLabel("Total: --")
+        self.fp_validated_label = QLabel("Validated: --")
+        self.fp_legacy_label = QLabel("Legacy: --")
+        self.fp_ready_label = QLabel("Ready: --")
+        for lbl in [self.fp_total_label, self.fp_validated_label, self.fp_legacy_label, self.fp_ready_label]:
+            lbl.setStyleSheet("color: #4caf50; font-weight: bold;")
+            stats_layout.addWidget(lbl)
+        layout.addLayout(stats_layout)
+
+        # Search + filter row
+        filter_layout = QHBoxLayout()
+        self.fp_search_edit = QLineEdit()
+        self.fp_search_edit.setPlaceholderText("Search by name, category, or path...")
+        self.fp_search_edit.textChanged.connect(self._filter_feature_pool)
+        filter_layout.addWidget(QLabel("Search:"))
+        filter_layout.addWidget(self.fp_search_edit)
+
+        self.fp_status_combo = QComboBox()
+        self.fp_status_combo.addItems(["All", "DISCOVERED", "ANALYZED", "VALIDATED", "BLOCKED", "BROKEN", "ARCHIVED"])
+        self.fp_status_combo.currentTextChanged.connect(self._filter_feature_pool)
+        filter_layout.addWidget(QLabel("Status:"))
+        filter_layout.addWidget(self.fp_status_combo)
+
+        self.fp_cat_combo = QComboBox()
+        self.fp_cat_combo.addItems(["All", "agents", "debate", "experiments", "studio", "providers", "routing", "personas", "safety", "validation", "generation", "crawlers", "autopilot", "observability", "persistence"])
+        self.fp_cat_combo.currentTextChanged.connect(self._filter_feature_pool)
+        filter_layout.addWidget(QLabel("Category:"))
+        filter_layout.addWidget(self.fp_cat_combo)
+
+        self.fp_source_combo = QComboBox()
+        self.fp_source_combo.addItems(["All", "modern", "legacy"])
+        self.fp_source_combo.currentTextChanged.connect(self._filter_feature_pool)
+        filter_layout.addWidget(QLabel("Source:"))
+        filter_layout.addWidget(self.fp_source_combo)
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self._load_feature_pool)
+        filter_layout.addWidget(refresh_btn)
+
+        export_btn = QPushButton("Export CSV")
+        export_btn.clicked.connect(self._export_feature_pool_csv)
+        filter_layout.addWidget(export_btn)
+
+        layout.addLayout(filter_layout)
+
+        # Feature table (read-only)
+        self.fp_table = QTableWidget()
+        self.fp_table.setColumnCount(9)
+        self.fp_table.setHorizontalHeaderLabels([
+            "ID", "Name", "Category", "Source", "Status", "Integration", "Tests", "Confidence", "Action"
+        ])
+        self.fp_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.fp_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.fp_table.verticalHeader().setVisible(False)
+        self.fp_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        layout.addWidget(self.fp_table)
+
+        # History panel (bottom)
+        history_label = QLabel("History (last 20 changes):")
+        layout.addWidget(history_label)
+        self.fp_history_text = QTextEdit()
+        self.fp_history_text.setReadOnly(True)
+        self.fp_history_text.setFont(QFont("Consolas", 9))
+        layout.addWidget(self.fp_history_text)
+
+        # Load data — deferred so the window paints before the scan runs.
+        # The feature-pool analysis walks the tree; running it inline blocked
+        # the constructor (and therefore mainloop startup) for minutes.
+        QTimer.singleShot(0, self._load_feature_pool)
+
+        return widget
+
+    def _load_feature_pool(self):
+        """Load feature pool data into the dashboard (read-only)."""
+        try:
+            from feature_pool import FeaturePool
+            pool = FeaturePool(str(self.project_root if hasattr(self, 'project_root') else '.'))
+            pool.discover()
+            pool.analyze_all()
+            pool.validate_all()
+
+            self._fp_pool = pool
+            self._fp_all_features = sorted(pool.registry.all_features, key=lambda f: (f.category.value, f.name))
+
+            # Update stats
+            stats = pool.get_statistics()
+            self.fp_total_label.setText(f"Total: {stats['total']}")
+            self.fp_validated_label.setText(f"Validated: {stats['by_status'].get('VALIDATED', 0)}")
+            self.fp_legacy_label.setText(f"Legacy: {stats['by_source']['legacy']}")
+            self.fp_ready_label.setText(f"Ready: {stats['ready_for_integration']}")
+
+            self._apply_feature_pool_filter()
+
+            # Show recent history
+            self.fp_history_text.clear()
+            all_entries = []
+            for f in pool.registry.all_features:
+                for h in f.history[-3:]:
+                    all_entries.append((h.timestamp, f.id, h.action, h.actor))
+            all_entries.sort(key=lambda x: x[0], reverse=True)
+            for ts, fid, action, actor in all_entries[:20]:
+                self.fp_history_text.append(f"[{ts.strftime('%H:%M:%S')}] {fid} → {action} (by {actor})")
+
+        except Exception as exc:
+            self.fp_total_label.setText(f"Error loading: {exc}")
+
+    def _filter_feature_pool(self):
+        """Apply current filters to the feature pool table."""
+        self._apply_feature_pool_filter()
+
+    def _apply_feature_pool_filter(self):
+        """Apply filters from combo boxes to the table."""
+        if not hasattr(self, '_fp_all_features'):
+            return
+
+        query = self.fp_search_edit.text().lower()
+        status_filter = self.fp_status_combo.currentText()
+        cat_filter = self.fp_cat_combo.currentText()
+        source_filter = self.fp_source_combo.currentText()
+
+        filtered = []
+        for f in self._fp_all_features:
+            if query and query not in f.name.lower() and query not in f.category.value and query not in f.source.lower():
+                continue
+            if status_filter != "All" and f.status.value != status_filter:
+                continue
+            if cat_filter != "All" and f.category.value != cat_filter:
+                continue
+            if source_filter == "legacy" and not f.is_legacy:
+                continue
+            if source_filter == "modern" and f.is_legacy:
+                continue
+            filtered.append(f)
+
+        self.fp_table.setRowCount(len(filtered))
+        for row, f in enumerate(filtered):
+            self.fp_table.setItem(row, 0, QTableWidgetItem(f.id))
+            self.fp_table.setItem(row, 1, QTableWidgetItem(f.name))
+            self.fp_table.setItem(row, 2, QTableWidgetItem(f.category.value))
+            src = f.source.replace("\\", "/")
+            self.fp_table.setItem(row, 3, QTableWidgetItem(src))
+            status_item = QTableWidgetItem(f.status.value)
+            status_colors = {"VALIDATED": "#4caf50", "BLOCKED": "#ff9800", "BROKEN": "#f44336", "DISCOVERED": "#2196f3", "ANALYZED": "#9c27b0"}
+            status_item.setForeground(QColor(status_colors.get(f.status.value, "#cccccc")))
+            self.fp_table.setItem(row, 4, status_item)
+            self.fp_table.setItem(row, 5, QTableWidgetItem(f.integration_status.value))
+            self.fp_table.setItem(row, 6, QTableWidgetItem(str(len(f.test_paths))))
+            conf_item = QTableWidgetItem(f"{f.confidence:.2f}")
+            conf_item.setForeground(QColor("#4caf50" if f.confidence >= 0.7 else "#ff9800" if f.confidence >= 0.5 else "#f44336"))
+            self.fp_table.setItem(row, 7, conf_item)
+            self.fp_table.setItem(row, 8, QTableWidgetItem(f.recommended_action))
+        self.fp_table.resizeColumnsToContents()
+
+    def _export_feature_pool_csv(self):
+        """Export current filtered features to CSV."""
+        if not hasattr(self, '_fp_all_features'):
+            return
+        from pathlib import Path
+        path, _ = QFileDialog.getSaveFileName(self, "Export CSV", "", "CSV Files (*.csv)")
+        if path:
+            self.fp_pool.export_report(Path(path))
+            QMessageBox.information(self, "Export OK", f"Report saved to {path}")
 
     def closeEvent(self, event):
         """Handle window close."""

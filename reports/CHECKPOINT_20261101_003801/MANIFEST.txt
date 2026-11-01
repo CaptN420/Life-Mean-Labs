@@ -1,0 +1,22 @@
+[OK ] git_status.txt  <- git status --porcelain=v1  (exit 0)
+[OK ] git_branch.txt  <- git rev-parse --abbrev-ref HEAD  (exit 0)
+[OK ] git_head.txt  <- git log --oneline -5  (exit 0)
+[OK ] git_diff_stat.txt  <- git diff --stat  (exit 0)
+[OK ] git_diff.patch  <- git diff  (exit 0)
+[OK ] git_stash.txt  <- git stash list  (exit 0)
+[OK ] untracked.txt  <- git ls-files --others --exclude-standard  (exit 0)
+[OK ] python_version.txt  <- C:\Users\celes\Documents\Hermes-Workspace\Life_mean_realm\.venv\Scripts\python.exe -c "import sys,PySide6;print(sys.version);print('PySide6',PySide6.__version__)"  (exit 0)
+[OK ] pip_freeze.txt  <- C:\Users\celes\Documents\Hermes-Workspace\Life_mean_realm\.venv\Scripts\python.exe -m pip freeze  (exit 0)
+[OK ] services.txt  <- netstat -ano | findstr :3000  (exit 0)
+[OK ] uncommitted_sources.tar.gz: 386519 bytes
+[OK ] 2e run independant pytest tests -q : 29 failed, 1552 passed, 13 skipped in 439.30s (baseline reproductible, 1er run 434.17s)
+[--] Artefacts EXCLUS du commit (conserves sur disque, verifiables par sha256) :
+     sha256 9a4aaa5f79ea22ca5ba7a32f9260f0f631621762e2c19f097a2d84d9fc095934  reports/CHECKPOINT_20261101_003801/git_diff.patch
+     sha256 88af40185fa3ce8960ce9ab192a49abde2457b93f68c1ab0d64170175b975ffb  reports/CHECKPOINT_20261101_003801/uncommitted_sources.tar.gz
+     sha256 5188fc1c6ce8316f9160d9181ffd5c15cdd91884210efdf57b80b32ab3e92cd3  reports/CHECKPOINT_20261101_003801/pytest_root_suite.log
+     sha256 7dd86cee14049793aed1b4ba05aa62a23f1b771d2e372b64214178c02c10287e  sandbox/tools/tool-2/spec.json
+     sha256 d6f30d04be0e591cd0420b76f198b8730f4273bb278aca501d2f4e7503bb9fcf  captn_runtime/captn_experiences.jsonl
+     sha256 01f8863efae7ff765f6ed4f0b9a44bd99fb0406f715ddd0172c34b149cd6d50f  .feature_pool_report.json
+     sha256 adaab19af4ea28964744e32a39f1b65e19f65abb46eb0fab784c3e4cc693e3d1  feature_pool_report.json
+     sha256 ece9c4e044a84821ece66034dc84d956d327f8aa269cfc2deedb278c1836a3df  feature_pool_full_report.json
+     sha256 34fd75ebb037b3942453a16e50de043cd7f40ec4191a593f1a365cc42feb24a4  dashboard_debug.html

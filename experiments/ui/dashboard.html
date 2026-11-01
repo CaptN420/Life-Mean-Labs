@@ -88,6 +88,62 @@
             display: block;
         }
 
+        /* ── Pipeline Inspector ───────────────────────────── */
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.9rem 1rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+        }
+
+        .pi-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.76rem;
+        }
+
+        .pi-table th {
+            text-align: left;
+            padding: 0.45rem 0.5rem;
+            border-bottom: 2px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--card);
+            font-weight: 600;
+        }
+
+        .pi-table td {
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .pi-badge {
+            display: inline-block;
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            background: #eef2ff;
+            color: #3730a3;
+        }
+
+        .pi-badge.ok { background: #ecfdf5; color: #047857; }
+        .pi-badge.ko { background: #fef2f2; color: #b91c1c; }
+        .pi-badge.warn { background: #fffbeb; color: #b45309; }
+
         /* ── Code Lab ─────────────────────────────────────── */
         .clab-grid {
             display: grid;
@@ -606,7 +662,8 @@
             <button class="tab-btn" data-tab="experimental" onclick="switchTab('experimental', this)">Experimental</button>
             <button class="tab-btn" data-tab="workspace" onclick="switchTab('workspace', this)">Workspace</button>
             <button class="tab-btn" data-tab="agent-builder" onclick="switchTab('agent-builder', this)">Agent Builder</button>
-            <button class="tab-btn" data-tab="skills" onclick="switchTab('skills', this)">Skills & Tools</button>
+            <button class="tab-btn" data-tab="skills" onclick="switchTab('skills', this)">Skills &amp; Tools</button>
+            <button class="tab-btn" data-tab="pipeline" onclick="switchTab('pipeline', this)">Pipeline</button>
         </nav>
 
         <!-- ── Autopilot tab — the REAL experiment workflow (GOAL 7/8) ── -->
@@ -1312,8 +1369,7 @@
         function wsLog(msg, type='info') {
             const el = document.getElementById('ws-console-pre');
             const prefix = { info: '[INFO]', success: '[OK]', error: '[ERR]', warning: '[WARN]' }[type] || '[INFO]';
-            el.textContent += '[' + new Date().toLocaleTimeString() + '] ' + prefix + ' ' + msg + '
-';
+            el.textContent += '[' + new Date().toLocaleTimeString() + '] ' + prefix + ' ' + msg + '\n';
             el.parentElement.scrollTop = el.parentElement.scrollHeight;
         }
         function wsSwitchView(view) {
@@ -1445,6 +1501,137 @@
         </div>
     </div>
 
+    <!-- ── Pipeline Inspector tab — lecture seule sur les logs ── -->
+    <div id="panel-pipeline" class="tab-panel">
+        <div class="card" style="margin-bottom:1rem;">
+            <h2>Pipeline Inspector</h2>
+            <p class="subtitle" style="font-size:.84rem;line-height:1.5;">
+                Transforme les journaux locaux (Code Lab, Hermes, CaptN, débats, logs texte) en
+                événements structurés. Lecture seule, local uniquement, secrets masqués.
+                Les liens <strong>probables</strong> sont distingués des liens <strong>explicites</strong>.
+            </p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;">
+                <button class="btn-sm" onclick="piIngest(false)" id="pi-ingest-btn">Ingérer les logs</button>
+                <button class="btn-sm" onclick="piIngest(true)">Ré-ingestion complète</button>
+                <button class="btn-sm" onclick="piGenerateReports()">Générer rapports</button>
+                <button class="btn-sm" onclick="piExport()">Export JSON</button>
+                <span id="pi-status" class="subtitle" style="font-size:.78rem;align-self:center;"></span>
+            </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:1rem;">
+            <div class="stat-card"><div class="stat-value" id="pi-stat-events">0</div><div class="stat-label">Événements</div></div>
+            <div class="stat-card"><div class="stat-value" id="pi-stat-sessions">0</div><div class="stat-label">Sessions</div></div>
+            <div class="stat-card"><div class="stat-value" id="pi-stat-errors">0</div><div class="stat-label">Erreurs</div></div>
+            <div class="stat-card"><div class="stat-value" id="pi-stat-denies">0</div><div class="stat-label">Décisions DENY</div></div>
+        </div>
+
+        <div class="card" style="margin-bottom:1rem;">
+            <h2>Filtres</h2>
+            <div class="form-row" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:end;">
+                <div class="form-group" style="flex:1;min-width:130px;">
+                    <label for="pi-filter-type">Type</label>
+                    <select id="pi-filter-type" onchange="piLoadEvents()">
+                        <option value="">Tous</option>
+                        <option>PIPELINE_START</option><option>ROUTING_DECISION</option>
+                        <option>MODEL_REQUEST</option><option>MODEL_RESPONSE</option>
+                        <option>TOOL_CALL</option><option>TOOL_RESULT</option>
+                        <option>SECURITY_REVIEW</option><option>SECURITY_APPROVE</option>
+                        <option>SECURITY_DENY</option><option>SECURITY_ESCALATE</option>
+                        <option>FILE_PATCH</option><option>FILE_READ</option>
+                        <option>TEST_RESULT</option><option>API_ERROR</option>
+                        <option>PIPELINE_ERROR</option><option>PIPELINE_COMPLETE</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1;min-width:130px;">
+                    <label for="pi-filter-source">Source</label>
+                    <select id="pi-filter-source" onchange="piLoadEvents()"><option value="">Toutes</option></select>
+                </div>
+                <div class="form-group" style="flex:1;min-width:130px;">
+                    <label for="pi-filter-session">Session</label>
+                    <select id="pi-filter-session" onchange="piLoadEvents()"><option value="">Toutes</option></select>
+                </div>
+                <div class="form-group" style="flex:2;min-width:180px;">
+                    <label for="pi-search">Recherche</label>
+                    <input type="text" id="pi-search" placeholder="agent, modèle, message…" onkeydown="if(event.key==='Enter'){piLoadEvents();}">
+                </div>
+                <button class="btn-sm" onclick="piLoadEvents()">Appliquer</button>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:1rem;">
+            <h2>Chronologie des événements <span id="pi-events-count" class="subtitle" style="font-size:.75rem;"></span></h2>
+            <div style="max-height:420px;overflow:auto;">
+                <table class="pi-table" id="pi-events-table">
+                    <thead><tr><th>Horodatage</th><th>Type</th><th>Agent</th><th>Modèle</th><th>Statut</th><th>Corrélation</th><th>Source</th></tr></thead>
+                    <tbody><tr><td colspan="7" class="empty-state">Aucun événement indexé.</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Sessions observées</h2>
+                <div style="max-height:300px;overflow:auto;">
+                    <table class="pi-table" id="pi-sessions-table">
+                        <thead><tr><th>Session</th><th>Événements</th><th>Erreurs</th><th>DENY</th><th>Tests OK/KO</th></tr></thead>
+                        <tbody><tr><td colspan="5" class="empty-state">Aucune session.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Graphe observé</h2>
+                <p class="subtitle" style="font-size:.75rem;">Construit uniquement à partir des transitions réelles.</p>
+                <div style="max-height:300px;overflow:auto;">
+                    <table class="pi-table" id="pi-graph-table">
+                        <thead><tr><th>De</th><th>Vers</th><th>Occurrences</th></tr></thead>
+                        <tbody><tr><td colspan="3" class="empty-state">Graphe vide.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid" style="margin-top:1rem;">
+            <div class="card">
+                <h2>Décisions de sécurité</h2>
+                <p class="subtitle" style="font-size:.75rem;">APPROVE n'est pas une preuve de sûreté.</p>
+                <div id="pi-security-summary" class="subtitle" style="font-size:.8rem;"></div>
+                <div style="max-height:280px;overflow:auto;">
+                    <table class="pi-table" id="pi-security-table">
+                        <thead><tr><th>Heure</th><th>Décision</th><th>Opération</th><th>Composant</th><th>Corrélation</th></tr></thead>
+                        <tbody><tr><td colspan="5" class="empty-state">Aucune décision.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Erreurs &amp; recommandations</h2>
+                <div id="pi-errors-summary" class="subtitle" style="font-size:.8rem;"></div>
+                <div style="max-height:280px;overflow:auto;">
+                    <table class="pi-table" id="pi-errors-table">
+                        <thead><tr><th>Heure</th><th>Code</th><th>Source</th><th>Message</th></tr></thead>
+                        <tbody><tr><td colspan="4" class="empty-state">Aucune erreur.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem;">
+            <h2>Performance mesurée</h2>
+            <div id="pi-performance" class="subtitle" style="font-size:.82rem;"></div>
+        </div>
+
+        <div class="card" style="margin-top:1rem;">
+            <h2>Feature Pool ↔ Pipeline</h2>
+            <p class="subtitle" style="font-size:.75rem;">Usage observé ≠ validation. Aucun statut n'est modifié.</p>
+            <div style="max-height:320px;overflow:auto;">
+                <table class="pi-table" id="pi-features-table">
+                    <thead><tr><th>Feature</th><th>Statut</th><th>Événements</th><th>OK</th><th>Échecs</th><th>Via</th></tr></thead>
+                    <tbody><tr><td colspan="6" class="empty-state">Aucune feature reliée.</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- ── Agent Builder tab ── -->
     <div id="panel-agent-builder" class="tab-panel">
         <div class="card">
@@ -1573,6 +1760,7 @@
             if (name === 'clustertree') { loadClusterTree(); }
             if (name === 'experimental') { loadExperimental(); }
             if (name === 'skills') { loadSkillsPanel(); }
+            if (name === 'pipeline') { piLoadAll(); }
             if (name === 'experiments') switchToManagedExperiments();
         }
 
@@ -4574,7 +4762,9 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
         }
 
         // ── Skills & Tools tab ───────────────────────────────────────────────
-        const el = id => document.getElementById(id);
+        // NOTE: `el` est déjà déclaré globalement (ligne ~1498). Le redéclarer
+        // ici provoquait une SyntaxError qui empêchait TOUT le script de
+        // s'exécuter (onglets inertes). Ne pas réintroduire.
 
         async function loadSkillsPanel() {
             await Promise.all([
@@ -5148,6 +5338,297 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
             }
         }
 
+    </script>
+
+    <!-- ── Pipeline Inspector — logique UI (lecture seule) ── -->
+    <script>
+        const PI_BASE = '/api/pipeline';
+        let _piLoaded = false;
+
+        function piEsc(v) {
+            if (v === null || v === undefined) return '—';
+            return String(v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function piBadge(corr) {
+            if (corr === 'explicit') return '<span class="pi-badge ok">explicite</span>';
+            if (corr === 'probable') return '<span class="pi-badge warn">probable</span>';
+            return '<span class="pi-badge">inconnue</span>';
+        }
+
+        async function piGet(path) {
+            const resp = await fetch(PI_BASE + path);
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+            return data;
+        }
+
+        async function piPost(path, body) {
+            const resp = await fetch(PI_BASE + path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body || {}),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+            return data;
+        }
+
+        async function piLoadAll() {
+            const status = document.getElementById('pi-status');
+            if (status) status.textContent = 'Chargement…';
+            try {
+                const stats = await piGet('/stats');
+                document.getElementById('pi-stat-events').textContent = stats.total_events || 0;
+                document.getElementById('pi-stat-sessions').textContent = stats.sessions || 0;
+                fillPipelineFilters(stats);
+                await Promise.all([
+                    piLoadEvents(),
+                    piLoadSessions(),
+                    piLoadGraph(),
+                    piLoadSecurity(),
+                    piLoadErrors(),
+                    piLoadPerformance(),
+                    piLoadFeatures(),
+                ]);
+                const errCount = (stats.by_type && (stats.by_type.API_ERROR || 0) + (stats.by_type.PIPELINE_ERROR || 0)) || 0;
+                document.getElementById('pi-stat-errors').textContent = errCount;
+                document.getElementById('pi-stat-denies').textContent =
+                    (stats.by_type && stats.by_type.SECURITY_DENY) || 0;
+                if (status) {
+                    const src = stats.sources ? Object.keys(stats.sources).length : 0;
+                    status.textContent = stats.total_events
+                        ? `${src} source(s), ${stats.total_events} événements indexés`
+                        : 'Aucun événement indexé — cliquez « Ingérer les logs ».';
+                }
+                _piLoaded = true;
+            } catch (err) {
+                if (status) status.textContent = 'Erreur: ' + err.message;
+                console.error('pipeline:', err);
+            }
+        }
+
+        function fillPipelineFilters(stats) {
+            const srcSel = document.getElementById('pi-filter-source');
+            if (srcSel && stats.sources) {
+                const current = srcSel.value;
+                srcSel.innerHTML = '<option value="">Toutes</option>' +
+                    Object.keys(stats.sources).map(s => `<option>${piEsc(s)}</option>`).join('');
+                srcSel.value = current;
+            }
+            piGet('/sessions?limit=200').then(d => {
+                const sel = document.getElementById('pi-filter-session');
+                if (!sel) return;
+                const current = sel.value;
+                sel.innerHTML = '<option value="">Toutes</option>' +
+                    (d.sessions || []).map(s => `<option>${piEsc(s.session_id)}</option>`).join('');
+                sel.value = current;
+            }).catch(() => {});
+        }
+
+        async function piLoadEvents() {
+            const type = document.getElementById('pi-filter-type').value;
+            const source = document.getElementById('pi-filter-source').value;
+            const session = document.getElementById('pi-filter-session').value;
+            const q = document.getElementById('pi-search').value;
+            const params = new URLSearchParams({ limit: '200', order: 'desc' });
+            if (type) params.set('types', type);
+            if (source) params.set('source', source);
+            if (session) params.set('session', session);
+            if (q) params.set('q', q);
+            try {
+                const d = await piGet('/events?' + params.toString());
+                const tbody = document.querySelector('#pi-events-table tbody');
+                const events = d.events || [];
+                document.getElementById('pi-events-count').textContent =
+                    `(${events.length} affichés)`;
+                if (!events.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Aucun événement pour ces filtres.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = events.map(e => `
+                    <tr title="${piEsc(e.event_id)}">
+                        <td>${piEsc((e.timestamp_iso || '').replace('T', ' ').slice(0, 19))}</td>
+                        <td><strong>${piEsc(e.event_type)}</strong>${e.ok === false ? ' <span class="pi-badge ko">KO</span>' : (e.ok === true ? ' <span class="pi-badge ok">OK</span>' : '')}</td>
+                        <td>${piEsc(e.agent)}</td>
+                        <td>${piEsc(e.model)}</td>
+                        <td>${piEsc(e.status)}</td>
+                        <td>${piBadge(e.correlation)}</td>
+                        <td>${piEsc(e.source)}</td>
+                    </tr>`).join('');
+            } catch (err) {
+                document.querySelector('#pi-events-table tbody').innerHTML =
+                    `<tr><td colspan="7" class="empty-state">Erreur: ${piEsc(err.message)}</td></tr>`;
+            }
+        }
+
+        async function piLoadSessions() {
+            try {
+                const d = await piGet('/sessions?limit=200');
+                const tbody = document.querySelector('#pi-sessions-table tbody');
+                const rows = d.sessions || [];
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucune session identifiée.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.slice(0, 200).map(s => `
+                    <tr>
+                        <td title="${piEsc(s.session_id)}">${piEsc(String(s.session_id).slice(0, 28))}</td>
+                        <td>${piEsc(s.events)}</td>
+                        <td>${piEsc(s.errors)}</td>
+                        <td>${piEsc(s.denies)}</td>
+                        <td>${piEsc(s.tests_passed)} / ${piEsc(s.tests_failed)}</td>
+                    </tr>`).join('');
+            } catch (err) { console.error('sessions:', err); }
+        }
+
+        async function piLoadGraph() {
+            try {
+                const g = await piGet('/graph');
+                const tbody = document.querySelector('#pi-graph-table tbody');
+                const edges = (g.edges || []).slice(0, 40);
+                if (!edges.length) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Aucune transition observée.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = edges.map(e => `
+                    <tr><td>${piEsc(e.from)}</td><td>${piEsc(e.to)}</td><td>${piEsc(e.count)}</td></tr>`).join('');
+            } catch (err) { console.error('graph:', err); }
+        }
+
+        async function piLoadSecurity() {
+            try {
+                const s = await piGet('/security');
+                const summary = document.getElementById('pi-security-summary');
+                summary.innerHTML =
+                    `<strong>${s.total_decisions || 0}</strong> décision(s) — ` +
+                    `<span class="pi-badge ok">${(s.by_decision && s.by_decision.SECURITY_APPROVE) || 0} APPROVE</span> ` +
+                    `<span class="pi-badge ko">${(s.by_decision && s.by_decision.SECURITY_DENY) || 0} DENY</span> ` +
+                    `<span class="pi-badge warn">${(s.by_decision && s.by_decision.SECURITY_ESCALATE) || 0} ESCALATE</span>` +
+                    ` — incohérences: <strong>${s.inconsistency_count || 0}</strong>`;
+                const tbody = document.querySelector('#pi-security-table tbody');
+                const rows = (s.timeline || []).slice(-100).reverse();
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Aucune décision de sécurité.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(r => `
+                    <tr>
+                        <td>${piEsc(String(r.timestamp || '').replace('T', ' ').slice(0, 19))}</td>
+                        <td>${piEsc(r.decision)}</td>
+                        <td>${piEsc(r.operation)}</td>
+                        <td>${piEsc(r.component)}</td>
+                        <td>${piBadge(r.correlation)}</td>
+                    </tr>`).join('');
+            } catch (err) { console.error('security:', err); }
+        }
+
+        async function piLoadErrors() {
+            try {
+                const e = await piGet('/errors');
+                const summary = document.getElementById('pi-errors-summary');
+                summary.innerHTML = `<strong>${e.total_errors || 0}</strong> erreur(s) — ` +
+                    Object.entries(e.by_code || {}).map(([k, v]) =>
+                        `<span class="pi-badge warn">${piEsc(k)}: ${piEsc(v)}</span>`).join(' ');
+                const tbody = document.querySelector('#pi-errors-table tbody');
+                const rows = e.samples || [];
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Aucune erreur classée.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(r => `
+                    <tr>
+                        <td>${piEsc(String(r.timestamp || '').replace('T', ' ').slice(0, 19))}</td>
+                        <td><span class="pi-badge ko">${piEsc(r.code)}</span></td>
+                        <td>${piEsc(r.source)}</td>
+                        <td>${piEsc(String(r.message || '').slice(0, 180))}</td>
+                    </tr>`).join('');
+            } catch (err) { console.error('errors:', err); }
+        }
+
+        async function piLoadPerformance() {
+            try {
+                const p = await piGet('/performance');
+                const box = document.getElementById('pi-performance');
+                const models = p.models || {};
+                const rows = Object.entries(models).slice(0, 12).map(([m, v]) =>
+                    `<tr><td>${piEsc(m)}</td><td>${piEsc(v.calls)}</td><td>${piEsc(v.failed)}</td>` +
+                    `<td>${piEsc(v.tokens_input)}</td><td>${piEsc(v.tokens_output)}</td>` +
+                    `<td>${piEsc(v.latency_ms_avg)}</td><td>${piEsc(v.tokens_per_second)}</td></tr>`).join('');
+                const pl = p.pipeline || {};
+                box.innerHTML =
+                    `<p>Durée moyenne de session: <strong>${piEsc(pl.session_duration_s_avg)}</strong> s — ` +
+                    `taux d'échec: <strong>${piEsc(pl.failure_rate)}</strong> — ` +
+                    `sessions: <strong>${piEsc(pl.sessions)}</strong></p>` +
+                    `<table class="pi-table"><thead><tr><th>Modèle</th><th>Appels</th><th>Échecs</th>` +
+                    `<th>Tokens in</th><th>Tokens out</th><th>Latence moy. (ms)</th><th>Tokens/s</th></tr></thead>` +
+                    `<tbody>${rows || '<tr><td colspan="7" class="empty-state">Aucune métrique modèle.</td></tr>'}</tbody></table>`;
+            } catch (err) { console.error('performance:', err); }
+        }
+
+        async function piLoadFeatures() {
+            try {
+                const f = await piGet('/features');
+                const tbody = document.querySelector('#pi-features-table tbody');
+                const rows = (f.rows || []).slice(0, 60);
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucune feature reliée aux logs.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(r => `
+                    <tr>
+                        <td>${piEsc(r.name || r.feature_id)}</td>
+                        <td><span class="pi-badge">${piEsc(r.status)}</span></td>
+                        <td>${piEsc(r.observed_events)}</td>
+                        <td>${piEsc(r.observed_ok)}</td>
+                        <td>${piEsc(r.observed_fail)}</td>
+                        <td>${piEsc((r.observed_via || []).join(', '))}</td>
+                    </tr>`).join('');
+            } catch (err) { console.error('features:', err); }
+        }
+
+        async function piIngest(full) {
+            const btn = document.getElementById('pi-ingest-btn');
+            const status = document.getElementById('pi-status');
+            if (btn) btn.disabled = true;
+            if (status) status.textContent = 'Ingestion en cours… (peut prendre ~1 min)';
+            try {
+                const r = await piPost('/ingest', { full_rescan: !!full });
+                if (status) status.textContent =
+                    `Ingestion terminée: +${r.events_added || 0} événements, ` +
+                    `${r.files_parsed || 0} fichier(s) lu(s), ${r.duration_s || 0}s.`;
+                await piLoadAll();
+            } catch (err) {
+                if (status) status.textContent = 'Erreur ingestion: ' + err.message;
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function piGenerateReports() {
+            const status = document.getElementById('pi-status');
+            if (status) status.textContent = 'Génération des rapports…';
+            try {
+                const r = await piPost('/reports', {});
+                const n = r.written ? Object.keys(r.written).length : 0;
+                if (status) status.textContent = `${n} rapport(s) générés dans reports/pipeline/.`;
+            } catch (err) {
+                if (status) status.textContent = 'Erreur rapports: ' + err.message;
+            }
+        }
+
+        async function piExport() {
+            const status = document.getElementById('pi-status');
+            if (status) status.textContent = 'Export JSON…';
+            try {
+                const r = await piPost('/export', {});
+                if (status) status.textContent = 'Export créé: ' + r.path;
+            } catch (err) {
+                if (status) status.textContent = 'Erreur export: ' + err.message;
+            }
+        }
     </script>
 </body>
 </html>

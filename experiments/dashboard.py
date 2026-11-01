@@ -39,6 +39,15 @@ from experimental.api import ExperimentalApiMixin
 from compare.api import CompareApiMixin
 from life_mean_extensions.api import ExtensionsApiMixin
 
+try:  # Pipeline Inspector (lecture seule sur les logs)
+    from pipeline_inspector.studio_interface import PipelineApiMixin
+except Exception:  # pragma: no cover - paquet optionnel
+    class PipelineApiMixin:  # type: ignore[no-redef]
+        """Stub si le paquet pipeline_inspector n'est pas installé."""
+
+        def pipeline_inspector(self, auto_ingest: bool = False):
+            raise RuntimeError("pipeline_inspector non installé")
+
 
 class RequestSecurity:
     """Reusable request-boundary checks for the dashboard.
@@ -66,7 +75,7 @@ class RequestSecurity:
         # context exception) and required if exposed over HTTPS later.
         handler.send_header(
             "Set-Cookie",
-            f"{RequestSecurity.COOKIE_NAME}={token}; Path=/; SameSite=Strict; Secure",
+            f"{RequestSecurity.COOKIE_NAME}={token}; Path=/; SameSite=Strict",
         )
         return token
 
@@ -117,7 +126,31 @@ def _experimental_id_from_path(path: str, suffix: str):
     return core.split("/")[-1] if core else None
 
 
-class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin, BaseHTTPRequestHandler):
+def _query_dict(parsed) -> Dict[str, Any]:
+    """Query string -> dict simple (première valeur, listes pour 'types')."""
+    from urllib.parse import parse_qs
+
+    raw = parse_qs(parsed.query or "")
+    out: Dict[str, Any] = {}
+    for key, values in raw.items():
+        if key in ("types", "event_types"):
+            out[key] = [v for chunk in values for v in chunk.split(",") if v]
+        elif values:
+            out[key] = values[0]
+    return out
+
+
+def _int_param(parsed, name: str, default: int) -> int:
+    try:
+        from urllib.parse import parse_qs
+
+        raw = parse_qs(parsed.query or "").get(name)
+        return int(raw[0]) if raw else default
+    except (TypeError, ValueError):
+        return default
+
+
+class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin, BaseHTTPRequestHandler):
     """HTTP request handler for the experiment dashboard."""
 
     ui_controller: ExperimentUIController = None  # Set by server
@@ -216,6 +249,23 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
             self._sentinel_alerts_get()
         elif parsed.path == "/api/sentinel/confirm-upload":
             self._sentinel_confirm_upload()
+        # ── Pipeline Inspector (lecture seule) ──────────────────────────────
+        elif parsed.path == "/api/pipeline/stats":
+            self._send_json(self.pipeline_stats())
+        elif parsed.path == "/api/pipeline/sessions":
+            self._send_json(self.pipeline_sessions(limit=_int_param(parsed, "limit", 200)))
+        elif parsed.path == "/api/pipeline/events":
+            self._send_json(self.pipeline_events(_query_dict(parsed)))
+        elif parsed.path == "/api/pipeline/graph":
+            self._send_json(self.pipeline_graph())
+        elif parsed.path == "/api/pipeline/security":
+            self._send_json(self.pipeline_security())
+        elif parsed.path == "/api/pipeline/performance":
+            self._send_json(self.pipeline_performance())
+        elif parsed.path == "/api/pipeline/errors":
+            self._send_json(self.pipeline_errors())
+        elif parsed.path == "/api/pipeline/features":
+            self._send_json(self.pipeline_features())
         elif parsed.path in ("/dashboard", "/dashboard.html"):
             self._serve_dashboard()
         else:
@@ -391,6 +441,14 @@ class DashboardHandler(ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin
             self._extensions_capabilities_resolve(need_id, data)
         elif parsed.path == "/api/agents":
             self._agents_create(data)
+        # ── Pipeline Inspector (actions explicites, jamais automatiques) ────
+        elif parsed.path == "/api/pipeline/ingest":
+            full = bool(data.get("full_rescan")) if isinstance(data, dict) else False
+            self._send_json(self.pipeline_ingest(full_rescan=full))
+        elif parsed.path == "/api/pipeline/reports":
+            self._send_json(self.pipeline_reports())
+        elif parsed.path == "/api/pipeline/export":
+            self._send_json(self.pipeline_export())
         else:
             self._send_error(404, "Not found")
 

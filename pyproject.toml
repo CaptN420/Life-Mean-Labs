@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "ttkbootstrap",       # legacy UI helper (philosophical_council)
     "pyyaml>=6.0",
+    "jinja2>=3.1",       # sandboxed prompt templating (life_mean_studio tests)
 ]
 
 [project.optional-dependencies]
@@ -36,6 +37,9 @@ include = [
     "autopilot*",
     "experimental*",
     "compare*",
+    "pipeline_inspector*",
+    "feature_pool*",
+    "life_mean_studio*",
 ]
 # Exclude generated / namespace runtimes and legacy projects from the wheel.
 # NOTE: `code_lab*` must NOT capture the generated user-workspace `code_lab_runs`

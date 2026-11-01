@@ -63,7 +63,10 @@ class StudioStorage:
         if self._conn is not None:
             return self._conn
 
-        self._conn = sqlite3.connect(str(self.db_path))
+        # Use WAL mode and set timeout to avoid locking issues on Windows
+        self._conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        self._conn.execute("PRAGMA journal_mode=WAL;")
+        self._conn.execute("PRAGMA busy_timeout=5000;")
         self._conn.row_factory = sqlite3.Row
 
         if not self._schema_initialized:
@@ -168,9 +171,11 @@ class StudioStorage:
             );
         """)
 
-        # Update schema version
-        self._conn.execute("DELETE FROM schema_version")
-        self._conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
+        # Update schema version only if different
+        current = self._conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
+        if current is None or current[0] != SCHEMA_VERSION:
+            self._conn.execute("DELETE FROM schema_version")
+            self._conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
     
     # ---- Workflow operations ----
     

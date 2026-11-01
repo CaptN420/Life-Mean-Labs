@@ -1,0 +1,2968 @@
+{
+ "root": "C:\\Users\\celes\\Documents\\Hermes-Workspace\\Life_mean_realm",
+ "total_features": 187,
+ "by_status": {
+  "VALIDATED": 138,
+  "READY": 49
+ },
+ "by_source": {
+  "core\\assignment\\router.py": 2,
+  "core\\debate\\causal_hypothesis_engine.py": 1,
+  "core\\debate\\deepening_engine.py": 1,
+  "core\\debate\\engine.py": 5,
+  "core\\debate\\events.py": 3,
+  "core\\debate\\persistence.py": 1,
+  "core\\personas\\manager.py": 2,
+  "core\\personas\\network.py": 2,
+  "core\\personas\\schema.py": 5,
+  "core\\providers\\base.py": 7,
+  "core\\router\\adaptive.py": 4,
+  "core\\router\\evidence.py": 2,
+  "core\\runtime\\worker.py": 3,
+  "core\\safety\\incident_manager.py": 1,
+  "core\\safety\\sentinel.py": 7,
+  "core\\safety\\sentinel_alert.py": 1,
+  "core\\safety\\sentinel_controller.py": 1,
+  "core\\workers\\tool.py": 1,
+  "experiments\\autopilot.py": 2,
+  "experiments\\experiment_layer.py": 1,
+  "experiments\\observability.py": 3,
+  "experiments\\ui_controller.py": 1,
+  "experiments\\generation\\task_generator.py": 1,
+  "experiments\\validation\\oracle.py": 1,
+  "life_mean_studio\\engine\\agent_manager.py": 2,
+  "life_mean_studio\\engine\\package_manager.py": 1,
+  "life_mean_studio\\engine\\personas.py": 1,
+  "life_mean_studio\\tests\\test_runner.py": 1,
+  "life_mean_studio\\workflows\\manager.py": 1,
+  "life_mean_studio\\workflows\\__init__.py": 1,
+  "captn_runtime\\captn\\providers\\__init__.py": 4,
+  "captn_runtime\\captn\\runtime\\__init__.py": 4,
+  "philosophical_council\\config.py": 2,
+  "philosophical_council\\agents\\base_agent.py": 1,
+  "philosophical_council\\agents\\configurable.py": 1,
+  "philosophical_council\\agents\\existentialist.py": 1,
+  "philosophical_council\\agents\\moderator.py": 1,
+  "philosophical_council\\agents\\nihilist.py": 1,
+  "philosophical_council\\agents\\pragmatist.py": 1,
+  "philosophical_council\\agents\\skeptic.py": 1,
+  "philosophical_council\\agents\\spiritual.py": 1,
+  "philosophical_council\\agents\\stoic.py": 1,
+  "philosophical_council\\core\\debate_saver.py": 1,
+  "philosophical_council\\core\\debate_state.py": 1,
+  "philosophical_council\\core\\events.py": 1,
+  "philosophical_council\\core\\router.py": 1,
+  "philosophical_council\\core\\turn_manager.py": 1,
+  "philosophical_council\\database\\repositories.py": 1,
+  "philosophical_council\\memory\\archive.py": 1,
+  "philosophical_council\\memory\\debate_state.py": 1,
+  "philosophical_council\\raw_protocol\\__init__.py": 2,
+  "philosophical_council\\ui\\agent_panel.py": 1,
+  "philosophical_council\\ui\\debate_view.py": 1,
+  "debate_lab\\config.py": 2,
+  "debate_lab\\controller.py": 2,
+  "debate_lab\\run_store.py": 1,
+  "debate_lab\\session_factory.py": 2,
+  "debate_lab\\validation.py": 1,
+  "code_lab\\checkpoint.py": 1,
+  "code_lab\\controller.py": 1,
+  "code_lab\\engine.py": 1,
+  "code_lab\\multiagent.py": 2,
+  "code_lab\\persistence.py": 1,
+  "code_lab\\team_workflow.py": 1,
+  "code_lab\\compression\\adaptive_manager.py": 1,
+  "autopilot\\curriculum.py": 1,
+  "hermes-debate\\agents\\base.py": 3,
+  "hermes-debate\\agents\\bonsai.py": 1,
+  "hermes-debate\\agents\\counter_position.py": 1,
+  "hermes-debate\\agents\\jev.py": 1,
+  "hermes-debate\\agents\\rational.py": 1,
+  "hermes-debate\\agents\\savant.py": 1,
+  "hermes-debate\\core\\domain.py": 1,
+  "hermes-debate\\core\\escalation.py": 1,
+  "hermes-debate\\core\\experiment_engine.py": 1,
+  "hermes-debate\\core\\routing.py": 1,
+  "hermes-debate\\debate\\reranker.py": 2,
+  "hermes-debate\\decision\\clef.py": 2,
+  "hermes-debate\\models\\manager.py": 1,
+  "hermes-debate\\models\\schemas.py": 1,
+  "hermes-debate\\models\\state.py": 1,
+  "historical\\v0-alchemy-multi-agent\\src\\base_debate_core.py": 1,
+  "historical\\v0-alchemy-multi-agent\\src\\equation_debate_orchestrator.py": 1,
+  "historical\\v0-alchemy-multi-agent\\src\\variable_debate_orchestrator.py": 1,
+  "experimental\\engine.py": 1,
+  "experimental\\schema.py": 1,
+  "life_mean_lab\\orchestrator\\adaptive_controller.py": 2,
+  "life_mean_lab\\orchestrator\\budget_controller.py": 1,
+  "life_mean_lab\\orchestrator\\convergence_engine.py": 1,
+  "life_mean_lab\\orchestrator\\debate_experiment.py": 3,
+  "life_mean_lab\\orchestrator\\divergence_engine.py": 1,
+  "life_mean_lab\\orchestrator\\models.py": 2,
+  "life_mean_lab\\orchestrator\\model_registry.py": 1,
+  "life_mean_lab\\orchestrator\\router.py": 1,
+  "life_mean_lab\\orchestrator\\workspace_manager.py": 1,
+  "library\\reliability\\manager.py": 1,
+  "compare\\analyzer.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\diversifier_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\library_safety_gate.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\no_repetition_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\alchimie_library_manager.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\math_validator.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\pipeline_trace.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\orchestration\\agents.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\manager.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\mirror_agent.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\patch_generator.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\per_tool_necessity.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\reconcile.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\runtime.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\schemas.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py": 2,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\token_economy_orchestrator.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\validator.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\workers.py": 2,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\incremental_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\code_backend_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\fix_generator.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\pgm_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py": 3,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\raw2json_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\orchestration\\opposition_router.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\orchestration\\smart_router.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\diversity_checker_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\domain_classifier_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\validator.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\chemistry_validation_worker.py": 1,
+  "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\math_validation_worker.py": 1
+ },
+ "by_category": {
+  "routing": 12,
+  "agents": 55,
+  "experiments": 23,
+  "debate": 29,
+  "personas": 8,
+  "studio": 25,
+  "providers": 12,
+  "validation": 7,
+  "safety": 8,
+  "autopilot": 1,
+  "observability": 1,
+  "generation": 3,
+  "persistence": 1,
+  "crawlers": 2
+ },
+ "by_integration": {
+  "NOT_STARTED": 187
+ },
+ "readiness": {
+  "READY": 187
+ },
+ "validated_with_generic_name": [
+  "feat_agents_Worker",
+  "feat_routing_Router"
+ ],
+ "domains": {
+  "patch_verification": [
+   {
+    "id": "feat_agents_AgentRecord",
+    "name": "AgentRecord",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\observability.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_observability.py"
+    ],
+    "locations": [
+     "experiments\\observability.py:AgentRecord"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_BenchmarkEngine",
+    "name": "BenchmarkEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\router\\evidence.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_evidence_layer.py"
+    ],
+    "locations": [
+     "core\\router\\evidence.py:BenchmarkEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_EvidenceValidator",
+    "name": "EvidenceValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\router\\evidence.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_evidence_layer.py"
+    ],
+    "locations": [
+     "core\\router\\evidence.py:EvidenceValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_PatchValidator",
+    "name": "PatchValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\validator.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\validator.py:PatchValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_RawDebateRecorder",
+    "name": "RawDebateRecorder",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "philosophical_council\\raw_protocol\\__init__.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_raw_secret_redaction.py"
+    ],
+    "locations": [
+     "philosophical_council\\raw_protocol\\__init__.py:RawDebateRecorder"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_generation_PatchGenerator",
+    "name": "PatchGenerator",
+    "category": "generation",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\patch_generator.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\patch_generator.py:PatchGenerator"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_safety_SafetyGate",
+    "name": "SafetyGate",
+    "category": "safety",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\library_safety_gate.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\library_safety_gate.py:SafetyGate"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   }
+  ],
+  "agent_permissions": [],
+  "validation_tests": [
+   {
+    "id": "feat_debate_DebateState",
+    "name": "DebateState",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "philosophical_council\\core\\debate_state.py",
+    "integration": "NOT_STARTED",
+    "tests": 5,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py",
+     "hermes-debate\\tests\\test_orchestrators.py",
+     "philosophical_council\\tests\\test_debate_engine.py"
+    ],
+    "locations": [
+     "philosophical_council\\core\\debate_state.py:DebateState",
+     "philosophical_council\\core\\events.py:DebateState",
+     "philosophical_council\\memory\\argument_tracker.py:DebateState"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateStatus",
+    "name": "DebateStatus",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_engine.py",
+     "tests\\test_debate_engine_comprehensive.py"
+    ],
+    "locations": [
+     "core\\debate\\engine.py:DebateStatus"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_EvidenceValidator",
+    "name": "EvidenceValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\router\\evidence.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_evidence_layer.py"
+    ],
+    "locations": [
+     "core\\router\\evidence.py:EvidenceValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_FakeController",
+    "name": "FakeController",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "life_mean_studio\\tests\\test_runner.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "life_mean_studio\\tests\\test_runner.py"
+    ],
+    "locations": [
+     "life_mean_studio\\tests\\test_runner.py:FakeController"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_MathValidationWorker",
+    "name": "MathValidationWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\math_validation_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "pipeline_inspector\\tests\\test_pipeline_inspector.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\math_validation_worker.py:MathValidationWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_MathValidator",
+    "name": "MathValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\math_validator.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_mirror_transformation.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\math_validator.py:MathValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_OracleValidator",
+    "name": "OracleValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\validation\\oracle.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_phase4_validation.py"
+    ],
+    "locations": [
+     "experiments\\validation\\oracle.py:OracleValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_PatchValidator",
+    "name": "PatchValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\validator.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\validator.py:PatchValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_personas_PersonaValidationError",
+    "name": "PersonaValidationError",
+    "category": "personas",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\personas\\manager.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_personas.py"
+    ],
+    "locations": [
+     "core\\personas\\manager.py:PersonaValidationError"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_ResultValidator",
+    "name": "ResultValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\router\\adaptive.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_adaptive_router.py"
+    ],
+    "locations": [
+     "core\\router\\adaptive.py:ResultValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_TemplateInvalidForDebate",
+    "name": "TemplateInvalidForDebate",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\validation.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_debate_lab_integration.py"
+    ],
+    "locations": [
+     "debate_lab\\validation.py:TemplateInvalidForDebate"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_Validator",
+    "name": "Validator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\validator.py",
+    "integration": "NOT_STARTED",
+    "tests": 15,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_mirror_transformation.py",
+     "tests\\test_adaptive_router.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\validator.py:Validator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_ValidatorResult",
+    "name": "ValidatorResult",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "code_lab\\team_workflow.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_team_workflow.py"
+    ],
+    "locations": [
+     "code_lab\\team_workflow.py:ValidatorResult"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_ChemistryValidationWorker",
+    "name": "ChemistryValidationWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\chemistry_validation_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\chemistry_validation_worker.py:ChemistryValidationWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   }
+  ],
+  "pipeline_inspector": [
+   {
+    "id": "feat_crawlers_CrawlError",
+    "name": "CrawlError",
+    "category": "crawlers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py:CrawlError"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_CrawlerWorker",
+    "name": "CrawlerWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py:CrawlerWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_crawlers_GitHubCrawler",
+    "name": "GitHubCrawler",
+    "category": "crawlers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py:GitHubCrawler"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_Raw2JsonWorker",
+    "name": "Raw2JsonWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\raw2json_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_raw2json_worker.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\raw2json_worker.py:Raw2JsonWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_WorkerInvocation",
+    "name": "WorkerInvocation",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\pipeline_trace.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\pipeline_trace.py:WorkerInvocation"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   }
+  ],
+  "sentinel_security": [
+   {
+    "id": "feat_studio_QuarantineManager",
+    "name": "QuarantineManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_state_quarantine.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py:QuarantineManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_ReflectionEngine",
+    "name": "ReflectionEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_state_quarantine.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py:ReflectionEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_safety_Sentinel",
+    "name": "Sentinel",
+    "category": "safety",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel.py",
+    "integration": "NOT_STARTED",
+    "tests": 4,
+    "test_sample": [
+     "historical\\v0-alchemy-multi-agent\\tests\\test_debate_orchestrator.py",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\test_debate_orchestrator.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\test_debate_orchestrator.py"
+    ],
+    "locations": [
+     "core\\safety\\sentinel.py:Sentinel"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_safety_SentinelAction",
+    "name": "SentinelAction",
+    "category": "safety",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_sentinel.py"
+    ],
+    "locations": [
+     "core\\safety\\sentinel.py:SentinelAction"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_safety_SentinelAlertLevel",
+    "name": "SentinelAlertLevel",
+    "category": "safety",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_sentinel.py"
+    ],
+    "locations": [
+     "core\\safety\\sentinel.py:SentinelAlertLevel"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_safety_SentinelAnalysis",
+    "name": "SentinelAnalysis",
+    "category": "safety",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_sentinel.py"
+    ],
+    "locations": [
+     "core\\safety\\sentinel.py:SentinelAnalysis"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_safety_SentinelConfig",
+    "name": "SentinelConfig",
+    "category": "safety",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_sentinel.py"
+    ],
+    "locations": [
+     "core\\safety\\sentinel.py:SentinelConfig"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_SentinelController",
+    "name": "SentinelController",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel_controller.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_sentinel.py"
+    ],
+    "locations": [
+     "core\\safety\\sentinel_controller.py:SentinelController"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_safety_SentinelEvent",
+    "name": "SentinelEvent",
+    "category": "safety",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_sentinel.py"
+    ],
+    "locations": [
+     "core\\safety\\sentinel.py:SentinelEvent"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_safety_SentinelAlertWindow",
+    "name": "SentinelAlertWindow",
+    "category": "safety",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel_alert.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "core\\safety\\sentinel_alert.py:SentinelAlertWindow"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_providers_SentinelProvider",
+    "name": "SentinelProvider",
+    "category": "providers",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "core\\safety\\sentinel.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "core\\safety\\sentinel.py:SentinelProvider"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   }
+  ],
+  "scientific_exploration": [
+   {
+    "id": "feat_agents_AgentRecord",
+    "name": "AgentRecord",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\observability.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_observability.py"
+    ],
+    "locations": [
+     "experiments\\observability.py:AgentRecord"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentResponse",
+    "name": "AgentResponse",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\models\\schemas.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\models\\schemas.py:AgentResponse",
+     "hermes-debate\\models\\state.py:AgentResponse",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\schemas.py:AgentResponse"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentRole",
+    "name": "AgentRole",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\models\\state.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\models\\state.py:AgentRole"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentStatus",
+    "name": "AgentStatus",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\observability.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_cognitive_orchestration.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_integration.py"
+    ],
+    "locations": [
+     "experiments\\observability.py:AgentStatus",
+     "philosophical_council\\raw_protocol\\__init__.py:AgentStatus",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\orchestration\\agents.py:AgentStatus"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_autopilot_AutoPilot",
+    "name": "AutoPilot",
+    "category": "autopilot",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\autopilot.py",
+    "integration": "NOT_STARTED",
+    "tests": 14,
+    "test_sample": [
+     "hermes-debate\\tests\\test_experiment_engine.py",
+     "tests\\test_autopilot_lifecycle_integrity.py",
+     "tests\\test_autopilot_llm_adapter.py"
+    ],
+    "locations": [
+     "experiments\\autopilot.py:AutoPilot",
+     "hermes-debate\\core\\experiment_engine.py:AutoPilot"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_observability_AutopilotObservability",
+    "name": "AutopilotObservability",
+    "category": "observability",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\observability.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_observability.py"
+    ],
+    "locations": [
+     "experiments\\observability.py:AutopilotObservability"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_BaseAgent",
+    "name": "BaseAgent",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "philosophical_council\\agents\\base_agent.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "philosophical_council\\agents\\base_agent.py:BaseAgent",
+     "hermes-debate\\agents\\base.py:BaseAgent"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_BaseDebateCore",
+    "name": "BaseDebateCore",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "historical\\v0-alchemy-multi-agent\\src\\base_debate_core.py",
+    "integration": "NOT_STARTED",
+    "tests": 3,
+    "test_sample": [
+     "historical\\v0-alchemy-multi-agent\\tests\\test_debate_orchestrator.py",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\test_debate_orchestrator.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\test_debate_orchestrator.py"
+    ],
+    "locations": [
+     "historical\\v0-alchemy-multi-agent\\src\\base_debate_core.py:BaseDebateCore",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\base_debate_core.py:BaseDebateCore",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\base_debate_core.py:BaseDebateCore"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_CausalHypothesisEngine",
+    "name": "CausalHypothesisEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\causal_hypothesis_engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_failure_to_knowledge.py"
+    ],
+    "locations": [
+     "core\\debate\\causal_hypothesis_engine.py:CausalHypothesisEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_ClefDecisionEngine",
+    "name": "ClefDecisionEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\decision\\clef.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\decision\\clef.py:ClefDecisionEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_CriticAgent",
+    "name": "CriticAgent",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\base.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\agents\\base.py:CriticAgent"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateCondition",
+    "name": "DebateCondition",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "life_mean_lab\\orchestrator\\debate_experiment.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_phase4d.py"
+    ],
+    "locations": [
+     "life_mean_lab\\orchestrator\\debate_experiment.py:DebateCondition"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateConfig",
+    "name": "DebateConfig",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "philosophical_council\\config.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_lab_integration.py",
+     "tests\\test_phase4d.py"
+    ],
+    "locations": [
+     "philosophical_council\\config.py:DebateConfig",
+     "life_mean_lab\\orchestrator\\debate_experiment.py:DebateConfig"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_DebateEngine",
+    "name": "DebateEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 16,
+    "test_sample": [
+     "philosophical_council\\tests\\test_debate_engine.py",
+     "philosophical_council\\tests\\test_debate_engine_fixes.py",
+     "philosophical_council\\tests\\test_moderator_flow.py"
+    ],
+    "locations": [
+     "core\\debate\\engine.py:DebateEngine",
+     "philosophical_council\\core\\debate_engine.py:DebateEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateEvent",
+    "name": "DebateEvent",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\events.py",
+    "integration": "NOT_STARTED",
+    "tests": 3,
+    "test_sample": [
+     "tests\\test_debate_engine_comprehensive.py",
+     "tests\\test_observability.py",
+     "tests\\test_phase4d.py"
+    ],
+    "locations": [
+     "core\\debate\\events.py:DebateEvent",
+     "experiments\\observability.py:DebateEvent",
+     "philosophical_council\\raw_protocol\\__init__.py:DebateEvent"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateEventLogger",
+    "name": "DebateEventLogger",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\events.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_debate_engine_comprehensive.py"
+    ],
+    "locations": [
+     "core\\debate\\events.py:DebateEventLogger"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateEventType",
+    "name": "DebateEventType",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\events.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_engine_comprehensive.py",
+     "tests\\test_phase4d.py"
+    ],
+    "locations": [
+     "core\\debate\\events.py:DebateEventType",
+     "life_mean_lab\\orchestrator\\debate_ledger.py:DebateEventType"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateExperimentRunner",
+    "name": "DebateExperimentRunner",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "life_mean_lab\\orchestrator\\debate_experiment.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_phase4d.py"
+    ],
+    "locations": [
+     "life_mean_lab\\orchestrator\\debate_experiment.py:DebateExperimentRunner"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateLabConfig",
+    "name": "DebateLabConfig",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\config.py",
+    "integration": "NOT_STARTED",
+    "tests": 4,
+    "test_sample": [
+     "tests\\test_debate_conversation.py",
+     "tests\\test_debate_lab_integration.py",
+     "tests\\test_long_debate.py"
+    ],
+    "locations": [
+     "debate_lab\\config.py:DebateLabConfig"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateLabConfigError",
+    "name": "DebateLabConfigError",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\config.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_lab_integration.py",
+     "tests\\test_long_debate.py"
+    ],
+    "locations": [
+     "debate_lab\\config.py:DebateLabConfigError"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_DebateLabController",
+    "name": "DebateLabController",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\controller.py",
+    "integration": "NOT_STARTED",
+    "tests": 4,
+    "test_sample": [
+     "tests\\test_debate_conversation.py",
+     "tests\\test_debate_lab_integration.py",
+     "tests\\test_long_debate.py"
+    ],
+    "locations": [
+     "debate_lab\\controller.py:DebateLabController"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateLabRunStore",
+    "name": "DebateLabRunStore",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\run_store.py",
+    "integration": "NOT_STARTED",
+    "tests": 4,
+    "test_sample": [
+     "tests\\test_debate_conversation.py",
+     "tests\\test_debate_lab_integration.py",
+     "tests\\test_long_debate.py"
+    ],
+    "locations": [
+     "debate_lab\\run_store.py:DebateLabRunStore"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateResult",
+    "name": "DebateResult",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_engine.py",
+     "tests\\test_debate_engine_comprehensive.py"
+    ],
+    "locations": [
+     "core\\debate\\engine.py:DebateResult",
+     "life_mean_lab\\orchestrator\\debate_experiment.py:DebateResult"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateRunResult",
+    "name": "DebateRunResult",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\autopilot.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_phase7_autopilot.py",
+     "tests\\test_phase7_integration.py"
+    ],
+    "locations": [
+     "experiments\\autopilot.py:DebateRunResult"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateSession",
+    "name": "DebateSession",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\session_factory.py",
+    "integration": "NOT_STARTED",
+    "tests": 10,
+    "test_sample": [
+     "tests\\test_debate_conversation.py",
+     "tests\\test_debate_engine.py",
+     "tests\\test_debate_engine_comprehensive.py"
+    ],
+    "locations": [
+     "debate_lab\\session_factory.py:DebateSession"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateSessionConfig",
+    "name": "DebateSessionConfig",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\personas\\schema.py",
+    "integration": "NOT_STARTED",
+    "tests": 5,
+    "test_sample": [
+     "tests\\test_debate_engine.py",
+     "tests\\test_debate_engine_comprehensive.py",
+     "tests\\test_debate_engine_enhanced.py"
+    ],
+    "locations": [
+     "core\\personas\\schema.py:DebateSessionConfig"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateSessionFactory",
+    "name": "DebateSessionFactory",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\session_factory.py",
+    "integration": "NOT_STARTED",
+    "tests": 5,
+    "test_sample": [
+     "tests\\test_debate_conversation.py",
+     "tests\\test_debate_lab_integration.py",
+     "tests\\test_long_debate.py"
+    ],
+    "locations": [
+     "debate_lab\\session_factory.py:DebateSessionFactory"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateState",
+    "name": "DebateState",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "philosophical_council\\core\\debate_state.py",
+    "integration": "NOT_STARTED",
+    "tests": 5,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py",
+     "hermes-debate\\tests\\test_orchestrators.py",
+     "philosophical_council\\tests\\test_debate_engine.py"
+    ],
+    "locations": [
+     "philosophical_council\\core\\debate_state.py:DebateState",
+     "philosophical_council\\core\\events.py:DebateState",
+     "philosophical_council\\memory\\argument_tracker.py:DebateState"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateStatus",
+    "name": "DebateStatus",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_engine.py",
+     "tests\\test_debate_engine_comprehensive.py"
+    ],
+    "locations": [
+     "core\\debate\\engine.py:DebateStatus"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateTurn",
+    "name": "DebateTurn",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_engine.py",
+     "tests\\test_debate_engine_comprehensive.py"
+    ],
+    "locations": [
+     "core\\debate\\engine.py:DebateTurn"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_DesignAgent",
+    "name": "DesignAgent",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experimental\\schema.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_experimental_api.py",
+     "tests\\test_experimental_engine.py"
+    ],
+    "locations": [
+     "experimental\\schema.py:DesignAgent"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_ExperimentDeepeningEngine",
+    "name": "ExperimentDeepeningEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\deepening_engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_experience_investigation.py"
+    ],
+    "locations": [
+     "core\\debate\\deepening_engine.py:ExperimentDeepeningEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_ExperimentEngine",
+    "name": "ExperimentEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\core\\experiment_engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_experiment_engine.py"
+    ],
+    "locations": [
+     "hermes-debate\\core\\experiment_engine.py:ExperimentEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_ExperimentManager",
+    "name": "ExperimentManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\experiment_layer.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_phase6_experiment_layer.py"
+    ],
+    "locations": [
+     "experiments\\experiment_layer.py:ExperimentManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_ExperimentUIController",
+    "name": "ExperimentUIController",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\ui_controller.py",
+    "integration": "NOT_STARTED",
+    "tests": 11,
+    "test_sample": [
+     "life_mean_studio\\tests\\test_runner.py",
+     "tests\\test_autopilot_lifecycle_integrity.py",
+     "tests\\test_dashboard_http_smoke.py"
+    ],
+    "locations": [
+     "experiments\\ui_controller.py:ExperimentUIController"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_ExperimentalEngine",
+    "name": "ExperimentalEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experimental\\engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_experimental_engine.py"
+    ],
+    "locations": [
+     "experimental\\engine.py:ExperimentalEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_FakeClefEngine",
+    "name": "FakeClefEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\decision\\clef.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\decision\\clef.py:FakeClefEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_JudgeAgent",
+    "name": "JudgeAgent",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\base.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py",
+     "tests\\test_code_lab_visibility.py"
+    ],
+    "locations": [
+     "hermes-debate\\agents\\base.py:JudgeAgent",
+     "hermes-debate\\agents\\judge.py:JudgeAgent"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_ModelManager",
+    "name": "ModelManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\models\\manager.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\models\\manager.py:ModelManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_OracleValidator",
+    "name": "OracleValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\validation\\oracle.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_phase4_validation.py"
+    ],
+    "locations": [
+     "experiments\\validation\\oracle.py:OracleValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_PersistenceEngine",
+    "name": "PersistenceEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\persistence.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_persistence_triggers.py"
+    ],
+    "locations": [
+     "core\\debate\\persistence.py:PersistenceEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_personas_Persona",
+    "name": "Persona",
+    "category": "personas",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\core\\domain.py",
+    "integration": "NOT_STARTED",
+    "tests": 20,
+    "test_sample": [
+     "hermes-debate\\tests\\test_experiment_engine.py",
+     "hermes-debate\\tests\\test_orchestrators.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_phase316.py"
+    ],
+    "locations": [
+     "hermes-debate\\core\\domain.py:Persona"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_personas_PersonaType",
+    "name": "PersonaType",
+    "category": "personas",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\personas\\schema.py",
+    "integration": "NOT_STARTED",
+    "tests": 4,
+    "test_sample": [
+     "hermes-debate\\tests\\test_experiment_engine.py",
+     "tests\\test_debate_engine.py",
+     "tests\\test_debate_engine_comprehensive.py"
+    ],
+    "locations": [
+     "core\\personas\\schema.py:PersonaType",
+     "hermes-debate\\core\\domain.py:PersonaType"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_RawDebateRecorder",
+    "name": "RawDebateRecorder",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "philosophical_council\\raw_protocol\\__init__.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_raw_secret_redaction.py"
+    ],
+    "locations": [
+     "philosophical_council\\raw_protocol\\__init__.py:RawDebateRecorder"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_ReasoningAgent",
+    "name": "ReasoningAgent",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\base.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\agents\\base.py:ReasoningAgent"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_ReplayEngine",
+    "name": "ReplayEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\debate\\engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_debate_engine_enhanced.py",
+     "tests\\test_experience_investigation.py"
+    ],
+    "locations": [
+     "core\\debate\\engine.py:ReplayEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_routing_Router",
+    "name": "Router",
+    "category": "routing",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\core\\routing.py",
+    "integration": "NOT_STARTED",
+    "tests": 30,
+    "test_sample": [
+     "captn_runtime\\tests\\test_end_to_end.py",
+     "captn_runtime\\tests\\test_runtime.py",
+     "captn_runtime\\tests\\test_stress.py"
+    ],
+    "locations": [
+     "hermes-debate\\core\\routing.py:Router"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_generation_TaskGenerator",
+    "name": "TaskGenerator",
+    "category": "generation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\generation\\task_generator.py",
+    "integration": "NOT_STARTED",
+    "tests": 7,
+    "test_sample": [
+     "life_mean_studio\\tests\\test_runner.py",
+     "tests\\test_phase1_task_generator.py",
+     "tests\\test_phase2_diversity_novelty.py"
+    ],
+    "locations": [
+     "experiments\\generation\\task_generator.py:TaskGenerator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_TemplateInvalidForDebate",
+    "name": "TemplateInvalidForDebate",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "debate_lab\\validation.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_debate_lab_integration.py"
+    ],
+    "locations": [
+     "debate_lab\\validation.py:TemplateInvalidForDebate"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentState",
+    "name": "AgentState",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "life_mean_lab\\orchestrator\\debate_experiment.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "life_mean_lab\\orchestrator\\debate_experiment.py:AgentState"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_BonsaiAgent",
+    "name": "BonsaiAgent",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\bonsai.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\agents\\bonsai.py:BonsaiAgent"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_ConfigurableDebateAgent",
+    "name": "ConfigurableDebateAgent",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "philosophical_council\\agents\\configurable.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "philosophical_council\\agents\\configurable.py:ConfigurableDebateAgent"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_CounterPositionAgent",
+    "name": "CounterPositionAgent",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\counter_position.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\agents\\counter_position.py:CounterPositionAgent"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_DebateArchive",
+    "name": "DebateArchive",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "philosophical_council\\memory\\archive.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "philosophical_council\\memory\\archive.py:DebateArchive"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_DebateArchiveEntry",
+    "name": "DebateArchiveEntry",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "philosophical_council\\memory\\debate_state.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "philosophical_council\\memory\\debate_state.py:DebateArchiveEntry"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_DebateLabRunView",
+    "name": "DebateLabRunView",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "debate_lab\\controller.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "debate_lab\\controller.py:DebateLabRunView"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_DebateRepository",
+    "name": "DebateRepository",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "philosophical_council\\database\\repositories.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "philosophical_council\\database\\repositories.py:DebateRepository"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_DebateSaver",
+    "name": "DebateSaver",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "philosophical_council\\core\\debate_saver.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "philosophical_council\\core\\debate_saver.py:DebateSaver"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_DebateUpdate",
+    "name": "DebateUpdate",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "philosophical_council\\core\\events.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "philosophical_council\\core\\events.py:DebateUpdate"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_DebateView",
+    "name": "DebateView",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "philosophical_council\\ui\\debate_view.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "philosophical_council\\ui\\debate_view.py:DebateView"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_EquationDebateOrchestrator",
+    "name": "EquationDebateOrchestrator",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "historical\\v0-alchemy-multi-agent\\src\\equation_debate_orchestrator.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "historical\\v0-alchemy-multi-agent\\src\\equation_debate_orchestrator.py:EquationDebateOrchestrator",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\equation_debate_orchestrator.py:EquationDebateOrchestrator",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\equation_debate_orchestrator.py:EquationDebateOrchestrator"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_studio_EscalationManager",
+    "name": "EscalationManager",
+    "category": "studio",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\core\\escalation.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\core\\escalation.py:EscalationManager"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_experiments_FakeRerankerEngine",
+    "name": "FakeRerankerEngine",
+    "category": "experiments",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\debate\\reranker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\debate\\reranker.py:FakeRerankerEngine"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_JevAgent",
+    "name": "JevAgent",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\jev.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\agents\\jev.py:JevAgent"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_RationalAgent",
+    "name": "RationalAgent",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\rational.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\agents\\rational.py:RationalAgent"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_experiments_RerankerEngine",
+    "name": "RerankerEngine",
+    "category": "experiments",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\debate\\reranker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\debate\\reranker.py:RerankerEngine"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_SavantAgent",
+    "name": "SavantAgent",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "hermes-debate\\agents\\savant.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "hermes-debate\\agents\\savant.py:SavantAgent"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_VariableDebateOrchestrator",
+    "name": "VariableDebateOrchestrator",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "historical\\v0-alchemy-multi-agent\\src\\variable_debate_orchestrator.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "historical\\v0-alchemy-multi-agent\\src\\variable_debate_orchestrator.py:VariableDebateOrchestrator",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\variable_debate_orchestrator.py:VariableDebateOrchestrator",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\variable_debate_orchestrator.py:VariableDebateOrchestrator"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   }
+  ],
+  "feature_integration": [
+   {
+    "id": "feat_studio_AdaptiveContextManager",
+    "name": "AdaptiveContextManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "code_lab\\compression\\adaptive_manager.py",
+    "integration": "NOT_STARTED",
+    "tests": 6,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_adaptive_ab.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_adaptive_calibration.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_adaptive_manager.py"
+    ],
+    "locations": [
+     "code_lab\\compression\\adaptive_manager.py:AdaptiveContextManager",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\adaptive_manager.py:AdaptiveContextManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentRegistry",
+    "name": "AgentRegistry",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\orchestration\\agents.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_cognitive_orchestration.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\orchestration\\agents.py:AgentRegistry"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentResponse",
+    "name": "AgentResponse",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "hermes-debate\\models\\schemas.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "hermes-debate\\models\\schemas.py:AgentResponse",
+     "hermes-debate\\models\\state.py:AgentResponse",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\schemas.py:AgentResponse"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentStatus",
+    "name": "AgentStatus",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "experiments\\observability.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_cognitive_orchestration.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_integration.py"
+    ],
+    "locations": [
+     "experiments\\observability.py:AgentStatus",
+     "philosophical_council\\raw_protocol\\__init__.py:AgentStatus",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\orchestration\\agents.py:AgentStatus"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_AlchimieLibraryManager",
+    "name": "AlchimieLibraryManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\alchimie_library_manager.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_alchimie_library_manager.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\alchimie_library_manager.py:AlchimieLibraryManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_BaseDebateCore",
+    "name": "BaseDebateCore",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "historical\\v0-alchemy-multi-agent\\src\\base_debate_core.py",
+    "integration": "NOT_STARTED",
+    "tests": 3,
+    "test_sample": [
+     "historical\\v0-alchemy-multi-agent\\tests\\test_debate_orchestrator.py",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\test_debate_orchestrator.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\test_debate_orchestrator.py"
+    ],
+    "locations": [
+     "historical\\v0-alchemy-multi-agent\\src\\base_debate_core.py:BaseDebateCore",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\base_debate_core.py:BaseDebateCore",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\base_debate_core.py:BaseDebateCore"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_BaseWorker",
+    "name": "BaseWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\runtime\\worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_phase0_runtime.py"
+    ],
+    "locations": [
+     "core\\runtime\\worker.py:BaseWorker",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\workers.py:BaseWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_crawlers_CrawlError",
+    "name": "CrawlError",
+    "category": "crawlers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py:CrawlError"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_CrawlerWorker",
+    "name": "CrawlerWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py:CrawlerWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_debate_DebateState",
+    "name": "DebateState",
+    "category": "debate",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "philosophical_council\\core\\debate_state.py",
+    "integration": "NOT_STARTED",
+    "tests": 5,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py",
+     "hermes-debate\\tests\\test_orchestrators.py",
+     "philosophical_council\\tests\\test_debate_engine.py"
+    ],
+    "locations": [
+     "philosophical_council\\core\\debate_state.py:DebateState",
+     "philosophical_council\\core\\events.py:DebateState",
+     "philosophical_council\\memory\\argument_tracker.py:DebateState"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_DecisionEngine",
+    "name": "DecisionEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\token_economy_orchestrator.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "hermes-debate\\tests\\test_all.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\token_economy_orchestrator.py:DecisionEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_DivergenceEngine",
+    "name": "DivergenceEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "life_mean_lab\\orchestrator\\divergence_engine.py",
+    "integration": "NOT_STARTED",
+    "tests": 4,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_cognitive_orchestration.py",
+     "tests\\test_phase4b.py",
+     "tests\\test_phase4c.py"
+    ],
+    "locations": [
+     "life_mean_lab\\orchestrator\\divergence_engine.py:DivergenceEngine",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\orchestration\\divergence_convergence.py:DivergenceEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_generation_FixGenerator",
+    "name": "FixGenerator",
+    "category": "generation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\fix_generator.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\fix_generator.py:FixGenerator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_crawlers_GitHubCrawler",
+    "name": "GitHubCrawler",
+    "category": "crawlers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\crawler.py:GitHubCrawler"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_providers_LLMProvider",
+    "name": "LLMProvider",
+    "category": "providers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\providers\\base.py",
+    "integration": "NOT_STARTED",
+    "tests": 3,
+    "test_sample": [
+     "captn_runtime\\tests\\test_providers.py",
+     "tests\\test_providers.py",
+     "tests\\test_sentinel.py"
+    ],
+    "locations": [
+     "core\\providers\\base.py:LLMProvider",
+     "captn_runtime\\captn\\providers\\__init__.py:LLMProvider",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\llm_provider.py:LLMProvider"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_providers_LocalLLMProvider",
+    "name": "LocalLLMProvider",
+    "category": "providers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\providers\\base.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_providers.py"
+    ],
+    "locations": [
+     "core\\providers\\base.py:LocalLLMProvider",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\llm_provider.py:LocalLLMProvider"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_MathValidationWorker",
+    "name": "MathValidationWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\math_validation_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "pipeline_inspector\\tests\\test_pipeline_inspector.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\math_validation_worker.py:MathValidationWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_MathValidator",
+    "name": "MathValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\math_validator.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_mirror_transformation.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\math_validator.py:MathValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_providers_ModelProvider",
+    "name": "ModelProvider",
+    "category": "providers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "life_mean_lab\\orchestrator\\model_registry.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "tests\\test_multi_model_orchestrator.py",
+     "tests\\test_workspace_manager.py"
+    ],
+    "locations": [
+     "life_mean_lab\\orchestrator\\model_registry.py:ModelProvider"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_providers_OpenAIProvider",
+    "name": "OpenAIProvider",
+    "category": "providers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\providers\\base.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py",
+     "tests\\test_providers.py"
+    ],
+    "locations": [
+     "core\\providers\\base.py:OpenAIProvider",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\llm_provider.py:OpenAIProvider"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_routing_OpenRouterAccounting",
+    "name": "OpenRouterAccounting",
+    "category": "routing",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\reconcile.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_reconcile.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\reconcile.py:OpenRouterAccounting"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_PatchValidator",
+    "name": "PatchValidator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\validator.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\validator.py:PatchValidator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_routing_PerToolRouter",
+    "name": "PerToolRouter",
+    "category": "routing",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\per_tool_necessity.py",
+    "integration": "NOT_STARTED",
+    "tests": 2,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_phase321.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_runtime_integrity.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\per_tool_necessity.py:PerToolRouter"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_PluginManager",
+    "name": "PluginManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\manager.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\test_logging.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\manager.py:PluginManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_providers_ProviderRegistry",
+    "name": "ProviderRegistry",
+    "category": "providers",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\providers\\base.py",
+    "integration": "NOT_STARTED",
+    "tests": 4,
+    "test_sample": [
+     "captn_runtime\\tests\\test_providers.py",
+     "captn_runtime\\tests\\test_stress.py",
+     "tests\\test_providers.py"
+    ],
+    "locations": [
+     "core\\providers\\base.py:ProviderRegistry",
+     "captn_runtime\\captn\\providers\\__init__.py:ProviderRegistry"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_QuarantineManager",
+    "name": "QuarantineManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_state_quarantine.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py:QuarantineManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_Raw2JsonWorker",
+    "name": "Raw2JsonWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\raw2json_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_raw2json_worker.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\data_ingestion\\raw2json_worker.py:Raw2JsonWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_studio_RecoveryManager",
+    "name": "RecoveryManager",
+    "category": "studio",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "library\\reliability\\manager.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "tests\\test_phase5_reliability.py"
+    ],
+    "locations": [
+     "library\\reliability\\manager.py:RecoveryManager"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_experiments_ReflectionEngine",
+    "name": "ReflectionEngine",
+    "category": "experiments",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py",
+    "integration": "NOT_STARTED",
+    "tests": 1,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_state_quarantine.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\state_quarantine.py:ReflectionEngine"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_routing_SmartRouter",
+    "name": "SmartRouter",
+    "category": "routing",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\assignment\\router.py",
+    "integration": "NOT_STARTED",
+    "tests": 3,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_runtime_integrity.py",
+     "tests\\test_phase1_routing.py",
+     "tests\\test_phase3_integration.py"
+    ],
+    "locations": [
+     "core\\assignment\\router.py:SmartRouter",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\orchestration\\smart_router.py:SmartRouter"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_ToolWorker",
+    "name": "ToolWorker",
+    "category": "agents",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "core\\workers\\tool.py",
+    "integration": "NOT_STARTED",
+    "tests": 5,
+    "test_sample": [
+     "pipeline_inspector\\tests\\test_pipeline_inspector.py",
+     "tests\\test_experimental_api.py",
+     "tests\\test_experimental_harness.py"
+    ],
+    "locations": [
+     "core\\workers\\tool.py:ToolWorker",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\tool_worker.py:ToolWorker"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_validation_Validator",
+    "name": "Validator",
+    "category": "validation",
+    "status": "VALIDATED",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\validator.py",
+    "integration": "NOT_STARTED",
+    "tests": 15,
+    "test_sample": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_mirror_transformation.py",
+     "tests\\test_adaptive_router.py"
+    ],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\validator.py:Validator"
+    ],
+    "gaps": []
+   },
+   {
+    "id": "feat_agents_AgentTask",
+    "name": "AgentTask",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\schemas.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\schemas.py:AgentTask"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_BugWorker",
+    "name": "BugWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\workers.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\workers.py:BugWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_ChemistryValidationWorker",
+    "name": "ChemistryValidationWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\chemistry_validation_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\chemistry_validation_worker.py:ChemistryValidationWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_CodeBackendWorker",
+    "name": "CodeBackendWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\code_backend_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\code_backend_worker.py:CodeBackendWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_DiversifierWorker",
+    "name": "DiversifierWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\diversifier_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\diversifier_worker.py:DiversifierWorker",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\transformation\\diversifier_worker.py:DiversifierWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_DiversityCheckerWorker",
+    "name": "DiversityCheckerWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\diversity_checker_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\diversity_checker_worker.py:DiversityCheckerWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_DomainClassifierWorker",
+    "name": "DomainClassifierWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\domain_classifier_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\domain_classifier_worker.py:DomainClassifierWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_EquationDebateOrchestrator",
+    "name": "EquationDebateOrchestrator",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "historical\\v0-alchemy-multi-agent\\src\\equation_debate_orchestrator.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "historical\\v0-alchemy-multi-agent\\src\\equation_debate_orchestrator.py:EquationDebateOrchestrator",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\equation_debate_orchestrator.py:EquationDebateOrchestrator",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\equation_debate_orchestrator.py:EquationDebateOrchestrator"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_IncrementalWorker",
+    "name": "IncrementalWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\incremental_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\incremental_worker.py:IncrementalWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_MirrorAgent",
+    "name": "MirrorAgent",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\mirror_agent.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\mirror_agent.py:MirrorAgent"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_NoRepetitionWorker",
+    "name": "NoRepetitionWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\no_repetition_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\no_repetition_worker.py:NoRepetitionWorker",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\quality\\no_repetition_worker.py:NoRepetitionWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_routing_OppositionRouter",
+    "name": "OppositionRouter",
+    "category": "routing",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\orchestration\\opposition_router.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\orchestration\\opposition_router.py:OppositionRouter"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_PGMWorker",
+    "name": "PGMWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\pgm_worker.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\code_generation\\pgm_worker.py:PGMWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_generation_PatchGenerator",
+    "name": "PatchGenerator",
+    "category": "generation",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\patch_generator.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\patch_generator.py:PatchGenerator"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_experiments_RuleEngine",
+    "name": "RuleEngine",
+    "category": "experiments",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\runtime.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\runtime.py:RuleEngine"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_safety_SafetyGate",
+    "name": "SafetyGate",
+    "category": "safety",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\library_safety_gate.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\library_safety_gate.py:SafetyGate"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_SmartRouterWorker",
+    "name": "SmartRouterWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\orchestration\\smart_router.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\workers\\orchestration\\smart_router.py:SmartRouterWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_SyntaxWorker",
+    "name": "SyntaxWorker",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\workers.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\captn\\runtime\\workers.py:SyntaxWorker"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_debate_VariableDebateOrchestrator",
+    "name": "VariableDebateOrchestrator",
+    "category": "debate",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "historical\\v0-alchemy-multi-agent\\src\\variable_debate_orchestrator.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "historical\\v0-alchemy-multi-agent\\src\\variable_debate_orchestrator.py:VariableDebateOrchestrator",
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\variable_debate_orchestrator.py:VariableDebateOrchestrator",
+     "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\variable_debate_orchestrator.py:VariableDebateOrchestrator"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   },
+   {
+    "id": "feat_agents_WorkerInvocation",
+    "name": "WorkerInvocation",
+    "category": "agents",
+    "status": "READY",
+    "readiness": "READY",
+    "source": "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\pipeline_trace.py",
+    "integration": "NOT_STARTED",
+    "tests": 0,
+    "test_sample": [],
+    "locations": [
+     "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\pipeline_trace.py:WorkerInvocation"
+    ],
+    "gaps": [
+     "no_tests"
+    ]
+   }
+  ]
+ }
+}

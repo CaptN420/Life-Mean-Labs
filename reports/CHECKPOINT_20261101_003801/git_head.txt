@@ -1,0 +1,5 @@
+d1237af fix: serve dashboard on both /dashboard and /dashboard.html
+24c39ef fix: package import case-insensitivity and workflow config
+3367a68 feat: CaptN Runtime Beta v0.1 end-to-end validation
+cacb66c feat: CaptN Runtime Beta v0.1 — Provider integration, stress tests, validation report
+749a752 feat: Feature 4 — Telemetry & Observability with alerting, per-model stats, dashboard integration

@@ -1,0 +1,11 @@
+ captn_runtime/captn_experiences.jsonl | 4397 +++++++++++++++++++++++++++++++++
+ experiments/dashboard.py              |   62 +-
+ experiments/ui/dashboard.html         |  489 +++-
+ life_mean_studio/engine/storage.py    |   13 +-
+ life_mean_studio/launcher/app.py      |  226 +-
+ pyproject.toml                        |    4 +
+ sandbox/tools/tool-2/spec.json        |    2 +-
+ start_studio.bat                      |   38 +-
+ 8 files changed, 5205 insertions(+), 26 deletions(-)
+warning: in the working copy of 'experiments/ui/dashboard.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'life_mean_studio/engine/storage.py', LF will be replaced by CRLF the next time Git touches it

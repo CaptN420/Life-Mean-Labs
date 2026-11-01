@@ -1,0 +1,33 @@
+ M captn_runtime/captn_experiences.jsonl
+ M experiments/dashboard.py
+ M experiments/ui/dashboard.html
+ M life_mean_studio/engine/storage.py
+ M life_mean_studio/launcher/app.py
+ M pyproject.toml
+ M sandbox/tools/tool-2/spec.json
+ M start_studio.bat
+?? .feature_pool_report.csv
+?? .feature_pool_report.json
+?? AUDIT_COMPLET_20261031.md
+?? AUDIT_PIPELINE_INSPECTOR_20261101.md
+?? PIPELINE_VALIDATION_REPORT.md
+?? _astcheck.py
+?? _audit_features.py
+?? _audit_handlers.py
+?? _audit_js.py
+?? _audit_js_blocks.py
+?? _dash_script.js
+?? _e2e.py
+?? _final_stats.py
+?? _regen_features.py
+?? _validate_probe.py
+?? dashboard_debug.html
+?? feature_pool/
+?? feature_pool_full_report.csv
+?? feature_pool_full_report.json
+?? feature_pool_report.csv
+?? feature_pool_report.json
+?? life_mean_studio/life_mean_studio_data.db-shm
+?? life_mean_studio/life_mean_studio_data.db-wal
+?? pipeline_inspector/
+?? reports/
