@@ -1,0 +1,1683 @@
+{
+ "feat_routing_SmartRouter": {
+  "status": "VALIDATED",
+  "name": "SmartRouter",
+  "category": "routing",
+  "n_tests": 3,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_runtime_integrity.py",
+   "tests\\test_phase1_routing.py",
+   "tests\\test_phase3_integration.py"
+  ]
+ },
+ "feat_agents_RouterWorker": {
+  "status": "VALIDATED",
+  "name": "RouterWorker",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase1_routing.py"
+  ]
+ },
+ "feat_experiments_CausalHypothesisEngine": {
+  "status": "VALIDATED",
+  "name": "CausalHypothesisEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_failure_to_knowledge.py"
+  ]
+ },
+ "feat_experiments_ExperimentDeepeningEngine": {
+  "status": "VALIDATED",
+  "name": "ExperimentDeepeningEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_experience_investigation.py"
+  ]
+ },
+ "feat_debate_DebateStatus": {
+  "status": "VALIDATED",
+  "name": "DebateStatus",
+  "category": "debate",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_engine.py",
+   "tests\\test_debate_engine_comprehensive.py"
+  ]
+ },
+ "feat_debate_DebateTurn": {
+  "status": "VALIDATED",
+  "name": "DebateTurn",
+  "category": "debate",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_engine.py",
+   "tests\\test_debate_engine_comprehensive.py"
+  ]
+ },
+ "feat_debate_DebateResult": {
+  "status": "VALIDATED",
+  "name": "DebateResult",
+  "category": "debate",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_engine.py",
+   "tests\\test_debate_engine_comprehensive.py"
+  ]
+ },
+ "feat_experiments_ReplayEngine": {
+  "status": "VALIDATED",
+  "name": "ReplayEngine",
+  "category": "experiments",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_engine_enhanced.py",
+   "tests\\test_experience_investigation.py"
+  ]
+ },
+ "feat_experiments_DebateEngine": {
+  "status": "VALIDATED",
+  "name": "DebateEngine",
+  "category": "experiments",
+  "n_tests": 16,
+  "tests": [
+   "philosophical_council\\tests\\test_debate_engine.py",
+   "philosophical_council\\tests\\test_debate_engine_fixes.py",
+   "philosophical_council\\tests\\test_moderator_flow.py"
+  ]
+ },
+ "feat_debate_DebateEventType": {
+  "status": "VALIDATED",
+  "name": "DebateEventType",
+  "category": "debate",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_engine_comprehensive.py",
+   "tests\\test_phase4d.py"
+  ]
+ },
+ "feat_debate_DebateEvent": {
+  "status": "VALIDATED",
+  "name": "DebateEvent",
+  "category": "debate",
+  "n_tests": 3,
+  "tests": [
+   "tests\\test_debate_engine_comprehensive.py",
+   "tests\\test_observability.py",
+   "tests\\test_phase4d.py"
+  ]
+ },
+ "feat_debate_DebateEventLogger": {
+  "status": "VALIDATED",
+  "name": "DebateEventLogger",
+  "category": "debate",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_debate_engine_comprehensive.py"
+  ]
+ },
+ "feat_experiments_PersistenceEngine": {
+  "status": "VALIDATED",
+  "name": "PersistenceEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_persistence_triggers.py"
+  ]
+ },
+ "feat_personas_PersonaValidationError": {
+  "status": "VALIDATED",
+  "name": "PersonaValidationError",
+  "category": "personas",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_personas.py"
+  ]
+ },
+ "feat_studio_PersonaManager": {
+  "status": "VALIDATED",
+  "name": "PersonaManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_personas.py"
+  ]
+ },
+ "feat_personas_PersonaNode": {
+  "status": "READY",
+  "name": "PersonaNode",
+  "category": "personas",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_personas_PersonaNetwork": {
+  "status": "READY",
+  "name": "PersonaNetwork",
+  "category": "personas",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_personas_PersonaType": {
+  "status": "VALIDATED",
+  "name": "PersonaType",
+  "category": "personas",
+  "n_tests": 4,
+  "tests": [
+   "hermes-debate\\tests\\test_experiment_engine.py",
+   "tests\\test_debate_engine.py",
+   "tests\\test_debate_engine_comprehensive.py"
+  ]
+ },
+ "feat_providers_ProviderType": {
+  "status": "VALIDATED",
+  "name": "ProviderType",
+  "category": "providers",
+  "n_tests": 8,
+  "tests": [
+   "captn_runtime\\tests\\test_end_to_end.py",
+   "captn_runtime\\tests\\test_providers.py",
+   "captn_runtime\\tests\\test_stress.py"
+  ]
+ },
+ "feat_personas_PersonaConfig": {
+  "status": "VALIDATED",
+  "name": "PersonaConfig",
+  "category": "personas",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_engine_comprehensive.py",
+   "tests\\test_personas.py"
+  ]
+ },
+ "feat_personas_PersonaRelationship": {
+  "status": "READY",
+  "name": "PersonaRelationship",
+  "category": "personas",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_DebateSessionConfig": {
+  "status": "VALIDATED",
+  "name": "DebateSessionConfig",
+  "category": "debate",
+  "n_tests": 5,
+  "tests": [
+   "tests\\test_debate_engine.py",
+   "tests\\test_debate_engine_comprehensive.py",
+   "tests\\test_debate_engine_enhanced.py"
+  ]
+ },
+ "feat_providers_ProviderConfig": {
+  "status": "VALIDATED",
+  "name": "ProviderConfig",
+  "category": "providers",
+  "n_tests": 4,
+  "tests": [
+   "captn_runtime\\tests\\test_end_to_end.py",
+   "captn_runtime\\tests\\test_providers.py",
+   "tests\\test_providers.py"
+  ]
+ },
+ "feat_providers_LLMProvider": {
+  "status": "VALIDATED",
+  "name": "LLMProvider",
+  "category": "providers",
+  "n_tests": 3,
+  "tests": [
+   "captn_runtime\\tests\\test_providers.py",
+   "tests\\test_providers.py",
+   "tests\\test_sentinel.py"
+  ]
+ },
+ "feat_providers_LocalLLMProvider": {
+  "status": "VALIDATED",
+  "name": "LocalLLMProvider",
+  "category": "providers",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_providers.py"
+  ]
+ },
+ "feat_providers_OpenAIProvider": {
+  "status": "VALIDATED",
+  "name": "OpenAIProvider",
+  "category": "providers",
+  "n_tests": 2,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py",
+   "tests\\test_providers.py"
+  ]
+ },
+ "feat_providers_MockLLMProvider": {
+  "status": "VALIDATED",
+  "name": "MockLLMProvider",
+  "category": "providers",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_providers.py"
+  ]
+ },
+ "feat_providers_ProviderRegistry": {
+  "status": "VALIDATED",
+  "name": "ProviderRegistry",
+  "category": "providers",
+  "n_tests": 4,
+  "tests": [
+   "captn_runtime\\tests\\test_providers.py",
+   "captn_runtime\\tests\\test_stress.py",
+   "tests\\test_providers.py"
+  ]
+ },
+ "feat_routing_MixedProviderRouter": {
+  "status": "VALIDATED",
+  "name": "MixedProviderRouter",
+  "category": "routing",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_providers.py"
+  ]
+ },
+ "feat_experiments_EngineType": {
+  "status": "VALIDATED",
+  "name": "EngineType",
+  "category": "experiments",
+  "n_tests": 3,
+  "tests": [
+   "tests\\test_adaptive_router.py",
+   "tests\\test_chaos_safety.py",
+   "tests\\test_evidence_layer.py"
+  ]
+ },
+ "feat_agents_WorkerStats": {
+  "status": "VALIDATED",
+  "name": "WorkerStats",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_adaptive_router.py"
+  ]
+ },
+ "feat_validation_ResultValidator": {
+  "status": "VALIDATED",
+  "name": "ResultValidator",
+  "category": "validation",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_adaptive_router.py"
+  ]
+ },
+ "feat_routing_AdaptiveRouter": {
+  "status": "VALIDATED",
+  "name": "AdaptiveRouter",
+  "category": "routing",
+  "n_tests": 3,
+  "tests": [
+   "tests\\test_adaptive_router.py",
+   "tests\\test_chaos_safety.py",
+   "tests\\test_evidence_layer.py"
+  ]
+ },
+ "feat_validation_EvidenceValidator": {
+  "status": "VALIDATED",
+  "name": "EvidenceValidator",
+  "category": "validation",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_evidence_layer.py"
+  ]
+ },
+ "feat_experiments_BenchmarkEngine": {
+  "status": "VALIDATED",
+  "name": "BenchmarkEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_evidence_layer.py"
+  ]
+ },
+ "feat_agents_Worker": {
+  "status": "VALIDATED",
+  "name": "Worker",
+  "category": "agents",
+  "n_tests": 32,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\test_logging.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_corpus_dedup.py"
+  ]
+ },
+ "feat_agents_BaseWorker": {
+  "status": "VALIDATED",
+  "name": "BaseWorker",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase0_runtime.py"
+  ]
+ },
+ "feat_agents_DeterministicWorker": {
+  "status": "VALIDATED",
+  "name": "DeterministicWorker",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase0_runtime.py"
+  ]
+ },
+ "feat_studio_IncidentManager": {
+  "status": "VALIDATED",
+  "name": "IncidentManager",
+  "category": "studio",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_chaos_safety.py",
+   "tests\\test_safety_layer.py"
+  ]
+ },
+ "feat_safety_SentinelAlertLevel": {
+  "status": "VALIDATED",
+  "name": "SentinelAlertLevel",
+  "category": "safety",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_sentinel.py"
+  ]
+ },
+ "feat_safety_SentinelAction": {
+  "status": "VALIDATED",
+  "name": "SentinelAction",
+  "category": "safety",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_sentinel.py"
+  ]
+ },
+ "feat_providers_SentinelProvider": {
+  "status": "READY",
+  "name": "SentinelProvider",
+  "category": "providers",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_safety_SentinelEvent": {
+  "status": "VALIDATED",
+  "name": "SentinelEvent",
+  "category": "safety",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_sentinel.py"
+  ]
+ },
+ "feat_safety_SentinelAnalysis": {
+  "status": "VALIDATED",
+  "name": "SentinelAnalysis",
+  "category": "safety",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_sentinel.py"
+  ]
+ },
+ "feat_safety_SentinelConfig": {
+  "status": "VALIDATED",
+  "name": "SentinelConfig",
+  "category": "safety",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_sentinel.py"
+  ]
+ },
+ "feat_safety_Sentinel": {
+  "status": "VALIDATED",
+  "name": "Sentinel",
+  "category": "safety",
+  "n_tests": 4,
+  "tests": [
+   "historical\\v0-alchemy-multi-agent\\tests\\test_debate_orchestrator.py",
+   "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\test_debate_orchestrator.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\test_debate_orchestrator.py"
+  ]
+ },
+ "feat_safety_SentinelAlertWindow": {
+  "status": "READY",
+  "name": "SentinelAlertWindow",
+  "category": "safety",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_studio_SentinelController": {
+  "status": "VALIDATED",
+  "name": "SentinelController",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_sentinel.py"
+  ]
+ },
+ "feat_agents_ToolWorker": {
+  "status": "VALIDATED",
+  "name": "ToolWorker",
+  "category": "agents",
+  "n_tests": 5,
+  "tests": [
+   "pipeline_inspector\\tests\\test_pipeline_inspector.py",
+   "tests\\test_experimental_api.py",
+   "tests\\test_experimental_harness.py"
+  ]
+ },
+ "feat_debate_DebateRunResult": {
+  "status": "VALIDATED",
+  "name": "DebateRunResult",
+  "category": "debate",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_phase7_autopilot.py",
+   "tests\\test_phase7_integration.py"
+  ]
+ },
+ "feat_autopilot_AutoPilot": {
+  "status": "VALIDATED",
+  "name": "AutoPilot",
+  "category": "autopilot",
+  "n_tests": 14,
+  "tests": [
+   "hermes-debate\\tests\\test_experiment_engine.py",
+   "tests\\test_autopilot_lifecycle_integrity.py",
+   "tests\\test_autopilot_llm_adapter.py"
+  ]
+ },
+ "feat_studio_ExperimentManager": {
+  "status": "VALIDATED",
+  "name": "ExperimentManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase6_experiment_layer.py"
+  ]
+ },
+ "feat_agents_AgentStatus": {
+  "status": "VALIDATED",
+  "name": "AgentStatus",
+  "category": "agents",
+  "n_tests": 2,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_cognitive_orchestration.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_integration.py"
+  ]
+ },
+ "feat_agents_AgentRecord": {
+  "status": "VALIDATED",
+  "name": "AgentRecord",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_observability.py"
+  ]
+ },
+ "feat_observability_AutopilotObservability": {
+  "status": "VALIDATED",
+  "name": "AutopilotObservability",
+  "category": "observability",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_observability.py"
+  ]
+ },
+ "feat_studio_ExperimentUIController": {
+  "status": "VALIDATED",
+  "name": "ExperimentUIController",
+  "category": "studio",
+  "n_tests": 11,
+  "tests": [
+   "life_mean_studio\\tests\\test_runner.py",
+   "tests\\test_autopilot_lifecycle_integrity.py",
+   "tests\\test_dashboard_http_smoke.py"
+  ]
+ },
+ "feat_generation_TaskGenerator": {
+  "status": "VALIDATED",
+  "name": "TaskGenerator",
+  "category": "generation",
+  "n_tests": 7,
+  "tests": [
+   "life_mean_studio\\tests\\test_runner.py",
+   "tests\\test_phase1_task_generator.py",
+   "tests\\test_phase2_diversity_novelty.py"
+  ]
+ },
+ "feat_validation_OracleValidator": {
+  "status": "VALIDATED",
+  "name": "OracleValidator",
+  "category": "validation",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase4_validation.py"
+  ]
+ },
+ "feat_agents_AgentResult": {
+  "status": "VALIDATED",
+  "name": "AgentResult",
+  "category": "agents",
+  "n_tests": 9,
+  "tests": [
+   "tests\\test_multi_model_orchestrator.py",
+   "tests\\test_multi_role_orchestrator.py",
+   "tests\\test_orchestrator.py"
+  ]
+ },
+ "feat_studio_AgentManager": {
+  "status": "VALIDATED",
+  "name": "AgentManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_agent_manager.py"
+  ]
+ },
+ "feat_studio_PackageManager": {
+  "status": "VALIDATED",
+  "name": "PackageManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "life_mean_studio\\tests\\test_package_manager.py"
+  ]
+ },
+ "feat_personas_ScientistPersona": {
+  "status": "READY",
+  "name": "ScientistPersona",
+  "category": "personas",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_studio_FakeController": {
+  "status": "VALIDATED",
+  "name": "FakeController",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "life_mean_studio\\tests\\test_runner.py"
+  ]
+ },
+ "feat_studio_WorkflowManager": {
+  "status": "VALIDATED",
+  "name": "WorkflowManager",
+  "category": "studio",
+  "n_tests": 3,
+  "tests": [
+   "life_mean_studio\\tests\\test_launcher.py",
+   "life_mean_studio\\tests\\test_package_manager.py",
+   "life_mean_studio\\tests\\test_workflows.py"
+  ]
+ },
+ "feat_agents_AgentConfig": {
+  "status": "VALIDATED",
+  "name": "AgentConfig",
+  "category": "agents",
+  "n_tests": 3,
+  "tests": [
+   "life_mean_studio\\tests\\test_launcher.py",
+   "life_mean_studio\\tests\\test_workflows.py",
+   "tests\\test_agent_manager.py"
+  ]
+ },
+ "feat_providers_LmStudioProvider": {
+  "status": "VALIDATED",
+  "name": "LmStudioProvider",
+  "category": "providers",
+  "n_tests": 1,
+  "tests": [
+   "captn_runtime\\tests\\test_end_to_end.py"
+  ]
+ },
+ "feat_routing_OpenRouterProvider": {
+  "status": "VALIDATED",
+  "name": "OpenRouterProvider",
+  "category": "routing",
+  "n_tests": 1,
+  "tests": [
+   "captn_runtime\\tests\\test_end_to_end.py"
+  ]
+ },
+ "feat_providers_MockProvider": {
+  "status": "VALIDATED",
+  "name": "MockProvider",
+  "category": "providers",
+  "n_tests": 2,
+  "tests": [
+   "captn_runtime\\tests\\test_providers.py",
+   "captn_runtime\\tests\\test_stress.py"
+  ]
+ },
+ "feat_providers_ProviderFactory": {
+  "status": "VALIDATED",
+  "name": "ProviderFactory",
+  "category": "providers",
+  "n_tests": 1,
+  "tests": [
+   "captn_runtime\\tests\\test_providers.py"
+  ]
+ },
+ "feat_routing_ModelRouter": {
+  "status": "VALIDATED",
+  "name": "ModelRouter",
+  "category": "routing",
+  "n_tests": 2,
+  "tests": [
+   "captn_runtime\\tests\\test_runtime.py",
+   "tests\\test_debate_lab_integration.py"
+  ]
+ },
+ "feat_experiments_ContextEngine": {
+  "status": "VALIDATED",
+  "name": "ContextEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "captn_runtime\\tests\\test_runtime.py"
+  ]
+ },
+ "feat_experiments_ExperienceEngine": {
+  "status": "VALIDATED",
+  "name": "ExperienceEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "captn_runtime\\tests\\test_runtime.py"
+  ]
+ },
+ "feat_experiments_TelemetryEngine": {
+  "status": "VALIDATED",
+  "name": "TelemetryEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "captn_runtime\\tests\\test_runtime.py"
+  ]
+ },
+ "feat_debate_DebateConfig": {
+  "status": "VALIDATED",
+  "name": "DebateConfig",
+  "category": "debate",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_lab_integration.py",
+   "tests\\test_phase4d.py"
+  ]
+ },
+ "feat_routing_RouterConfig": {
+  "status": "READY",
+  "name": "RouterConfig",
+  "category": "routing",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_BaseAgent": {
+  "status": "VALIDATED",
+  "name": "BaseAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_agents_ConfigurableDebateAgent": {
+  "status": "READY",
+  "name": "ConfigurableDebateAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_ExistentialistAgent": {
+  "status": "VALIDATED",
+  "name": "ExistentialistAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "philosophical_council\\tests\\test_agents.py"
+  ]
+ },
+ "feat_agents_ModeratorAgent": {
+  "status": "VALIDATED",
+  "name": "ModeratorAgent",
+  "category": "agents",
+  "n_tests": 4,
+  "tests": [
+   "philosophical_council\\tests\\test_agents.py",
+   "philosophical_council\\tests\\test_moderator_flow.py",
+   "tests\\test_autopilot_lifecycle_integrity.py"
+  ]
+ },
+ "feat_agents_NihilistAgent": {
+  "status": "VALIDATED",
+  "name": "NihilistAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "philosophical_council\\tests\\test_agents.py"
+  ]
+ },
+ "feat_agents_PragmatistAgent": {
+  "status": "READY",
+  "name": "PragmatistAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_SkepticAgent": {
+  "status": "VALIDATED",
+  "name": "SkepticAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "philosophical_council\\tests\\test_agents.py"
+  ]
+ },
+ "feat_agents_SpiritualAgent": {
+  "status": "VALIDATED",
+  "name": "SpiritualAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "philosophical_council\\tests\\test_agents.py"
+  ]
+ },
+ "feat_agents_StoicAgent": {
+  "status": "VALIDATED",
+  "name": "StoicAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "philosophical_council\\tests\\test_agents.py"
+  ]
+ },
+ "feat_debate_DebateSaver": {
+  "status": "READY",
+  "name": "DebateSaver",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_DebateState": {
+  "status": "VALIDATED",
+  "name": "DebateState",
+  "category": "debate",
+  "n_tests": 5,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py",
+   "hermes-debate\\tests\\test_orchestrators.py",
+   "philosophical_council\\tests\\test_debate_engine.py"
+  ]
+ },
+ "feat_debate_DebateUpdate": {
+  "status": "READY",
+  "name": "DebateUpdate",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_routing_RouterMethod": {
+  "status": "READY",
+  "name": "RouterMethod",
+  "category": "routing",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_studio_TurnManager": {
+  "status": "VALIDATED",
+  "name": "TurnManager",
+  "category": "studio",
+  "n_tests": 5,
+  "tests": [
+   "philosophical_council\\tests\\test_debate_engine.py",
+   "philosophical_council\\tests\\test_debate_engine_fixes.py",
+   "philosophical_council\\tests\\test_moderator_flow.py"
+  ]
+ },
+ "feat_debate_DebateRepository": {
+  "status": "READY",
+  "name": "DebateRepository",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_DebateArchive": {
+  "status": "READY",
+  "name": "DebateArchive",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_DebateArchiveEntry": {
+  "status": "READY",
+  "name": "DebateArchiveEntry",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_AgentCall": {
+  "status": "READY",
+  "name": "AgentCall",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_RawDebateRecorder": {
+  "status": "VALIDATED",
+  "name": "RawDebateRecorder",
+  "category": "debate",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_raw_secret_redaction.py"
+  ]
+ },
+ "feat_agents_AgentPanel": {
+  "status": "READY",
+  "name": "AgentPanel",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_DebateView": {
+  "status": "READY",
+  "name": "DebateView",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_DebateLabConfigError": {
+  "status": "VALIDATED",
+  "name": "DebateLabConfigError",
+  "category": "debate",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_debate_lab_integration.py",
+   "tests\\test_long_debate.py"
+  ]
+ },
+ "feat_debate_DebateLabConfig": {
+  "status": "VALIDATED",
+  "name": "DebateLabConfig",
+  "category": "debate",
+  "n_tests": 4,
+  "tests": [
+   "tests\\test_debate_conversation.py",
+   "tests\\test_debate_lab_integration.py",
+   "tests\\test_long_debate.py"
+  ]
+ },
+ "feat_debate_DebateLabRunView": {
+  "status": "READY",
+  "name": "DebateLabRunView",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_studio_DebateLabController": {
+  "status": "VALIDATED",
+  "name": "DebateLabController",
+  "category": "studio",
+  "n_tests": 4,
+  "tests": [
+   "tests\\test_debate_conversation.py",
+   "tests\\test_debate_lab_integration.py",
+   "tests\\test_long_debate.py"
+  ]
+ },
+ "feat_debate_DebateLabRunStore": {
+  "status": "VALIDATED",
+  "name": "DebateLabRunStore",
+  "category": "debate",
+  "n_tests": 4,
+  "tests": [
+   "tests\\test_debate_conversation.py",
+   "tests\\test_debate_lab_integration.py",
+   "tests\\test_long_debate.py"
+  ]
+ },
+ "feat_debate_DebateSession": {
+  "status": "VALIDATED",
+  "name": "DebateSession",
+  "category": "debate",
+  "n_tests": 10,
+  "tests": [
+   "tests\\test_debate_conversation.py",
+   "tests\\test_debate_engine.py",
+   "tests\\test_debate_engine_comprehensive.py"
+  ]
+ },
+ "feat_debate_DebateSessionFactory": {
+  "status": "VALIDATED",
+  "name": "DebateSessionFactory",
+  "category": "debate",
+  "n_tests": 5,
+  "tests": [
+   "tests\\test_debate_conversation.py",
+   "tests\\test_debate_lab_integration.py",
+   "tests\\test_long_debate.py"
+  ]
+ },
+ "feat_debate_TemplateInvalidForDebate": {
+  "status": "VALIDATED",
+  "name": "TemplateInvalidForDebate",
+  "category": "debate",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_debate_lab_integration.py"
+  ]
+ },
+ "feat_studio_CheckpointManager": {
+  "status": "VALIDATED",
+  "name": "CheckpointManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_checkpoint.py"
+  ]
+ },
+ "feat_studio_CodeLabController": {
+  "status": "VALIDATED",
+  "name": "CodeLabController",
+  "category": "studio",
+  "n_tests": 4,
+  "tests": [
+   "tests\\test_code_lab.py",
+   "tests\\test_code_lab_conversation.py",
+   "tests\\test_code_lab_timeline.py"
+  ]
+ },
+ "feat_experiments_CodeLabEngine": {
+  "status": "VALIDATED",
+  "name": "CodeLabEngine",
+  "category": "experiments",
+  "n_tests": 13,
+  "tests": [
+   "tests\\test_code_lab.py",
+   "tests\\test_code_lab_event_provenance.py",
+   "tests\\test_code_lab_visibility.py"
+  ]
+ },
+ "feat_agents_CodingAgent": {
+  "status": "VALIDATED",
+  "name": "CodingAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_code_lab_multiagent.py"
+  ]
+ },
+ "feat_agents_CodingMultiAgent": {
+  "status": "VALIDATED",
+  "name": "CodingMultiAgent",
+  "category": "agents",
+  "n_tests": 6,
+  "tests": [
+   "tests\\test_code_lab_freeform.py",
+   "tests\\test_code_lab_multiagent.py",
+   "tests\\test_code_lab_visibility.py"
+  ]
+ },
+ "feat_persistence_AutonomousPersistence": {
+  "status": "VALIDATED",
+  "name": "AutonomousPersistence",
+  "category": "persistence",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_persistence.py"
+  ]
+ },
+ "feat_validation_ValidatorResult": {
+  "status": "VALIDATED",
+  "name": "ValidatorResult",
+  "category": "validation",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_team_workflow.py"
+  ]
+ },
+ "feat_studio_AdaptiveContextManager": {
+  "status": "VALIDATED",
+  "name": "AdaptiveContextManager",
+  "category": "studio",
+  "n_tests": 6,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_adaptive_ab.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_adaptive_calibration.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_adaptive_manager.py"
+  ]
+ },
+ "feat_studio_CurriculumController": {
+  "status": "VALIDATED",
+  "name": "CurriculumController",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase8_curriculum.py"
+  ]
+ },
+ "feat_agents_ReasoningAgent": {
+  "status": "VALIDATED",
+  "name": "ReasoningAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_agents_CriticAgent": {
+  "status": "VALIDATED",
+  "name": "CriticAgent",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_agents_JudgeAgent": {
+  "status": "VALIDATED",
+  "name": "JudgeAgent",
+  "category": "agents",
+  "n_tests": 2,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py",
+   "tests\\test_code_lab_visibility.py"
+  ]
+ },
+ "feat_agents_BonsaiAgent": {
+  "status": "READY",
+  "name": "BonsaiAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_CounterPositionAgent": {
+  "status": "READY",
+  "name": "CounterPositionAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_JevAgent": {
+  "status": "READY",
+  "name": "JevAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_RationalAgent": {
+  "status": "READY",
+  "name": "RationalAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_SavantAgent": {
+  "status": "READY",
+  "name": "SavantAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_personas_Persona": {
+  "status": "VALIDATED",
+  "name": "Persona",
+  "category": "personas",
+  "n_tests": 20,
+  "tests": [
+   "hermes-debate\\tests\\test_experiment_engine.py",
+   "hermes-debate\\tests\\test_orchestrators.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_phase316.py"
+  ]
+ },
+ "feat_studio_EscalationManager": {
+  "status": "READY",
+  "name": "EscalationManager",
+  "category": "studio",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_experiments_ExperimentEngine": {
+  "status": "VALIDATED",
+  "name": "ExperimentEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_experiment_engine.py"
+  ]
+ },
+ "feat_routing_Router": {
+  "status": "VALIDATED",
+  "name": "Router",
+  "category": "routing",
+  "n_tests": 30,
+  "tests": [
+   "captn_runtime\\tests\\test_end_to_end.py",
+   "captn_runtime\\tests\\test_runtime.py",
+   "captn_runtime\\tests\\test_stress.py"
+  ]
+ },
+ "feat_experiments_RerankerEngine": {
+  "status": "READY",
+  "name": "RerankerEngine",
+  "category": "experiments",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_experiments_FakeRerankerEngine": {
+  "status": "READY",
+  "name": "FakeRerankerEngine",
+  "category": "experiments",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_experiments_ClefDecisionEngine": {
+  "status": "VALIDATED",
+  "name": "ClefDecisionEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_experiments_FakeClefEngine": {
+  "status": "VALIDATED",
+  "name": "FakeClefEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_studio_ModelManager": {
+  "status": "VALIDATED",
+  "name": "ModelManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_agents_AgentResponse": {
+  "status": "VALIDATED",
+  "name": "AgentResponse",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_agents_AgentRole": {
+  "status": "VALIDATED",
+  "name": "AgentRole",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_debate_BaseDebateCore": {
+  "status": "VALIDATED",
+  "name": "BaseDebateCore",
+  "category": "debate",
+  "n_tests": 3,
+  "tests": [
+   "historical\\v0-alchemy-multi-agent\\tests\\test_debate_orchestrator.py",
+   "legacy\\MIA-LABS-main\\MIA-LABS-main\\MIA-LABS-main\\mia\\test_debate_orchestrator.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\mia\\test_debate_orchestrator.py"
+  ]
+ },
+ "feat_debate_EquationDebateOrchestrator": {
+  "status": "READY",
+  "name": "EquationDebateOrchestrator",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_VariableDebateOrchestrator": {
+  "status": "READY",
+  "name": "VariableDebateOrchestrator",
+  "category": "debate",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_experiments_ExperimentalEngine": {
+  "status": "VALIDATED",
+  "name": "ExperimentalEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_experimental_engine.py"
+  ]
+ },
+ "feat_agents_DesignAgent": {
+  "status": "VALIDATED",
+  "name": "DesignAgent",
+  "category": "agents",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_experimental_api.py",
+   "tests\\test_experimental_engine.py"
+  ]
+ },
+ "feat_studio_ControllerDecision": {
+  "status": "VALIDATED",
+  "name": "ControllerDecision",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase4a.py"
+  ]
+ },
+ "feat_studio_AdaptiveStrategyController": {
+  "status": "VALIDATED",
+  "name": "AdaptiveStrategyController",
+  "category": "studio",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_phase4a.py",
+   "tests\\test_phase4b.py"
+  ]
+ },
+ "feat_studio_MetacognitiveBudgetController": {
+  "status": "VALIDATED",
+  "name": "MetacognitiveBudgetController",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase4c.py"
+  ]
+ },
+ "feat_experiments_ConvergenceEngine": {
+  "status": "VALIDATED",
+  "name": "ConvergenceEngine",
+  "category": "experiments",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_phase4b.py",
+   "tests\\test_phase4c.py"
+  ]
+ },
+ "feat_debate_DebateCondition": {
+  "status": "VALIDATED",
+  "name": "DebateCondition",
+  "category": "debate",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase4d.py"
+  ]
+ },
+ "feat_agents_AgentState": {
+  "status": "READY",
+  "name": "AgentState",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_debate_DebateExperimentRunner": {
+  "status": "VALIDATED",
+  "name": "DebateExperimentRunner",
+  "category": "debate",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase4d.py"
+  ]
+ },
+ "feat_experiments_DivergenceEngine": {
+  "status": "VALIDATED",
+  "name": "DivergenceEngine",
+  "category": "experiments",
+  "n_tests": 4,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_cognitive_orchestration.py",
+   "tests\\test_phase4b.py",
+   "tests\\test_phase4c.py"
+  ]
+ },
+ "feat_agents_AgentType": {
+  "status": "VALIDATED",
+  "name": "AgentType",
+  "category": "agents",
+  "n_tests": 3,
+  "tests": [
+   "tests\\test_multi_model_orchestrator.py",
+   "tests\\test_multi_role_orchestrator.py",
+   "tests\\test_orchestrator.py"
+  ]
+ },
+ "feat_agents_AgentSpec": {
+  "status": "READY",
+  "name": "AgentSpec",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_providers_ModelProvider": {
+  "status": "VALIDATED",
+  "name": "ModelProvider",
+  "category": "providers",
+  "n_tests": 2,
+  "tests": [
+   "tests\\test_multi_model_orchestrator.py",
+   "tests\\test_workspace_manager.py"
+  ]
+ },
+ "feat_routing_StrategyRouter": {
+  "status": "VALIDATED",
+  "name": "StrategyRouter",
+  "category": "routing",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_orchestrator.py"
+  ]
+ },
+ "feat_studio_WorkspaceManager": {
+  "status": "VALIDATED",
+  "name": "WorkspaceManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_workspace_manager.py"
+  ]
+ },
+ "feat_studio_RecoveryManager": {
+  "status": "VALIDATED",
+  "name": "RecoveryManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_phase5_reliability.py"
+  ]
+ },
+ "feat_experiments_CompareEngine": {
+  "status": "VALIDATED",
+  "name": "CompareEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "tests\\test_compare.py"
+  ]
+ },
+ "feat_agents_DiversifierWorker": {
+  "status": "READY",
+  "name": "DiversifierWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_safety_SafetyGate": {
+  "status": "READY",
+  "name": "SafetyGate",
+  "category": "safety",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_NoRepetitionWorker": {
+  "status": "READY",
+  "name": "NoRepetitionWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_studio_AlchimieLibraryManager": {
+  "status": "VALIDATED",
+  "name": "AlchimieLibraryManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_alchimie_library_manager.py"
+  ]
+ },
+ "feat_validation_MathValidator": {
+  "status": "VALIDATED",
+  "name": "MathValidator",
+  "category": "validation",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_mirror_transformation.py"
+  ]
+ },
+ "feat_agents_WorkerInvocation": {
+  "status": "READY",
+  "name": "WorkerInvocation",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_AgentRegistry": {
+  "status": "VALIDATED",
+  "name": "AgentRegistry",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_cognitive_orchestration.py"
+  ]
+ },
+ "feat_studio_PluginManager": {
+  "status": "VALIDATED",
+  "name": "PluginManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\test_logging.py"
+  ]
+ },
+ "feat_agents_MirrorAgent": {
+  "status": "READY",
+  "name": "MirrorAgent",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_generation_PatchGenerator": {
+  "status": "READY",
+  "name": "PatchGenerator",
+  "category": "generation",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_routing_PerToolRouter": {
+  "status": "VALIDATED",
+  "name": "PerToolRouter",
+  "category": "routing",
+  "n_tests": 2,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_phase321.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_runtime_integrity.py"
+  ]
+ },
+ "feat_routing_OpenRouterAccounting": {
+  "status": "VALIDATED",
+  "name": "OpenRouterAccounting",
+  "category": "routing",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tools\\test_reconcile.py"
+  ]
+ },
+ "feat_experiments_RuleEngine": {
+  "status": "READY",
+  "name": "RuleEngine",
+  "category": "experiments",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_AgentTask": {
+  "status": "READY",
+  "name": "AgentTask",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_studio_QuarantineManager": {
+  "status": "VALIDATED",
+  "name": "QuarantineManager",
+  "category": "studio",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_state_quarantine.py"
+  ]
+ },
+ "feat_experiments_ReflectionEngine": {
+  "status": "VALIDATED",
+  "name": "ReflectionEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_state_quarantine.py"
+  ]
+ },
+ "feat_experiments_DecisionEngine": {
+  "status": "VALIDATED",
+  "name": "DecisionEngine",
+  "category": "experiments",
+  "n_tests": 1,
+  "tests": [
+   "hermes-debate\\tests\\test_all.py"
+  ]
+ },
+ "feat_validation_PatchValidator": {
+  "status": "VALIDATED",
+  "name": "PatchValidator",
+  "category": "validation",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py"
+  ]
+ },
+ "feat_agents_SyntaxWorker": {
+  "status": "READY",
+  "name": "SyntaxWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_BugWorker": {
+  "status": "READY",
+  "name": "BugWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_IncrementalWorker": {
+  "status": "READY",
+  "name": "IncrementalWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_CodeBackendWorker": {
+  "status": "READY",
+  "name": "CodeBackendWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_generation_FixGenerator": {
+  "status": "VALIDATED",
+  "name": "FixGenerator",
+  "category": "generation",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py"
+  ]
+ },
+ "feat_agents_PGMWorker": {
+  "status": "READY",
+  "name": "PGMWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_crawlers_CrawlError": {
+  "status": "VALIDATED",
+  "name": "CrawlError",
+  "category": "crawlers",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+  ]
+ },
+ "feat_crawlers_GitHubCrawler": {
+  "status": "VALIDATED",
+  "name": "GitHubCrawler",
+  "category": "crawlers",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+  ]
+ },
+ "feat_agents_CrawlerWorker": {
+  "status": "VALIDATED",
+  "name": "CrawlerWorker",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_crawler.py"
+  ]
+ },
+ "feat_agents_Raw2JsonWorker": {
+  "status": "VALIDATED",
+  "name": "Raw2JsonWorker",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_raw2json_worker.py"
+  ]
+ },
+ "feat_routing_OppositionRouter": {
+  "status": "READY",
+  "name": "OppositionRouter",
+  "category": "routing",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_SmartRouterWorker": {
+  "status": "READY",
+  "name": "SmartRouterWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_DiversityCheckerWorker": {
+  "status": "READY",
+  "name": "DiversityCheckerWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_DomainClassifierWorker": {
+  "status": "READY",
+  "name": "DomainClassifierWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_validation_Validator": {
+  "status": "VALIDATED",
+  "name": "Validator",
+  "category": "validation",
+  "n_tests": 15,
+  "tests": [
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_core_runtime.py",
+   "legacy\\Mia_Brain\\CaptN-BRAIN-main\\tests\\test_mirror_transformation.py",
+   "tests\\test_adaptive_router.py"
+  ]
+ },
+ "feat_agents_ChemistryValidationWorker": {
+  "status": "READY",
+  "name": "ChemistryValidationWorker",
+  "category": "agents",
+  "n_tests": 0,
+  "tests": []
+ },
+ "feat_agents_MathValidationWorker": {
+  "status": "VALIDATED",
+  "name": "MathValidationWorker",
+  "category": "agents",
+  "n_tests": 1,
+  "tests": [
+   "pipeline_inspector\\tests\\test_pipeline_inspector.py"
+  ]
+ }
+}

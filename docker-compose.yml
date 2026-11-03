@@ -1,10 +1,36 @@
 services:
+  # Repairs ownership of the run volumes before the dashboard starts.
+  # Named volumes keep the owner they got on first creation (root), and the
+  # dashboard runs as uid 999 with cap_drop ALL, so it can neither chown nor
+  # write there -> "[Errno 13] Permission denied: /app/debate_lab_runs/...".
+  # This init container runs as root with default caps, fixes the volumes,
+  # then exits; the dashboard keeps its hardened profile untouched.
+  volumes-init:
+    image: life-mean-dashboard:local
+    user: "0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        chown -R 999:999 /app/debate_lab_runs /app/code_lab_runs
+        /app/philosophical_council/storage/raw_data;
+        echo "ownership fixed"; ls -ld /app/debate_lab_runs /app/code_lab_runs
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - life_mean_code_lab_runs:/app/code_lab_runs
+      - life_mean_debate_lab_runs:/app/debate_lab_runs
+      - life_mean_philosophical_council:/app/philosophical_council/storage/raw_data
+    restart: "no"
+
   dashboard:
     build:
       context: .
       dockerfile: Dockerfile
     image: life-mean-dashboard:local
     init: true
+    depends_on:
+      volumes-init:
+        condition: service_completed_successfully
     env_file:
       - path: .env
         required: false

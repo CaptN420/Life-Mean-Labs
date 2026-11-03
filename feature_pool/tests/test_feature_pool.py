@@ -170,6 +170,71 @@ def test_feature_list():
     print(f"First feature: {first['name']} ({first['category']})")
 
 
+# ── Découverte : couverture réelle ────────────────────────────────────────────
+# Ces tests verrouillent le correctif de `_build_scan_paths` : la liste de
+# dossiers était codée en dur, donc `pipeline_inspector`, `feature_pool`, `data`
+# et `life_mean_extensions` n'étaient jamais scannés (187 features pour 1280
+# classes), et le silence du pool était lu comme « la capacité n'existe pas ».
+
+
+def test_scanner_sees_top_level_packages():
+    """Les paquets de premier niveau sont découverts sans liste codée en dur."""
+    pool = FeaturePool(str(_test_root))
+    pool.discover()
+    names = {f.name for f in pool.registry.all_features}
+
+    # Classes qui n'existaient dans le registre que si la découverte est réelle.
+    assert "PipelineInspector" in names, "pipeline_inspector/ n'est pas scanné"
+    assert "FeatureAnalyzer" in names, "feature_pool/ n'est pas scanné"
+
+    paths = {loc.path.replace("\\", "/") for f in pool.registry.all_features
+             for loc in f.locations}
+    assert any(p.startswith("pipeline_inspector/") for p in paths)
+    assert any(p.startswith("feature_pool/") for p in paths)
+
+
+def test_scanner_indexes_security_classes():
+    """Les classes de sécurité/permissions entrent dans le registre."""
+    pool = FeaturePool(str(_test_root))
+    pool.discover()
+    names = {f.name for f in pool.registry.all_features}
+
+    for expected in ("PolicyGuard", "ResourceGuard",
+                     "ExperimentExecutionGate", "PolicyViolation"):
+        assert expected in names, f"{expected} absent du registre"
+
+
+def test_scanner_excludes_tests_and_generated_runs():
+    """`tests/` et les workspaces générés ne produisent pas de « features »."""
+    pool = FeaturePool(str(_test_root))
+    pool.discover()
+
+    paths = [loc.path.replace("\\", "/") for f in pool.registry.all_features
+             for loc in f.locations]
+    assert paths, "aucune feature découverte"
+    offenders = [p for p in paths
+                 if p.startswith("tests/") or "/tests/" in p
+                 or p.startswith("code_lab_runs/") or "/code_lab_runs/" in p
+                 or p.startswith("debate_lab_runs/") or "/debate_lab_runs/" in p]
+    assert not offenders, f"chemins exclus indexés: {offenders[:5]}"
+    # Le fixture de test `FakeController` ne doit plus être une feature.
+    assert "FakeController" not in {f.name for f in pool.registry.all_features}
+
+
+def test_scanner_broken_count_is_bounded():
+    """Après analyse, le nombre de BROKEN reste borné (audit : 1 attendu)."""
+    pool = FeaturePool(str(_test_root))
+    pool.discover()
+    pool.analyze_all()
+    pool.validate_all()
+
+    statuses = [f.status.value if hasattr(f.status, "value") else f.status
+                for f in pool.registry.all_features]
+    broken = statuses.count("BROKEN")
+    assert broken <= 3, f"{broken} features BROKEN (attendu <= 3)"
+    assert len(statuses) > 500, f"seulement {len(statuses)} features découvertes"
+
+
 def main():
     """Run all tests."""
     print("=" * 60)

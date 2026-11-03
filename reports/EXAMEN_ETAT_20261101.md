@@ -288,4 +288,29 @@ Critère de sortie : `git status` ne montre plus de paquet fonctionnel non suivi
 
 ---
 
+## 13. Jalon B1 — élargissement de la découverte du Feature Pool (appliqué, non commité)
+
+Fichiers modifiés : `feature_pool/scanner.py` (+126/−33) et `feature_pool/tests/test_feature_pool.py` (+65). Rien d'autre.
+
+| Mesure | Avant | Après |
+|---|---|---|
+| Features enregistrées | 187 | **989** |
+| Classes réellement présentes (fichiers scannés) | 1280 | 1280 |
+| Noms de classes distincts | 1055 | 1055 (tous indexés) |
+| `tests/` et workspaces générés indexés | oui (1 fixture) | **non** |
+| `PolicyGuard`, `ResourceGuard`, `ExperimentExecutionGate` | absents | **présents** |
+| BROKEN | 0 | **0** |
+| VALIDATED | 138 | **632** (63,9 %) |
+| dont preuve uniquement `legacy/`+`historical/`+`hermes-debate/` | 27 | **129** (20,4 %) |
+| Conflits rapportés | 8 190 | 242 638 (bruit cartésien, toujours 0 high/medium) |
+| `analyze_all` | 0,75 s | 1,75 s |
+| Construction du Studio | 0,15 s | **0,13 s** (table 989 lignes) |
+| Suite racine | 29 / 1552 / 13 | **29 / 1552 / 13** (437,03 s) |
+
+**Défaut trouvé pendant l'implémentation (et corrigé) :** ma proposition initiale omettait `code_lab_runs/`, qui contient **1104 fichiers `.py` générés**. Premier scan : 1943 fichiers, 1004 features dont des doublons de runs. Ajout de `code_lab_runs`, `debate_lab_runs`, `runs` à `SKIP_DIRS` → 839 fichiers, 989 features.
+
+**Critère d'arrêt déclenché :** le critère n° 2 (« features entre 1200 et 1600 ») est **violé** (989). Cause : il était calibré sur `1817 − 378 = 1439`, sans tenir compte de la déduplication par nom effectuée par `_register_feature` (221 fusions) ni des classes privées/test (70). Décomposition exacte : 1280 classes − 70 privées − 221 fusions = 989. **Couverture des noms de classes non privés : 100 %.** Le seuil était faux, pas le résultat — la décision revient au créateur.
+
+**Effet de bord à trancher :** les faux `VALIDATED` sont amplifiés en valeur absolue (27 → 129). Le correctif de la preuve (`_find_tests`, R5) est donc un prérequis avant d'afficher ces statuts comme décisionnels.
+
 **AWAITING CREATOR DECISION — NO IMPLEMENTATION AUTHORIZED.**
