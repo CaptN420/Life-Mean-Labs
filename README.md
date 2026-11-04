@@ -301,4 +301,4 @@ python -m pytest -q
 
 ## 📜 License
 
-[MIT](LICENSE) © 2026 CaptN420
+[apach2](LICENSE) © 2026 CaptN420
