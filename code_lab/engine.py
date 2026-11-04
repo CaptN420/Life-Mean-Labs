@@ -754,6 +754,11 @@ class CodeLabEngine:
                            passed=ver["passed"], total=ver.get("total"))
                 break
 
+            # Emit TEST_FAILED event for visibility
+            self._emit(TEST_FAILED, run_id=self.config.run_id, iteration=iteration,
+                       failed=ver.get("failures", 0), total=ver.get("total"),
+                       output=ver.get("output", "")[-500:])
+
             # ── ANALYZE FAILURE ───────────────────────────────────────────
             self._status = PipelineState.ANALYZING_FAILURE.value if self.persistence else "analyzing"
             error_msg = ver.get("output", "")[-1000:]

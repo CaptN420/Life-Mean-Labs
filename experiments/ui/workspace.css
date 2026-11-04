@@ -1,0 +1,19 @@
+:root {
+  --bg-primary: #1a1a2e;
+  --accent: #0f3460;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-primary);
+  color: #eee;
+}
+
+[data-tool="topbar"] { height: 48px; }
+[data-tool="left-panel"] { width: 250px; float: left; }
+[data-tool="center-panel"] { margin-left: 250px; flex: 1; }
+[data-tool="right-panel"] { width: 300px; float: right; }
+[data-tool="bottom-panel"] { clear: both; height: 200px; }
+[data-tool="code-editor"] { padding: 10px; }
+[data-tool="console-output"] { background: #000; color: #0f0; }
+[data-tool="state-display"] { padding: 10px; }

@@ -134,7 +134,7 @@ def test_weakest_dimension():
         _result(valid=False, domain="math"),
         _result(valid=True, domain="logic"),
     ])
-    weakest = analyzer.weakest_dimension()
+    weakest = analyzer.weakest_dimension(min_tests=1)
     assert weakest["domain"] == "math"
     assert weakest["accuracy"] == 0.0
 

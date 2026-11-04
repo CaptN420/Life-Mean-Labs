@@ -23,6 +23,7 @@ class ErrorRecord:
         self.error_message = error_message
         self.run_id = run_id
         self.strategies_tried: List[str] = []
+        self.strategy_attempts: Dict[str, int] = {}  # strategy -> attempt count
         self.successful_fixes: List[Dict[str, Any]] = []
         self.first_seen: float = time.time()
         self.last_seen: float = time.time()
@@ -34,6 +35,7 @@ class ErrorRecord:
             "error_message": self.error_message[:200],
             "run_id": self.run_id,
             "strategies_tried": self.strategies_tried,
+            "strategy_attempts": self.strategy_attempts,
             "successful_fixes": self.successful_fixes,
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
@@ -64,6 +66,7 @@ class ErrorMemory:
                     run_id=rec_data.get("run_id", "unknown"),
                 )
                 rec.strategies_tried = rec_data.get("strategies_tried", [])
+                rec.strategy_attempts = rec_data.get("strategy_attempts", {})
                 rec.successful_fixes = rec_data.get("successful_fixes", [])
                 rec.first_seen = rec_data.get("first_seen", time.time())
                 rec.last_seen = rec_data.get("last_seen", time.time())
@@ -81,8 +84,8 @@ class ErrorMemory:
 
     def record_error(self, error_type: str, error_message: str, run_id: str) -> ErrorRecord:
         """Record an error occurrence."""
-        # Create signature from error type and first line
-        sig = self._make_signature(error_type, error_message)
+        # Signature uses error_type only for consistency with lookup methods
+        sig = self._make_signature(error_type, "")
 
         if sig in self._errors:
             rec = self._errors[sig]
@@ -99,16 +102,23 @@ class ErrorMemory:
     def record_strategy_attempt(self, error_type: str, strategy: str, success: bool,
                                 fix_details: Optional[Dict[str, Any]] = None) -> None:
         """Record that a strategy was tried for an error."""
+        # Match signature by error_type only (not message), same as get_failed_strategies/should_avoid
         sig = self._make_signature(error_type, "")
         if sig not in self._errors:
-            return
+            # Auto-create record if strategy is being tracked without prior error record
+            self._errors[sig] = ErrorRecord(error_type, "", "unknown")
 
         rec = self._errors[sig]
         if strategy not in rec.strategies_tried:
             rec.strategies_tried.append(strategy)
+        # Track per-strategy attempt count
+        rec.strategy_attempts[strategy] = rec.strategy_attempts.get(strategy, 0) + 1
 
-        if success and fix_details:
-            rec.successful_fixes.append(fix_details)
+        if success:
+            fix = {"strategy": strategy}
+            if fix_details:
+                fix.update(fix_details)
+            rec.successful_fixes.append(fix)
 
         self._save()
 
@@ -135,13 +145,9 @@ class ErrorMemory:
             return False
 
         rec = self._errors[sig]
-        if strategy in rec.strategies_tried:
-            # Count how many times this specific strategy was tried
-            count = rec.strategies_tried.count(strategy)
-            # If tried 3+ times, avoid
-            return count >= 3
-
-        return False
+        # Use attempt count instead of list length
+        attempt_count = rec.strategy_attempts.get(strategy, 0)
+        return attempt_count >= 3
 
     def get_recommendation(self, error_type: str) -> Optional[str]:
         """Get a recommended strategy for an error type."""

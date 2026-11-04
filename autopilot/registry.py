@@ -192,6 +192,7 @@ class ModelRegistry:
         training_dataset_id: Optional[str] = None,
         training_config: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        status: Optional[ModelStatus] = None,
     ) -> ModelRecord:
         """Register a new candidate model.
 
@@ -201,14 +202,16 @@ class ModelRegistry:
             training_dataset_id: Dataset used for training (idempotency/lineage)
             training_config: Training hyperparameters/provenance
             metadata: Extra metadata
+            status: Initial status (default CANDIDATE)
 
         Returns:
             The registered candidate ModelRecord
         """
         parent_id = parent_model_id or self.stable_model_id()
+        record_status = status if status is not None else ModelStatus.CANDIDATE
         record = ModelRecord(
             name=name,
-            status=ModelStatus.CANDIDATE,
+            status=record_status,
             parent_model_id=parent_id,
             training_dataset_id=training_dataset_id,
             training_config=training_config or {},

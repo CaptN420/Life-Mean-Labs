@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Life Mean Workspace</title>
+  <link rel="stylesheet" href="workspace.css">
+</head>
+<body>
+  <div data-tool="topbar" id="topbar"></div>
+  <div data-tool="left-panel" id="left-panel"></div>
+  <div data-tool="center-panel" id="center-panel"></div>
+  <div data-tool="right-panel" id="right-panel"></div>
+  <div data-tool="bottom-panel" id="bottom-panel"></div>
+  <div data-tool="code-editor" id="code-editor"></div>
+  <div data-tool="console-output" id="console-output"></div>
+  <div data-tool="state-display" id="state-display"></div>
+
+  <div data-view-id="editor" id="view-editor"></div>
+  <div data-view-id="workflow" id="view-workflow"></div>
+  <div data-view-id="history" id="view-history"></div>
+  <div data-view-id="settings" id="view-settings"></div>
+
+  <button data-action="switch_view">Switch View</button>
+  <button data-action="start_run">Start Run</button>
+  <button data-action="stop_run">Stop Run</button>
+  <button data-action="change_model">Change Model</button>
+  <button data-action="change_workflow">Change Workflow</button>
+  <button data-action="clear_console">Clear Console</button>
+
+  <script src="workspace.js"></script>
+</body>
+</html>

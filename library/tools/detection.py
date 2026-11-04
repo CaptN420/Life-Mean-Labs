@@ -87,6 +87,13 @@ TOOL_DETECTION: Dict[str, List[Dict[str, Any]]] = {
     "logarithm": [{"tool": "math_log_", "param": "value", "score": 10}],
     "bayes": [{"tool": "math_bayes_theorem", "param": "prior", "score": 12}],
 
+    # ── Math: arithmetic operations (higher priority than coding_generator) ──
+    "gcd": [{"tool": "math_gcd", "param": "a", "score": 20}],
+    "lcm": [{"tool": "math_lcm", "param": "a", "score": 20}],
+    "factorial": [{"tool": "math_factorial", "param": "n", "score": 20}],
+    "prime": [{"tool": "math_is_prime", "param": "n", "score": 20}],
+    "fibonacci": [{"tool": "math_fibonacci", "param": "n", "score": 20}],
+
     # ── Physics ──
     "force": [{"tool": "physics_force", "param": "mass", "score": 12}],
     "ohms law": [{"tool": "physics_ohms_law", "param": "voltage", "score": 15}],
@@ -112,11 +119,6 @@ TOOL_DETECTION: Dict[str, List[Dict[str, Any]]] = {
     "coding task": [{"tool": "coding_generator", "param": "description", "score": 20}],
     "generate function": [{"tool": "coding_generator", "param": "description", "score": 20}],
     "implement": [{"tool": "coding_generator", "param": "description", "score": 18}],
-    "fibonacci": [{"tool": "coding_generator", "param": "description", "score": 15}],
-    "factorial": [{"tool": "coding_generator", "param": "description", "score": 15}],
-    "gcd": [{"tool": "coding_generator", "param": "description", "score": 15}],
-    "lcm": [{"tool": "coding_generator", "param": "description", "score": 15}],
-    "prime": [{"tool": "coding_generator", "param": "description", "score": 15}],
     "sort": [{"tool": "coding_generator", "param": "description", "score": 15}],
     "search": [{"tool": "coding_generator", "param": "description", "score": 15}],
 
@@ -134,13 +136,13 @@ DOMAIN_MAP: Dict[str, str] = {
     "format code": "coding", "security audit": "coding", "type check": "coding",
     "loc": "coding", "cyclomatic": "coding", "regex": "coding",
     "write code": "coding", "coding task": "coding", "generate function": "coding",
-    "implement": "coding", "fibonacci": "coding", "factorial": "coding",
-    "gcd": "coding", "lcm": "coding", "prime": "coding", "sort": "coding",
+    "implement": "coding", "sort": "coding",
     "search": "coding",
     # Math
     "simplify": "math", "expand": "math", "derivative": "math",
     "solve": "math", "factor": "math",
     "trig": "math", "logarithm": "math", "bayes": "math",
+    "gcd": "math", "lcm": "math", "factorial": "math", "prime": "math", "fibonacci": "math",
     "integrate": "math", "taylor": "math", "limit": "math",
     # Physics
     "force": "physics", "ohms law": "physics", "kinematics": "physics",

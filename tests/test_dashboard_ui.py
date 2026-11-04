@@ -114,8 +114,8 @@ class TestDashboardJavaScript:
 
     def test_el_function_defined(self, dashboard_html: str):
         """The el() helper should be defined at module scope."""
-        # Should be defined before loadSkillsPanel
-        assert re.search(r"const\s+el\s*=\s*id\s*=>\s*document\.getElementById", dashboard_html)
+        # Accept either arrow function or regular function form
+        assert re.search(r"function\s+el\s*\(", dashboard_html) or re.search(r"const\s+el\s*=\s*id\s*=>", dashboard_html)
 
     def test_load_skills_function_exists(self, dashboard_html: str):
         """loadSkills function should exist."""

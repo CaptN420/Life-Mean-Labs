@@ -32,6 +32,22 @@ except Exception:  # pragma: no cover
     DebateLabController = None
     _DEBATE_LAB_AVAILABLE = False
 
+try:
+    from experiments.trainer import Trainer, TrainingConfig
+    _TRAINER_AVAILABLE = True
+except Exception:  # pragma: no cover
+    Trainer = None
+    TrainingConfig = None
+    _TRAINER_AVAILABLE = False
+
+try:
+    from autopilot.registry import ModelRegistry, ModelStatus
+    _REGISTRY_AVAILABLE = True
+except Exception:  # pragma: no cover
+    ModelRegistry = None
+    ModelStatus = None
+    _REGISTRY_AVAILABLE = False
+
 logger = logging.getLogger("ExperimentDashboard")
 
 
@@ -157,6 +173,8 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
     code_lab_controller: Any = None  # Set by server (from code_lab)
     debate_lab_controller: Any = None  # Set by server (from debate_lab)
     extension_layer: Dict[str, Any] = None  # Set by server (from life_mean_extensions)
+    trainer: Any = None  # Set by server (from experiments.trainer)
+    registry: Any = None  # Set by server (from autopilot.registry)
 
     def do_GET(self) -> None:
         """Handle GET requests."""
@@ -355,6 +373,8 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
                     self._send_json({"status": "continued"})
                 else:
                     self._send_error(500, "Failed to continue experiment", code="server")
+        elif parsed.path == "/api/training/run":
+            self._training_start(data)
         elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/observability"):
             exp_id = parsed.path.split("/")[-2]
             obs_data = self.ui_controller.get_observability(exp_id)
@@ -489,6 +509,16 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
                 self._send_json({"status": "deleted", "role": role, "settings": result})
             except Exception as e:
                 self._send_error(500, str(e), code="server")
+        elif parsed.path == "/api/training/runs":
+            self._training_list_runs()
+        elif parsed.path.startswith("/api/training/runs/"):
+            run_id = parsed.path.strip("/").split("/")[-1]
+            self._training_get_run(run_id)
+        elif parsed.path == "/api/models":
+            self._models_list()
+        elif parsed.path.startswith("/api/models/"):
+            model_id = parsed.path.strip("/").split("/")[-1]
+            self._models_get(model_id)
         else:
             self._send_error(404, "Not found")
 
@@ -1198,6 +1228,74 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
 
 
 
+    # ── Training API ───────────────────────────────────────────────────────
+    def _training_list_runs(self) -> None:
+        if self.trainer is None:
+            self._send_json({"runs": [], "total": 0})
+            return
+        runs = self.trainer.list_runs()
+        self._send_json({"runs": [r.to_dict() for r in runs], "total": len(runs)})
+
+    def _training_get_run(self, run_id: str) -> None:
+        if self.trainer is None:
+            self._send_error(503, "Trainer not available")
+            return
+        result = self.trainer.get_run(run_id)
+        if result is None:
+            self._send_error(404, f"Run {run_id} not found")
+            return
+        self._send_json(result.to_dict())
+
+    def _models_list(self) -> None:
+        if self.registry is None:
+            self._send_json({"models": [], "total": 0})
+            return
+        models = self.registry.all()
+        self._send_json({"models": [m.to_dict() for m in models], "total": len(models)})
+
+    def _models_get(self, model_id: str) -> None:
+        if self.registry is None:
+            self._send_error(503, "Registry not available")
+            return
+        model = self.registry.get(model_id)
+        if model is None:
+            self._send_error(404, f"Model {model_id} not found")
+            return
+        self._send_json(model.to_dict())
+
+    def _training_start(self, data: Dict[str, Any]) -> None:
+        """Start a training run from the dashboard."""
+        if self.trainer is None:
+            self._send_error(503, "Trainer not available")
+            return
+        try:
+            config = TrainingConfig(
+                dataset_path=data.get("dataset_path", "/data/train.jsonl"),
+                model_name=data.get("model_name", "candidate-v1"),
+                epochs=int(data.get("epochs", 3)),
+                learning_rate=float(data.get("learning_rate", 0.001)),
+                batch_size=int(data.get("batch_size", 32)),
+                seed=int(data.get("seed", 42)),
+            )
+            result = self.trainer.train(config, simulate=True)
+            # Also register in registry if model_name provided
+            if self.registry is not None and config.model_name:
+                candidate = self.registry.register_candidate(
+                    name=config.model_name,
+                    training_dataset_id=Path(config.dataset_path).stem,
+                    training_config=result.config.to_dict(),
+                )
+                # Record benchmark metrics
+                self.registry.record_benchmark(
+                    model_id=candidate.model_id,
+                    benchmark_name="simulated",
+                    metrics=result.metrics,
+                )
+            self._send_json({"run_id": result.run_id, "status": "started", "metrics": result.metrics})
+        except Exception as e:
+            self._send_error(500, f"Failed to start training: {e}", code="server")
+
+
 def start_dashboard(
     host: str = "127.0.0.1",
     port: int = 8080,
@@ -1246,6 +1344,17 @@ def start_dashboard(
     except Exception as exc:  # pragma: no cover - graceful degradation
         logger.warning("Extensions layer unavailable: %s", exc)
         DashboardHandler.extension_layer = None
+    # Wire up Trainer and ModelRegistry
+    try:
+        from experiments.trainer import Trainer
+        from autopilot.registry import ModelRegistry
+        DashboardHandler.trainer = Trainer()
+        DashboardHandler.registry = ModelRegistry()
+        logger.info("Trainer and ModelRegistry initialized")
+    except Exception as exc:  # pragma: no cover - graceful degradation
+        logger.warning("Trainer/Registry unavailable: %s", exc)
+        DashboardHandler.trainer = None
+        DashboardHandler.registry = None
 
     server = HTTPServer((host, port), DashboardHandler)
     logger.info(f"Starting dashboard on http://{host}:{port}")
