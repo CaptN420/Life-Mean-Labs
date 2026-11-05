@@ -68,8 +68,9 @@ def test_summary_contains_events_traces_and_agent_records(monkeypatch, tmp_path)
     assert block["truncated"]["events"] is False
     # the persisted copy is what the live tracker had
     assert [e.get("event_id") for e in block["events"]] == [e.get("event_id") for e in live["events"]]
-    # traces are empty because the engine never records them (checked below)
-    assert block["totals"]["traces"] == 0
+    # traces are produced by the deterministic rules now (RoutingRule + ValidationRule)
+    assert block["traces"], "deterministic traces must land in the summary"
+    assert block["totals"]["traces"] >= len(block["traces"])
 
 
 def test_event_limit_truncates_and_says_so(monkeypatch, tmp_path):
@@ -117,10 +118,9 @@ def test_manifest_of_a_restored_run_carries_the_evidence(monkeypatch, tmp_path):
     assert manifest["events"], "a restored manifest must not pretend to be empty"
     assert manifest["agents"]
     assert "events" in manifest["note"]
-    # traces are declared absent with a reason instead of silently empty
-    assert manifest["traces"] == []
-    assert manifest["traces_absent_reason"]
-    assert "never calls record_transition" in manifest["traces_absent_reason"]
+    # deterministic traces are restored too, and no "why is it empty" reason is needed
+    assert manifest["traces"], "a restored manifest must carry the traces it recorded"
+    assert manifest["traces_absent_reason"] is None
     assert manifest["reproducibility"]["seed"] == 17
     assert manifest["reproducibility_fingerprint"]
 
@@ -166,11 +166,12 @@ def test_old_summary_without_the_block_still_rehydrates(monkeypatch, tmp_path):
     assert fresh.get_observability("exp_legacy") is None
 
 
-def test_live_manifest_also_declares_the_missing_traces(monkeypatch, tmp_path):
+def test_live_manifest_carries_the_deterministic_traces(monkeypatch, tmp_path):
     runs_dir = tmp_path / "runs"
     ui = _run_one(monkeypatch, runs_dir)
 
     manifest = ui.export_experiment_manifest("exp_obs")
     assert manifest["events"]
-    assert manifest["traces"] == []
-    assert "never calls record_transition" in manifest["traces_absent_reason"]
+    assert manifest["traces"], "RoutingRule/ValidationRule traces must be recorded"
+    assert {t["rule_name"] for t in manifest["traces"]} == {"RoutingRule", "ValidationRule"}
+    assert manifest["traces_absent_reason"] is None

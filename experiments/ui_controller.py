@@ -18,9 +18,10 @@ logger = logging.getLogger("ExperimentUI")
 
 # Stated wherever a payload could otherwise look like "we lost the traces".
 _TRACES_ABSENT_REASON = (
-    "This build records events but no deterministic traces: the execution engine "
-    "never calls record_transition()/record_rule_application(). The RAW jsonl "
-    "under data/raw_debates holds the per-task evidence."
+    "No deterministic trace was recorded for this run: traces come from the "
+    "deterministic pipeline (RoutingRule/ValidationRule per task), which debate "
+    "mode does not use. The RAW jsonl under data/raw_debates holds the per-task "
+    "evidence."
 )
 
 
@@ -704,6 +705,19 @@ class ExperimentUIController:
 
             # Run through ExperimentRunner (reuses SmartRouter + ToolWorker)
             runner = ExperimentRunner(config=config)
+            # Wire the deterministic decisions into the tracker. Until now
+            # record_transition()/record_rule_application() had no caller, so
+            # every manifest carried an empty "traces" array.
+            _obs = self._observability.get(experiment_id)
+            if _obs is not None:
+                def _trace_sink(trace: Dict[str, Any], _obs=_obs) -> None:
+                    # Observability only: never re-enter this controller here.
+                    _obs.record_transition(
+                        trace.get("before", {}), trace.get("after", {}),
+                        str(trace.get("rule", "")), agent_id=str(trace.get("agent_id", "")),
+                    )
+
+                runner.trace_sink = _trace_sink
 
             # Create experiment context
             context = ExperimentContext(
@@ -799,6 +813,20 @@ class ExperimentUIController:
                     "pass_rate": (valid / completed) if completed else 0.0,
                     "mode": "deterministic",
                 })
+                # The tracker's progress object is what /manifest and
+                # /observability report; nothing fed it, so a finished 3-task run
+                # still displayed tasks_completed: 0.
+                obs = self._observability.get(experiment_id)
+                if obs is not None:
+                    obs.update_progress(
+                        tasks_completed=completed,
+                        tasks_total=total_tasks,
+                        current_round=index + 1,
+                        total_rounds=total_tasks,
+                        current_step=f"{completed}/{total_tasks} tasks",
+                        active_agent="deterministic_pipeline",
+                        elapsed_seconds=round(time.time() - run_started, 1),
+                    )
 
             completed = len(done_indices) + len(new_results)
             valid = prior_valid + sum(1 for r in new_results if r.is_valid)
@@ -810,6 +838,16 @@ class ExperimentUIController:
                 "pass_rate": pass_rate,
                 "mode": "deterministic",
             })
+
+            obs = self._observability.get(experiment_id)
+            if obs is not None:
+                obs.update_progress(
+                    tasks_completed=completed,
+                    tasks_total=total_tasks,
+                    total_rounds=total_tasks,
+                    current_step="finished",
+                    elapsed_seconds=round(time.time() - run_started, 1),
+                )
 
             logger.info(
                 "Experiment %s %s: %d/%d tasks done, %d valid, pass rate %.1f%%%s",
@@ -1165,8 +1203,8 @@ class ExperimentUIController:
             "rehydrated": True,
             "restored_totals": restored_totals,
             "truncated": truncated,
-            # Empty traces are a fact of this build, not a lost file: the engine
-            # never calls record_transition/record_rule_application.
+            # Empty traces mean "this run recorded none" (debate mode), not a
+            # lost file: the reason is stated instead of a bare empty array.
             "traces_absent_reason": None if restored_traces else _TRACES_ABSENT_REASON,
             "note": (
                 "Rebuilt from the persisted run summary after a restart. Config, seed "

@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 765 passed, 13 skipped, 0 failed** (après P1→P7) |
+| Tests de référence | **1 773 passed, 13 skipped, 0 failed** (après P1→P9) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -264,6 +264,59 @@ Second point relevé pendant la manipulation HTTP : `POST /api/experiments` ne f
 (`status: created`) ; il faut ensuite `POST /api/experiments/{id}/start`. Un run « terminé » avec
 `tasks_completed: 0` vu juste après la création vient de là, pas d'un bug du moteur.
 
+### 4nonies. Traces déterministes réellement produites (P8)
+
+Constat de P6 : `record_transition()` et `record_rule_application()` existaient, étaient exposés dans
+chaque manifeste… et n'avaient **aucun appelant**. `update_progress()` non plus. Trois mécanismes
+annoncés, jamais alimentés.
+
+Câblage réalisé :
+
+- `ExperimentRunner` publie ses deux décisions déterministes par tâche via un `trace_sink` optionnel :
+  `RoutingRule` (entrée : tâche/domaine/difficulté → sortie : workers et outils retenus) et
+  `ValidationRule` (entrée : réponse + vérité terrain → sortie : `valid`/`method`/`error`) ;
+- un sink qui lève n'échoue jamais une tâche (avertissement journalisé, test dédié) ;
+- la boucle d'exécution appelle désormais `update_progress(tasks_completed, tasks_total, current_step,
+  elapsed_seconds)` après chaque tâche et une fois à la fin.
+
+Relevé contre le conteneur (run `exp_97f1c8e1`, 3 tâches) :
+
+```
+progression: tasks_completed 3, tasks_total 3, current_step 'finished', total_rounds 3
+traces: 6  ['RoutingRule', 'ValidationRule']
+events: 8  | traces_absent_reason: None
+exemple: ValidationRule  in {task_id, answer 24, ground_truth 24} -> {valid true, method deterministic}
+```
+
+Avant ce correctif, le même run affichait `tasks_completed: 0` et `traces: []`. Les manifestes portent
+toujours `traces_absent_reason`, mais seulement quand la liste est réellement vide (mode débat), avec
+une raison exacte.
+
+### 4decies. Le « flake » CSRF était un reset TCP, pas de la concurrence (P9)
+
+Après la correction de P7, c'est `test_state_changing_with_wrong_token_is_403` qui a échoué sur un
+passage complet — le second test signalé comme instable dans le §6 initial. Reproduit **hors suite** :
+1 échec sur 12 exécutions du seul fichier. Trace capturée :
+
+```
+ConnectionAbortedError: [WinError 10053] Une connexion établie a été abandonnée …
+```
+
+Cause : `do_POST`/`do_PUT`/`do_DELETE` répondaient **403 avant de lire le corps** de la requête. Windows
+réinitialise une socket fermée avec des données non lues : le client ne voyait jamais la réponse, selon
+le moment où il finissait d'écrire (d'où 1 échec sur 12).
+
+A/B mesuré sur 60 requêtes POST avec corps de 4 Ko et jeton invalide :
+
+```
+SANS drain (ancien comportement) : 403 reçus 53/60, connexions avortées 7/60
+AVEC drain (corrigé)             : 403 reçus 60/60, connexions avortées 0/60
+```
+
+Correctif : `_drain_request_body()` lit et jette le corps (plafonné à 1 Mo) avant toute réponse 403 des
+trois verbes ; un test de régression martèle 25 fois la même requête et exige 25 fois 403. Le fichier
+passe désormais 10/10 exécutions consécutives (avant : 1 échec sur 12).
+
 ## 2. Sondes HTTP réelles (serveur démarré)
 
 | Route | Code | Charge utile |
@@ -381,5 +434,9 @@ Correction (aucune assertion affaiblie) :
   vérifie que `current_source` reste correct **et** que `inspect.getsource` renvoie bien la mauvaise
   fonction (si CPython change un jour, ce test le dira), puis restaure le fichier et compare son sha256.
 
-Statut : `FIXED_AND_VERIFIED`. Le test n'est plus sensible à une réécriture pendant l'exécution — la
-cause du seul échec non reproduit de cet audit est donc identifiée et fermée, pas reclassée.
+Statut : `FIXED_AND_VERIFIED`. Le test n'est plus sensible à une réécriture pendant l'exécution.
+
+La **seconde** instabilité du même fichier (`test_state_changing_with_wrong_token_is_403`, citée au §6
+initial) a une autre cause, également mesurée : voir §4decies — un reset TCP provoqué par une réponse
+403 envoyée avant la lecture du corps de la requête. Les deux causes sont donc identifiées et fermées,
+aucune assertion n'a été assouplie.

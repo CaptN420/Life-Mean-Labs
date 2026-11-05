@@ -406,11 +406,14 @@ class AutopilotObservability:
                 "traces": [t.to_dict() for t in self._traces],
                 # An empty trace list is a property of this build, not a loss:
                 # nothing calls record_transition()/record_rule_application().
+                # Traces come from the deterministic runner (RoutingRule per
+                # task, ValidationRule per task). A debate run records none:
+                # say why instead of shipping a bare empty array.
                 "traces_absent_reason": None if self._traces else (
-                    "This build records events but no deterministic traces: the "
-                    "execution engine never calls record_transition()/"
-                    "record_rule_application(). The RAW jsonl under "
-                    "data/raw_debates holds the per-task evidence."
+                    "No deterministic trace was recorded for this run: traces come "
+                    "from the deterministic pipeline (RoutingRule/ValidationRule per "
+                    "task), which debate mode does not use. The RAW jsonl under "
+                    "data/raw_debates holds the per-turn evidence."
                 ),
                 "progress": self._progress.to_dict() if self._progress else None,
                 "reproducibility": reproducibility,

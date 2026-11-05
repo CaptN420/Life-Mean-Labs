@@ -322,6 +322,7 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
     def do_POST(self) -> None:
         """Handle POST requests."""
         if not self._state_change_authorized():
+            self._drain_request_body()
             self._send_error(403, "Forbidden: CSRF token missing or mismatched",
                              code="csrf_failed")
             return
@@ -503,6 +504,7 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
     def do_DELETE(self) -> None:
         """Handle DELETE requests."""
         if not self._state_change_authorized():
+            self._drain_request_body()
             self._send_error(403, "Forbidden: CSRF token missing or mismatched",
                              code="csrf_failed")
             return
@@ -543,6 +545,7 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
     def do_PUT(self) -> None:
         """Handle PUT requests (e.g. settings update)."""
         if not self._state_change_authorized():
+            self._drain_request_body()
             self._send_error(403, "Forbidden: CSRF token missing or mismatched",
                              code="csrf_failed")
             return
@@ -1293,6 +1296,27 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(body).encode("utf-8"))
+
+    def _drain_request_body(self, limit: int = 1024 * 1024) -> int:
+        """Read and discard an unread request body, returning the bytes drained.
+
+        Windows resets a socket closed with unread data pending
+        (``ConnectionAbortedError: [WinError 10053]``). A state-changing request
+        rejected before its body was read therefore killed the connection and
+        the client never saw the 403 — observed as an intermittent failure of
+        the CSRF tests (1 run in ~12), never reproducible on demand.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            length = 0
+        if length <= 0:
+            return 0
+        try:
+            return len(self.rfile.read(min(length, limit)) or b"")
+        except OSError as exc:  # client already gone: nothing to drain
+            logger.warning("could not drain request body: %s", exc)
+            return 0
 
     def _state_change_authorized(self) -> bool:
         """Return True when a state-changing (POST/PUT/DELETE) request is

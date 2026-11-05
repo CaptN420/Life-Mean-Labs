@@ -14,7 +14,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from core.events.event_bus import EventBus
 from core.events.message import Message
@@ -113,6 +113,23 @@ class ExperimentRunner:
         self.event_bus = EventBus()
         self._results: List[ExperimentResult] = []
         self._run_counter = 0
+        # Optional observer for the deterministic decisions (routing, validation).
+        # The observability tracker used to expose record_transition() and
+        # record_rule_application() with NO caller anywhere, so every manifest
+        # advertised an empty "traces" section. The sink is optional so the
+        # runner stays usable standalone.
+        self.trace_sink: Optional[Callable[[Dict[str, Any]], None]] = None
+
+    def _emit_trace(self, rule: str, before: Dict[str, Any], after: Dict[str, Any],
+                    agent_id: str = "") -> None:
+        """Publish one deterministic decision. Never breaks the run."""
+        sink = self.trace_sink
+        if sink is None:
+            return
+        try:
+            sink({"rule": rule, "before": before, "after": after, "agent_id": agent_id})
+        except Exception as exc:  # noqa: BLE001 - tracing must not fail a task
+            logger.warning("trace sink failed for rule %s: %s", rule, exc)
 
     def run_task(
         self,
@@ -234,8 +251,30 @@ class ExperimentRunner:
             answer = None
             error = str(exc)
 
+        # The routing decision is deterministic (SmartRouter), so it is traced
+        # with its inputs and outputs: this is what makes a wrong answer
+        # explainable after the fact.
+        self._emit_trace(
+            "RoutingRule",
+            {"task_id": task.task_id, "domain": task.domain, "difficulty": task.difficulty},
+            {
+                "selected": list(routing_decision.get("selected", []) or []),
+                "tools": self._extract_tools_used(routing_decision),
+            },
+        )
+
         # Validate result
         validation_result = self._validate_task(task, answer)
+
+        self._emit_trace(
+            "ValidationRule",
+            {"task_id": task.task_id, "answer": answer, "ground_truth": task.ground_truth},
+            {
+                "valid": bool(validation_result.valid),
+                "method": getattr(validation_result, "method", ""),
+                "error": error,
+            },
+        )
 
         # Create provenance chain
         provenance = ProvenanceChain(

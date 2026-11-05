@@ -316,6 +316,23 @@ class TestCSRFAndAccessControl:
         assert st == 200, body
         assert body.get("status") == "created"
 
+    def test_rejected_request_always_reaches_the_client(self, server):
+        """A body-carrying POST rejected by the CSRF gate must answer 403 every
+        time — not abort the connection.
+
+        Measured: this failed ~1 run in 12 with
+        ``ConnectionAbortedError: [WinError 10053]`` because the server answered
+        before reading the request body; Windows resets a socket closed with
+        unread data pending, so the client never saw the response.
+        """
+        cookie, _token = _get_csrf(server)
+        big = {"num_tasks": 1, "padding": "x" * 4096}
+        for attempt in range(25):
+            st, body, _ = _req(server, "/api/experiments", method="POST",
+                               body=big, cookie=cookie, token="deadbeef")
+            assert st == 403, f"attempt {attempt}: {st} {body}"
+            assert body.get("code") == "csrf_failed"
+
     def test_state_changing_with_wrong_token_is_403(self, server):
         cookie, token = _get_csrf(server)
         assert token
