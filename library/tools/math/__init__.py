@@ -130,6 +130,13 @@ def log_(value=1, base=10) -> Dict[str, Any]:
     return {"valid": True, "value": value, "base": base, "log": round(math.log(value, base), 6)}
 
 
+def sqrt_(x=0) -> Dict[str, Any]:
+    """Square root of a non-negative number."""
+    if x < 0:
+        return {"valid": False, "error": "x must be >= 0"}
+    return {"valid": True, "x": x, "sqrt": round(math.sqrt(x), 6)}
+
+
 def exp_(x=0) -> Dict[str, Any]:
     return {"valid": True, "x": x, "exp": round(math.exp(x), 6)}
 
@@ -217,6 +224,7 @@ MATH_TOOLS: Dict[str, Dict[str, Any]] = {
     "quadratic": {"fn": quadratic, "desc": "ax^2+bx+c=0 roots"},
     "trig": {"fn": trig, "desc": "sin/cos/tan table"},
     "log": {"fn": log_, "desc": "Logarithm"},
+    "sqrt": {"fn": sqrt_, "desc": "Square root"},
     "exp": {"fn": exp_, "desc": "Exponential"},
     "pow": {"fn": pow_, "desc": "Power"},
     "abs": {"fn": abs_, "desc": "Absolute value"},

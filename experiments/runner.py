@@ -7,6 +7,8 @@ to execute tasks through the multi-agent pipeline.
 from __future__ import annotations
 
 import logging
+import math
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -24,6 +26,15 @@ logger = logging.getLogger("ExperimentRunner")
 # CANONICAL ValidationResult lives in `experiments.validation.schemas`
 # (validation owns the concept). runner reuses it — one implementation.
 from experiments.validation.schemas import ValidationResult  # noqa: F401
+
+
+class UnsupportedTaskError(RuntimeError):
+    """Raised when no deterministic tool can serve a task.
+
+    Carries a machine-readable ``code`` prefix (``UNSUPPORTED_TASK`` /
+    ``NO_ANSWER``) so a caller can tell "we have no tool for this" from "the tool
+    ran and the answer was wrong".
+    """
 
 
 @dataclass
@@ -44,6 +55,9 @@ class ExperimentResult:
     provenance: Optional[ProvenanceChain] = None
     timestamp: float = field(default_factory=time.time)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Why the task could not be answered, when it could not. Silent None answers
+    # made a missing tool look like a wrong answer; this keeps the reason.
+    error: Optional[str] = None
 
     @property
     def is_valid(self) -> bool:
@@ -72,6 +86,7 @@ class ExperimentResult:
             "provenance": self.provenance.to_dict() if self.provenance else None,
             "timestamp": self.timestamp,
             "metadata": self.metadata,
+            "error": self.error,
         }
 
 
@@ -126,8 +141,14 @@ class ExperimentRunner:
         # Route task to appropriate workers
         routing_decision = self._route_task(task)
 
-        # Execute through workers
-        answer = self._execute_task(task, routing_decision)
+        # Execute through workers. A task no tool can serve fails EXPLICITLY:
+        # an unanswered task must not look like a merely wrong answer.
+        error: Optional[str] = None
+        try:
+            answer = self._execute_task(task, routing_decision)
+        except UnsupportedTaskError as exc:
+            answer = None
+            error = str(exc)
 
         # Validate result
         validation_result = self._validate_task(task, answer)
@@ -161,6 +182,7 @@ class ExperimentRunner:
             ground_truth=task.ground_truth,
             validation_result=validation_result,
             provenance=provenance,
+            error=error,
         )
 
         self._results.append(result)
@@ -303,6 +325,11 @@ class ExperimentRunner:
 
         # Auto-detect tool and extract parameters from task description
         detection = detect_tool(task.description)
+        if not detection:
+            raise UnsupportedTaskError(
+                f"UNSUPPORTED_TASK: no deterministic tool matches "
+                f"domain={task.domain!r} description={task.description[:120]!r}"
+            )
         tool_kwargs = {}
         if detection:
             param_key = detection.get("param_key", "")
@@ -341,6 +368,16 @@ class ExperimentRunner:
                 elif param_key in ("a", "n") and len(numbers) >= 1:
                     # Single-number operations (factorial, is_prime, fibonacci)
                     tool_kwargs[param_key] = numbers[0]
+                elif param_key in ("angle_deg", "value", "x") and len(numbers) >= 1:
+                    # trig (angle in degrees), log/sqrt (single value)
+                    tool_kwargs[param_key] = numbers[0]
+                    if param_key == "value":
+                        # The generator's ground truth uses the natural log, so
+                        # say it explicitly instead of relying on a tool default.
+                        base_match = re.search(r"base\s+(\d+)", task.description.lower())
+                        tool_kwargs["base"] = (
+                            float(base_match.group(1)) if base_match else math.e
+                        )
                 elif len(numbers) >= 2:
                     tool_kwargs["a"] = numbers[0]
                     tool_kwargs["b"] = numbers[1]
@@ -395,12 +432,25 @@ class ExperimentRunner:
                             answer = raw_answer.get("force")
                         elif "molar mass" in desc:
                             answer = raw_answer.get("molar_mass")
-                        elif "trig" in desc or "sin" in desc:
-                            answer = raw_answer.get("result")  # trig returns 'result' key
+                        elif "sin" in desc:
+                            answer = raw_answer.get("sin")
+                        elif "cos" in desc:
+                            answer = raw_answer.get("cos")
+                        elif "tan" in desc:
+                            answer = raw_answer.get("tan")
+                        elif "trig" in desc:
+                            answer = raw_answer.get("result")
+                        elif "log" in desc:
+                            answer = raw_answer.get("log")
+                        elif "sqrt" in desc or "square root" in desc:
+                            answer = raw_answer.get("sqrt")
+                        elif re.search(r'\bexp\b', desc) or "exponential" in desc:
+                            answer = raw_answer.get("exp")
                         else:
                             # Try to find a numeric answer
                             keys = ["gcd", "lcm", "factorial", "fibonacci",
-                                    "is_prime", "force", "molar_mass", "result"]
+                                    "is_prime", "force", "molar_mass", "result",
+                                    "sin", "cos", "tan", "log", "sqrt", "exp"]
                             for key in keys:
                                 if key in raw_answer and isinstance(raw_answer[key], (int, float, bool)):
                                     answer = raw_answer[key]
@@ -408,12 +458,23 @@ class ExperimentRunner:
                             else:
                                 answer = raw_answer  # Return the whole dict if no match
 
+                        if answer is None:
+                            raise UnsupportedTaskError(
+                                f"NO_ANSWER: tool '{detection.get('tool_name')}' returned "
+                                f"no usable value (keys={sorted(raw_answer)})"
+                            )
                         return answer
                     return raw_answer
+        except UnsupportedTaskError:
+            raise
         except Exception as e:
             logger.error(f"[ExperimentRunner] Execution failed: {e}")
+            raise UnsupportedTaskError(f"NO_ANSWER: tool execution failed: {e}") from e
 
-        return None
+        raise UnsupportedTaskError(
+            f"NO_ANSWER: tool worker produced no tool_response for "
+            f"description={task.description[:120]!r}"
+        )
 
     def _validate_task(
         self,

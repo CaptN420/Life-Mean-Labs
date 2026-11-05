@@ -93,6 +93,17 @@ TOOL_DETECTION: Dict[str, List[Dict[str, Any]]] = {
     "factorial": [{"tool": "math_factorial", "param": "n", "score": 20}],
     "prime": [{"tool": "math_is_prime", "param": "n", "score": 20}],
     "fibonacci": [{"tool": "math_fibonacci", "param": "n", "score": 20}],
+    # Trigonometry / logs / roots / exp: the tools exist (`trig`, `log`, `exp`,
+    # `sqrt` in MATH_TOOLS) but had no detection pattern, so seeds producing
+    # these tasks answered None silently.
+    "sin": [{"tool": "math_trig", "param": "angle_deg", "score": 20}],
+    "cos": [{"tool": "math_trig", "param": "angle_deg", "score": 20}],
+    "tan": [{"tool": "math_trig", "param": "angle_deg", "score": 20}],
+    "trig": [{"tool": "math_trig", "param": "angle_deg", "score": 18}],
+    "log": [{"tool": "math_log", "param": "value", "score": 20}],
+    "logarithm": [{"tool": "math_log", "param": "value", "score": 20}],
+    "square root": [{"tool": "math_sqrt", "param": "x", "score": 20}],
+    "sqrt": [{"tool": "math_sqrt", "param": "x", "score": 18}],
 
     # ── Physics ──
     "force": [{"tool": "physics_force", "param": "mass", "score": 12}],
@@ -143,6 +154,8 @@ DOMAIN_MAP: Dict[str, str] = {
     "solve": "math", "factor": "math",
     "trig": "math", "logarithm": "math", "bayes": "math",
     "gcd": "math", "lcm": "math", "factorial": "math", "prime": "math", "fibonacci": "math",
+    "sin": "math", "cos": "math", "tan": "math", "log": "math",
+    "sqrt": "math", "square root": "math",
     "integrate": "math", "taylor": "math", "limit": "math",
     # Physics
     "force": "physics", "ohms law": "physics", "kinematics": "physics",
