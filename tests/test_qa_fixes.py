@@ -192,8 +192,11 @@ def test_runner_loop_sets_valid_counts():
         def __init__(self, v):
             self.is_valid = v
 
+    # The loop now executes task-by-task (that is what makes a real resume
+    # possible), so the seam is run_task, not run_batch. The assertions below
+    # are unchanged: valid/invalid counts must still reach the state.
     fake_runner = MagicMock()
-    fake_runner.run_batch.return_value = [_FakeResult(True), _FakeResult(False)]
+    fake_runner.run_task.side_effect = [_FakeResult(True), _FakeResult(False)]
     fake_runner.get_statistics.return_value = {"validation_pass_rate": 0.5}
 
     fake_mod = types.ModuleType("experiments.runner")
@@ -222,6 +225,7 @@ def test_runner_loop_sets_valid_counts():
         assert st.tasks_invalid == 1
         assert st.tasks_completed == 2
         assert st.current_pass_rate == 0.5
+        assert fake_runner.run_task.call_count == 2  # one call per task, no re-run
     finally:
         if orig is not None:
             sys.modules["experiments.runner"] = orig

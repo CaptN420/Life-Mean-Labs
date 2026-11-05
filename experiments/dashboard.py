@@ -400,9 +400,14 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             else:
                 success = self.ui_controller.continue_experiment(exp_id)
                 if success:
-                    self._send_json({"status": "continued"})
+                    self._send_json({"status": "resumed"})
                 else:
-                    self._send_error(500, "Failed to continue experiment", code="server")
+                    # The controller records WHY it refused; returning a generic
+                    # 500 here would hide the reason from the user.
+                    _state = self.ui_controller.get_experiment(exp_id)
+                    _reason = (_state.errors[-1] if _state and _state.errors
+                               else "Resume refused: nothing to resume")
+                    self._send_error(409, _reason, code="resume_refused")
         elif parsed.path == "/api/training/run":
             self._training_start(data)
         elif parsed.path == "/api/experimental/designs":

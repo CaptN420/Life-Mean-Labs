@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 728 passed, 13 skipped, 0 failed** (après P1/P2) |
+| Tests de référence | **1 736 passed, 13 skipped, 0 failed** (après P1/P2/P3) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -48,8 +48,14 @@ l'ancien code.**
 | 11 | Aucune route HTTP pour les packages LM | `FIXED_AND_VERIFIED` | `experiments/packages_api.py` : `GET /api/packages`, `GET /api/packages/inspect`, `POST /api/packages/validate`, `POST /api/packages/import` — sondes live 200 |
 | 12 | Aucune UI pour charger un package | `FIXED_AND_VERIFIED` | onglet **Packages** : catalogue, détail + double verdict, boutons Inspecter / Valider / **Importer** |
 | 13 | Registres Skills/Tools vides | **`CONFIRMED_BROKEN`** | `/api/extensions/skills` et `/tools` → `total: 0` |
-| 14 | `continue_experiment` ne reprend pas | **`CONFIRMED_BROKEN`** (statique) | relance `start_experiment`/`restart_experiment`, aucun curseur de reprise |
+| 14 | `continue_experiment` ne reprend pas | `FIXED_AND_VERIFIED` | checkpoint par tâche ; 3/8 arrêtées → reprise exécute **5** tâches, RAW 3→8, métriques cumulées ; terminée/absente → refus motivé |
 | 15 | Aucun timeout moteur | **`CONFIRMED_BROKEN`** | aucune occurrence de `timeout` dans `core/runtime`, `core/workers`, `core/events` |
+| 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
+| 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents |
+| 18 | Collecteurs Windows (Defender, Event Log) | `BLOCKED_EXTERNAL` | `psutil`, `win32evtlog`, `win32service` absents |
+| 19 | Feature Pool à 987/989 non observées | `PARTIAL` | usage observé ≠ validation, statuts inchangés |
+| 20 | Pipeline Inspector | `FIXED_AND_VERIFIED` | `a719f12` — 392 151 événements, idempotent, 28 tests |
+| 21 | `/api/agents` en dur + création non persistée | `FIXED_AND_VERIFIED` | registre réel (12 agents), toggle vérifié par relecture, doublon → 409 |
 
 ### 4bis. Défaut découvert pendant P1 : import qui dupliquait le registre
 
@@ -89,12 +95,61 @@ POST /api/agents (nouveau)      -> 200 persisted=True verified=True (UUID réel 
 L'import conserve désormais le `role` du pack (ex. « Transformation ») dans `description` : il était
 jeté, ce qui laissait 11 cartes identiques « general ». Réserve honnête : les 11 agents déjà importés
 avant cette correction gardent une description vide — aucun rattrapage silencieux n'a été fait.
-| 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
-| 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents |
-| 18 | Collecteurs Windows (Defender, Event Log) | `BLOCKED_EXTERNAL` | `psutil`, `win32evtlog`, `win32service` absents |
-| 19 | Feature Pool à 987/989 non observées | `PARTIAL` | usage observé ≠ validation, statuts inchangés |
-| 20 | Pipeline Inspector | `FIXED_AND_VERIFIED` | `a719f12` — 392 151 événements, idempotent, 28 tests |
-| 21 | `/api/agents` en dur + création non persistée | `FIXED_AND_VERIFIED` | registre réel (12 agents), toggle vérifié par relecture, doublon → 409 |
+
+### 4quater. Reprise réelle (P3) — ce que « Continue » fait maintenant
+
+`continue_experiment` appelait `start_experiment` (nouvelle exécution depuis la tâche 0) et, pour une
+expérience terminée, `restart_experiment` en silence. Le bouton « Continue » ne continuait rien.
+
+Désormais chaque tâche terminée écrit **sa preuve RAW puis sa ligne de checkpoint** (dans cet ordre :
+on ne saute que ce qui a laissé une trace). Les identifiants de tâches étant des UUID aléatoires, la
+reprise s'appuie sur l'**index + empreinte du contenu** (domaine, difficulté, description, vérité
+terrain) : si le contenu régénéré diffère, la reprise est **refusée** au lieu de mélanger deux
+exécutions.
+
+Mesure réelle (script hors pytest, `LIFE_MEAN_RUNS_DIR` temporaire) :
+
+```
+APRÈS ARRÊT (8 tâches prévues, stop après la 3e)
+  checkpoint : {'total': 8, 'seed': 42, 'domain': 'math'}
+  entrées    : 3   indices: [0, 1, 2]
+  lignes RAW : 3
+APRÈS CONTINUE
+  tâches réexécutées : 5      ← les 3 premières ne sont pas relancées
+  entrées checkpoint : 8      indices: [0..7]
+  lignes RAW         : 8
+  état UI : completed=8 valid=8 pass_rate=1.000
+REFUS
+  sans checkpoint     : False — « aucune progression enregistrée »
+  expérience terminée : False — « déjà terminée (2/2 tâches) »
+```
+
+L'API renvoie 409 `resume_refused` avec la raison (avant : 500 générique « Failed to continue »), et
+l'UI affiche ce message. Un checkpoint antérieur est **archivé** (`.jsonl.bak`), jamais supprimé.
+
+Mesure réelle en HTTP contre le conteneur (expérience de 4 000 tâches, arrêtée en cours de route) :
+
+```
+POST /api/experiments/{id}/stop   -> 200
+après stop   : completed=975/4000   checkpoint=976 lignes   RAW=975 lignes
+POST /api/experiments/{id}/continue -> 200 {"status": "resumed"}
+après reprise: completed=4000/4000  checkpoint=4001 lignes  RAW=4000 lignes
+POST continue (2e fois) -> 409 resume_refused
+```
+
+Exactement une ligne RAW et une ligne de checkpoint par tâche, aucune tâche exécutée deux fois.
+
+### 4quinquies. Transparence — un test existant a été adapté (sans être affaibli)
+
+La boucle déterministe exécute désormais **tâche par tâche** (`run_task`) au lieu d'un `run_batch` :
+c'est la condition d'un checkpoint par tâche. `tests/test_qa_fixes.py::test_runner_loop_sets_valid_counts`
+simulait un `run_batch` renvoyant deux résultats ; le simulacre a été déplacé sur `run_task`.
+
+- assertions **conservées** : `tasks_valid == 1`, `tasks_invalid == 1`, `tasks_completed == 2`,
+  `pass_rate == 0.5` ;
+- assertion **ajoutée** : `run_task.call_count == 2` (une exécution par tâche, aucune reprise).
+
+Aucun seuil abaissé, aucun test supprimé.
 
 ---
 
@@ -189,7 +244,7 @@ a échoué une fois, puis :
 
 - passe seul (23/23 dans son fichier) ;
 - passe dans le lot `dashboard_security + http_smoke + packages_api + experimental_api` (55/55) ;
-- passe sur les passages complets ultérieurs : **1717**, **1720**, puis **1728 passed, 13 skipped, 0 failed**.
+- passe sur les passages complets ultérieurs : **1717**, **1720**, **1728**, puis **1736 passed, 13 skipped, 0 failed**.
 
 Classé `UNVERIFIED_FLAKE` : non reproduit, cause non identifiée, assertion **non modifiée**. À traiter en
 phase 9 (isolation des serveurs in-process) plutôt qu'à être ignoré.

@@ -12,7 +12,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("ExperimentUI")
 
@@ -172,29 +172,173 @@ class ExperimentUIController:
         # Start the experiment with reset state
         return self.start_experiment(experiment_id)
 
+    # ── Reprise réelle : progression persistée tâche par tâche ─────────────
+    def _progress_dir(self) -> Path:
+        """Checkpoints live next to the run summaries (same mounted volume)."""
+        return self._runs_dir().parent / "progress"
+
+    def _progress_path(self, experiment_id: str) -> Path:
+        safe = experiment_id.replace("/", "_").replace("\\", "_")
+        return self._progress_dir() / f"{safe}.jsonl"
+
+    @staticmethod
+    def _task_fingerprint(task: Any) -> str:
+        """Content identity of a generated task.
+
+        Task ids are random UUIDs, so they cannot identify a task across
+        processes. What IS stable for a given seed is the task's content:
+        domain, difficulty, description and ground truth.
+        """
+        import hashlib as _hashlib
+
+        material = "|".join([
+            str(getattr(task, "domain", "")),
+            str(getattr(task, "difficulty", "")),
+            str(getattr(task, "description", "")),
+            str(getattr(task, "ground_truth", "")),
+        ])
+        return _hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
+    def _start_progress(self, experiment_id: str, tasks: List[Any],
+                        config: Dict[str, Any]) -> None:
+        """Open a checkpoint file for a fresh run (previous one is archived)."""
+        import json as _json
+        import time as _time
+
+        path = self._progress_path(experiment_id)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists():
+                # NO DELETE: the previous checkpoint is preserved under a new name.
+                archive = path.with_name(f"{path.stem}.{int(_time.time())}.jsonl.bak")
+                path.replace(archive)
+            meta = {
+                "type": "meta",
+                "experiment_id": experiment_id,
+                "total": len(tasks),
+                "seed": config.get("seed", 42),
+                "domain": config.get("domain", "math"),
+                "mode": "deterministic",
+                "created_at": _time.time(),
+            }
+            path.write_text(_json.dumps(meta) + "\n", encoding="utf-8")
+        except OSError as exc:
+            logger.error("could not open checkpoint for %s: %s", experiment_id, exc)
+
+    def _append_progress(self, experiment_id: str, index: int, task: Any,
+                         is_valid: bool) -> None:
+        """Record one finished task. Appended AFTER its RAW evidence exists."""
+        import json as _json
+        import time as _time
+
+        entry = {
+            "type": "task",
+            "index": index,
+            "task_id": getattr(task, "task_id", ""),
+            "fingerprint": self._task_fingerprint(task),
+            "is_valid": bool(is_valid),
+            "ts": _time.time(),
+        }
+        try:
+            with open(self._progress_path(experiment_id), "a", encoding="utf-8") as fh:
+                fh.write(_json.dumps(entry) + "\n")
+        except OSError as exc:
+            logger.error("could not append progress for %s: %s", experiment_id, exc)
+
+    def _load_progress(self, experiment_id: str) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Read a checkpoint. Corrupt lines are skipped and logged, never guessed."""
+        import json as _json
+
+        path = self._progress_path(experiment_id)
+        if not path.exists():
+            return None, []
+        meta: Optional[Dict[str, Any]] = None
+        entries: List[Dict[str, Any]] = []
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = _json.loads(line)
+                except ValueError:
+                    logger.warning("skipping corrupt checkpoint line in %s", path.name)
+                    continue
+                if record.get("type") == "meta":
+                    meta = record
+                elif record.get("type") == "task":
+                    entries.append(record)
+        except OSError as exc:
+            logger.error("could not read checkpoint for %s: %s", experiment_id, exc)
+            return None, []
+        return meta, entries
+
     def continue_experiment(self, experiment_id: str) -> bool:
-        """Continue an experiment from where it left off (if stopped).
+        """Resume an interrupted run from its last recorded task.
 
-        Args:
-            experiment_id: Experiment identifier
-
-        Returns:
-            True if continuation was initiated successfully
+        This used to call ``start_experiment`` (a fresh run from task 0) and, for
+        a finished run, silently restart it — a "continue" that continued
+        nothing. Now it resumes only what has a checkpoint, refuses a finished
+        run, and refuses a checkpoint that no longer matches the configuration.
         """
         with self._lock:
-            if experiment_id not in self._experiments:
+            state = self._experiments.get(experiment_id)
+            if state is None:
                 logger.error(f"Experiment {experiment_id} not found for continue")
                 return False
-            state = self._experiments[experiment_id]
             if state.is_running:
                 logger.warning(f"Cannot continue experiment {experiment_id} while already running")
                 return False
-            # If completed, allow restart from beginning
-            if state.tasks_completed > 0 and state.tasks_generated == state.tasks_completed:
-                logger.info(f"Experiment {experiment_id} was completed, restarting from beginning")
-                return self.restart_experiment(experiment_id)
-        # Start the experiment
-        return self.start_experiment(experiment_id)
+            config = dict(self._configurations.get(experiment_id, {}))
+
+        meta, entries = self._load_progress(experiment_id)
+        if not meta or not entries:
+            self.add_error(
+                experiment_id,
+                "Continue refusé : aucune progression enregistrée pour cette expérience. "
+                "Utilisez Démarrer (ou Redémarrer) — rien ne serait repris.",
+            )
+            return False
+
+        total = int(meta.get("total", 0) or 0)
+        if len(entries) >= total:
+            self.add_error(
+                experiment_id,
+                f"Continue refusé : l'expérience est déjà terminée ({len(entries)}/{total} tâches). "
+                "Utilisez Redémarrer pour une nouvelle exécution complète.",
+            )
+            return False
+
+        if (meta.get("seed") != config.get("seed", 42)
+                or meta.get("domain") != config.get("domain", "math")):
+            self.add_error(
+                experiment_id,
+                "Continue refusé : la configuration (seed/domaine) diffère de celle de "
+                "l'exécution interrompue ; reprendre mélangerait deux expériences.",
+            )
+            return False
+
+        with self._lock:
+            state = self._experiments.get(experiment_id)
+            if state is None:
+                return False
+            state.is_running = True
+            self._stop_requested[experiment_id] = False
+            thread = threading.Thread(
+                target=self._run_experiment_loop,
+                args=(experiment_id, config, True),
+                daemon=True,
+                name=f"exp-{experiment_id}-resume",
+            )
+            self._worker_threads[experiment_id] = thread
+            thread.start()
+
+        logger.info(
+            "Resuming experiment %s: %d/%d tasks already recorded",
+            experiment_id, len(entries), total,
+        )
+        self._notify_callbacks(experiment_id, "started")
+        return True
 
     def start_experiment(self, experiment_id: str) -> bool:
         """Start an experiment.
@@ -230,7 +374,7 @@ class ExperimentUIController:
 
             thread = threading.Thread(
                 target=self._run_experiment_loop,
-                args=(experiment_id, config),
+                args=(experiment_id, config, False),
                 daemon=True,
                 name=f"exp-{experiment_id}",
             )
@@ -451,7 +595,8 @@ class ExperimentUIController:
                     except Exception as e:
                         logger.error(f"Callback error: {e}")
 
-    def _run_experiment_loop(self, experiment_id: str, config: Dict[str, Any]) -> None:
+    def _run_experiment_loop(self, experiment_id: str, config: Dict[str, Any],
+                             resume: bool = False) -> None:
         """Run the experiment loop in a background thread.
 
         Uses ExperimentRunner to connect generated tasks with the existing
@@ -543,7 +688,7 @@ class ExperimentUIController:
 
             # Run through ExperimentRunner (reuses SmartRouter + ToolWorker)
             runner = ExperimentRunner(config=config)
-            
+
             # Create experiment context
             context = ExperimentContext(
                 experiment_id=experiment_id,
@@ -552,25 +697,96 @@ class ExperimentUIController:
                 difficulty=difficulty_range[0],
             )
 
-            results = runner.run_batch(tasks, context)
+            # A resumed run must prove it is the SAME run: same seed, same
+            # domain, same task content at every already-recorded index.
+            done_indices: set = set()
+            prior_valid = 0
+            if resume:
+                meta, entries = self._load_progress(experiment_id)
+                if not meta:
+                    raise RuntimeError(
+                        "Resume impossible : aucune progression enregistrée pour cette expérience."
+                    )
+                if (int(meta.get("total", -1)) != len(tasks)
+                        or meta.get("seed") != config.get("seed", 42)
+                        or meta.get("domain") != domain):
+                    raise RuntimeError(
+                        "Resume refusé : la configuration a changé depuis l'interruption "
+                        f"(checkpoint: {meta.get('total')} tâches, seed {meta.get('seed')}, "
+                        f"domaine {meta.get('domain')} ; maintenant : {len(tasks)} tâches, "
+                        f"seed {config.get('seed', 42)}, domaine {domain})."
+                    )
+                fingerprints = [self._task_fingerprint(t) for t in tasks]
+                for entry in entries:
+                    index = int(entry.get("index", -1))
+                    if index < 0 or index >= len(tasks):
+                        raise RuntimeError(
+                            f"Resume refusé : le checkpoint référence une tâche {index} inexistante."
+                        )
+                    if entry.get("fingerprint") != fingerprints[index]:
+                        raise RuntimeError(
+                            f"Resume refusé : la tâche régénérée à l'index {index} ne correspond "
+                            "plus à celle qui avait été exécutée (contenu différent)."
+                        )
+                    done_indices.add(index)
+                prior_valid = sum(1 for e in entries if e.get("is_valid"))
+                logger.info(
+                    "Resume %s: %d/%d tasks already recorded, %d valid",
+                    experiment_id, len(done_indices), len(tasks), prior_valid,
+                )
+            else:
+                self._start_progress(experiment_id, tasks, config)
 
-            # Update metrics from results
-            stats = runner.get_statistics()
-            valid_count = sum(1 for r in results if r.is_valid)
-            invalid_count = len(results) - valid_count
+            # Task-by-task: each finished task writes its RAW evidence first,
+            # then its checkpoint line. Order matters — a task may only be
+            # skipped on resume if it already left evidence.
+            total_tasks = len(tasks)
+            new_results: List[Any] = []
+            stopped_early = False
+            for index, task in enumerate(tasks):
+                if index in done_indices:
+                    continue
+                if self._is_stop_requested(experiment_id):
+                    stopped_early = True
+                    logger.info(
+                        "Stop requested for %s before task %d/%d",
+                        experiment_id, index + 1, total_tasks,
+                    )
+                    break
+
+                result = runner.run_task(task, context)
+                new_results.append(result)
+                self._persist_results_to_raw(experiment_id, [result], mode="deterministic")
+                self._append_progress(experiment_id, index, task, bool(result.is_valid))
+
+                completed = len(done_indices) + len(new_results)
+                valid = prior_valid + sum(1 for r in new_results if r.is_valid)
+                self.update_metrics(experiment_id, {
+                    "tasks_completed": completed,
+                    "tasks_valid": valid,
+                    "tasks_invalid": completed - valid,
+                    "pass_rate": (valid / completed) if completed else 0.0,
+                    "mode": "deterministic",
+                })
+
+            completed = len(done_indices) + len(new_results)
+            valid = prior_valid + sum(1 for r in new_results if r.is_valid)
+            pass_rate = (valid / completed) if completed else 0.0
             self.update_metrics(experiment_id, {
-                "tasks_completed": len(results),
-                "tasks_valid": valid_count,
-                "tasks_invalid": invalid_count,
-                "pass_rate": stats.get("validation_pass_rate", 0.0),
+                "tasks_completed": completed,
+                "tasks_valid": valid,
+                "tasks_invalid": completed - valid,
+                "pass_rate": pass_rate,
                 "mode": "deterministic",
             })
-            # Persist deterministic execution as RAW (append-only). Same
-            # provenance contract as debate mode — evidence belongs to THIS
-            # experiment, with no secrets.
-            self._persist_results_to_raw(experiment_id, results, mode="deterministic")
 
-            logger.info(f"Completed experiment {experiment_id}: {len(results)} tasks, pass rate: {stats.get('validation_pass_rate', 0):.1%}")
+            logger.info(
+                "Experiment %s %s: %d/%d tasks done, %d valid, pass rate %.1f%%%s",
+                experiment_id,
+                "paused" if stopped_early else "completed",
+                completed, total_tasks, valid, pass_rate * 100,
+                " (resume possible)" if stopped_early else "",
+            )
 
         except Exception as e:
             logger.error(f"Experiment {experiment_id} failed: {e}")
