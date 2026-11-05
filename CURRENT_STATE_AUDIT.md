@@ -45,8 +45,8 @@ l'ancien code.**
 | 8 | Jetons `hf_`/`xoxb-`/`AIza`/`glpat-` en clair | `FIXED_AND_VERIFIED` | `a719f12` — 4 motifs + test de régression |
 | 9 | **Image Docker obsolète** | `FIXED_AND_VERIFIED` | reconstruite : `grep -c PackageFormatError` dans le conteneur → **5** (avant : 0), conteneur healthy |
 | 10 | LM Studio renvoie 401 | `NOT_APPLICABLE` — artefact de sonde | voir §2bis : l'appel réel aboutit avec le token du `.env` |
-| 11 | **Aucune route HTTP pour les packages LM** | **`CONFIRMED_BROKEN`** | `/api/packages`, `/api/lmpack`, `/api/workflows` → 404 |
-| 12 | **Aucune UI pour charger un package** | **`CONFIRMED_BROKEN`** | `dashboard.html` : **0** occurrence de « package » |
+| 11 | Aucune route HTTP pour les packages LM | `FIXED_AND_VERIFIED` | `experiments/packages_api.py` : `GET /api/packages`, `GET /api/packages/inspect`, `POST /api/packages/validate` — sondes live 200 |
+| 12 | Aucune UI pour charger un package | `FIXED_AND_VERIFIED` (consultation) | onglet **Packages** : 2 packages, 22 agents, détail + double verdict ; **import dans Studio toujours absent** |
 | 13 | Registres Skills/Tools vides | **`CONFIRMED_BROKEN`** | `/api/extensions/skills` et `/tools` → `total: 0` |
 | 14 | `continue_experiment` ne reprend pas | **`CONFIRMED_BROKEN`** (statique) | relance `start_experiment`/`restart_experiment`, aucun curseur de reprise |
 | 15 | Aucun timeout moteur | **`CONFIRMED_BROKEN`** | aucune occurrence de `timeout` dans `core/runtime`, `core/workers`, `core/events` |
@@ -135,8 +135,21 @@ Le `401` observé venait d'une sonde hors conteneur (voir §2bis) — pas d'une 
 ---
 
 ## 5. Ce que cet audit ne fait pas
-
 - Il ne re-corrige aucun des problèmes déjà marqués `FIXED_AND_VERIFIED` (règle explicite du mandat).
 - Il ne présente pas `total: 0` comme une panne : ce sont des registres réellement vides.
 - Il ne touche ni aux packages, ni aux datasets, ni aux historiques.
 - Il n'exécute aucun `git push` : les commits restent locaux jusqu'à autorisation explicite.
+
+---
+
+## 6. Observation à ne pas masquer — un test instable
+
+Lors d'un passage complet, `tests/test_dashboard_security.py::…::test_state_changing_with_wrong_token_is_403`
+a échoué une fois, puis :
+
+- passe seul (23/23 dans son fichier) ;
+- passe dans le lot `dashboard_security + http_smoke + packages_api + experimental_api` (55/55) ;
+- passe sur un second passage complet : **1717 passed, 13 skipped, 0 failed**.
+
+Classé `UNVERIFIED_FLAKE` : non reproduit, cause non identifiée, assertion **non modifiée**. À traiter en
+phase 9 (isolation des serveurs in-process) plutôt qu'à être ignoré.

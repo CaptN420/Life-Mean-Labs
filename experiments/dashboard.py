@@ -53,6 +53,7 @@ logger = logging.getLogger("ExperimentDashboard")
 
 from experimental.api import ExperimentalApiMixin
 from compare.api import CompareApiMixin
+from experiments.packages_api import PackagesApiMixin
 from life_mean_extensions.api import ExtensionsApiMixin
 
 try:  # Pipeline Inspector (lecture seule sur les logs)
@@ -166,7 +167,7 @@ def _int_param(parsed, name: str, default: int) -> int:
         return default
 
 
-class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin, BaseHTTPRequestHandler):
+class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, ExtensionsApiMixin, PackagesApiMixin, BaseHTTPRequestHandler):
     """HTTP request handler for the experiment dashboard."""
 
     ui_controller: ExperimentUIController = None  # Set by server
@@ -284,6 +285,11 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             self._send_json(self.pipeline_errors())
         elif parsed.path == "/api/pipeline/features":
             self._send_json(self.pipeline_features())
+        # ── Packages LM (lecture seule : lister / inspecter / valider) ──────
+        elif parsed.path == "/api/packages":
+            self._packages_list()
+        elif parsed.path == "/api/packages/inspect":
+            self._packages_inspect(_query_dict(parsed).get("path", ""))
         elif parsed.path == "/api/training/runs":
             self._training_list_runs()
         elif parsed.path.startswith("/api/training/runs/"):
@@ -477,6 +483,8 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             self._send_json(self.pipeline_ingest(full_rescan=full))
         elif parsed.path == "/api/pipeline/reports":
             self._send_json(self.pipeline_reports())
+        elif parsed.path == "/api/packages/validate":
+            self._packages_validate(data if isinstance(data, dict) else {})
         elif parsed.path == "/api/pipeline/export":
             self._send_json(self.pipeline_export())
         else:

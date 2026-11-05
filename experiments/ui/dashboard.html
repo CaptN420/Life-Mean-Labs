@@ -664,6 +664,7 @@
             <button class="tab-btn" data-tab="agent-builder" onclick="switchTab('agent-builder', this)">Agent Builder</button>
             <button class="tab-btn" data-tab="skills" onclick="switchTab('skills', this)">Skills &amp; Tools</button>
             <button class="tab-btn" data-tab="pipeline" onclick="switchTab('pipeline', this)">Pipeline</button>
+            <button class="tab-btn" data-tab="packages" onclick="switchTab('packages', this)">Packages</button>
             <button class="tab-btn" data-tab="training" onclick="switchTab('training', this)">Training & Models</button>
         </nav>
 
@@ -1503,6 +1504,47 @@
     </div>
 
     <!-- ── Pipeline Inspector tab — lecture seule sur les logs ── -->
+    <div id="panel-packages" class="tab-panel">
+        <div class="card" style="margin-bottom:1rem;">
+            <h2>Packages LM (.lmpack)</h2>
+            <p class="subtitle" style="font-size:.84rem;line-height:1.5;">
+                Catalogue local, lecture seule. Un ZIP qui s'ouvre n'est pas un package valide :
+                le statut <em>valide</em> exige un lecteur qui accepte l'archive <strong>et</strong> au moins un agent.
+                Les deux lecteurs (Studio et core) sont affichés séparément — jamais moyennés.
+            </p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;">
+                <button class="btn-sm" onclick="pkLoad()">Rafraîchir</button>
+                <span id="pk-status" class="subtitle" style="font-size:.78rem;align-self:center;"></span>
+            </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:1rem;">
+            <div class="stat-card"><div class="stat-value" id="pk-stat-total">0</div><div class="stat-label">Packages</div></div>
+            <div class="stat-card"><div class="stat-value" id="pk-stat-valid">0</div><div class="stat-label">Valides</div></div>
+            <div class="stat-card"><div class="stat-value" id="pk-stat-agents">0</div><div class="stat-label">Agents (total)</div></div>
+        </div>
+
+        <div class="card" style="margin-bottom:1rem;">
+            <h2>Catalogue</h2>
+            <table class="table" id="pk-table">
+                <thead>
+                    <tr>
+                        <th>Fichier</th><th>Nom</th><th>Version</th><th>Agents</th>
+                        <th>Workflows</th><th>Format</th><th>Statut</th><th></th>
+                    </tr>
+                </thead>
+                <tbody id="pk-rows">
+                    <tr><td colspan="8" class="subtitle">Chargement…</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card" id="pk-detail-card" style="display:none;">
+            <h2 id="pk-detail-title">Détail</h2>
+            <div id="pk-detail"></div>
+        </div>
+    </div>
+
     <div id="panel-pipeline" class="tab-panel">
         <div class="card" style="margin-bottom:1rem;">
             <h2>Pipeline Inspector</h2>
@@ -1762,6 +1804,7 @@
             if (name === 'experimental') { loadExperimental(); }
             if (name === 'skills') { loadSkillsPanel(); }
             if (name === 'pipeline') { piLoadAll(); }
+            if (name === 'packages') { pkLoad(); }
             if (name === 'experiments') switchToManagedExperiments();
         }
 
@@ -5628,6 +5671,142 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                 if (status) status.textContent = 'Export créé: ' + r.path;
             } catch (err) {
                 if (status) status.textContent = 'Erreur export: ' + err.message;
+            }
+        }
+    </script>
+    <!-- ── Packages LM — catalogue, inspection, double validation ── -->
+    <script>
+        const PK_BASE = '/api/packages';
+
+        function pkEsc(v) {
+            if (v === null || v === undefined) return '—';
+            return String(v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function pkBadge(ok) {
+            const color = ok ? 'var(--accent, #2e7d32)' : 'var(--danger, #c62828)';
+            const label = ok ? 'valide' : 'invalide';
+            return `<span style="color:${color};font-weight:600;">${label}</span>`;
+        }
+
+        async function pkLoad() {
+            const status = document.getElementById('pk-status');
+            const rows = document.getElementById('pk-rows');
+            if (status) status.textContent = 'Chargement…';
+            try {
+                const res = await fetch(PK_BASE);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                const total = data.total || 0;
+                const valid = data.valid_count || 0;
+                const agents = (data.packages || []).reduce((n, p) => n + (p.agents_count || 0), 0);
+                document.getElementById('pk-stat-total').textContent = total;
+                document.getElementById('pk-stat-valid').textContent = valid;
+                document.getElementById('pk-stat-agents').textContent = agents;
+
+                if (!data.exists) {
+                    rows.innerHTML = `<tr><td colspan="8" class="subtitle">Répertoire absent : ${pkEsc(data.root)}</td></tr>`;
+                    if (status) status.textContent = 'Aucun répertoire lmpack/';
+                    return;
+                }
+                if (!total) {
+                    rows.innerHTML = '<tr><td colspan="8" class="subtitle">Aucun package .lmpack trouvé.</td></tr>';
+                    if (status) status.textContent = `0 package dans ${pkEsc(data.root)}`;
+                    return;
+                }
+
+                rows.innerHTML = data.packages.map(p => `
+                    <tr>
+                        <td><code>${pkEsc(p.file)}</code></td>
+                        <td>${pkEsc(p.name)}</td>
+                        <td>${pkEsc(p.package_version)}</td>
+                        <td>${p.agents_count ?? 0}</td>
+                        <td>${p.workflows_count ?? 0}</td>
+                        <td>${pkEsc(p.format_version)}</td>
+                        <td>${pkBadge(p.valid)}${p.valid ? '' : `<div class="subtitle" style="font-size:.72rem;">${pkEsc((p.errors || []).join('; '))}</div>`}</td>
+                        <td style="white-space:nowrap;">
+                            <button class="btn-sm" onclick="pkInspect('${pkEsc(p.file)}')">Inspecter</button>
+                            <button class="btn-sm" onclick="pkValidate('${pkEsc(p.file)}')">Valider</button>
+                        </td>
+                    </tr>`).join('');
+
+                if (status) status.textContent = `${total} package(s) · ${valid} valide(s) · ${agents} agent(s)`;
+            } catch (err) {
+                rows.innerHTML = `<tr><td colspan="8" class="subtitle">Erreur : ${pkEsc(err.message)}</td></tr>`;
+                if (status) status.textContent = 'Erreur de chargement';
+            }
+        }
+
+        async function pkInspect(file) {
+            const card = document.getElementById('pk-detail-card');
+            const body = document.getElementById('pk-detail');
+            document.getElementById('pk-detail-title').textContent = `Détail — ${file}`;
+            card.style.display = '';
+            body.innerHTML = '<p class="subtitle">Chargement…</p>';
+            try {
+                const res = await fetch(`${PK_BASE}/inspect?path=${encodeURIComponent(file)}`);
+                const data = await res.json();
+                if (!res.ok) {
+                    body.innerHTML = `<p class="subtitle">${pkEsc(data.error || 'introuvable')}</p>`;
+                    return;
+                }
+                const studio = data.verdicts?.studio || {};
+                const core = data.verdicts?.core || {};
+                body.innerHTML = `
+                    <p class="subtitle" style="font-size:.82rem;">
+                        ${pkEsc(data.file)} · ${data.size_bytes} octets · archive lisible :
+                        <strong>${data.readable ? 'oui' : 'non'}</strong> · statut :
+                        ${pkBadge(data.valid)} · agents : <strong>${data.agents_count}</strong>
+                    </p>
+                    <table class="table" style="margin-top:.75rem;">
+                        <thead><tr><th>Lecteur</th><th>Verdict</th><th>Détail</th></tr></thead>
+                        <tbody>
+                            <tr><td>Studio</td><td>${pkBadge(studio.ok)}</td>
+                                <td class="subtitle" style="font-size:.76rem;">${pkEsc(studio.agents_count ?? 0)} agents · ${pkEsc((studio.errors || studio.error || []).toString())}</td></tr>
+                            <tr><td>core</td><td>${pkBadge(core.ok)}</td>
+                                <td class="subtitle" style="font-size:.76rem;">${pkEsc(core.persona_count ?? 0)} personas · ${pkEsc((core.errors || core.error || []).toString())}</td></tr>
+                        </tbody>
+                    </table>
+                    <h3 style="margin-top:1rem;font-size:.95rem;">Agents</h3>
+                    <table class="table">
+                        <thead><tr><th>Agent</th><th>Rôle</th><th>Provider</th><th>Prompt</th></tr></thead>
+                        <tbody>
+                            ${(data.agents || []).map(a => `
+                                <tr>
+                                    <td>${pkEsc(a.name || a.id || a.entry)}</td>
+                                    <td class="subtitle" style="font-size:.78rem;">${pkEsc(a.role)}</td>
+                                    <td class="subtitle" style="font-size:.78rem;">${pkEsc(a.provider)}</td>
+                                    <td class="subtitle" style="font-size:.74rem;">${a.prompt_chars ?? 0} car. — ${pkEsc((a.prompt_preview || '').slice(0, 90))}…</td>
+                                </tr>`).join('') || '<tr><td colspan="4" class="subtitle">Aucun agent</td></tr>'}
+                        </tbody>
+                    </table>`;
+            } catch (err) {
+                body.innerHTML = `<p class="subtitle">Erreur : ${pkEsc(err.message)}</p>`;
+            }
+        }
+
+        async function pkValidate(file) {
+            const status = document.getElementById('pk-status');
+            if (status) status.textContent = `Validation de ${file}…`;
+            try {
+                const res = await fetch(`${PK_BASE}/validate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: file }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const s = data.verdicts?.studio || {}, c = data.verdicts?.core || {};
+                if (status) {
+                    status.textContent = `${file} : ${data.valid ? 'valide' : 'invalide'} · `
+                        + `Studio ${s.ok ? 'OK' : 'KO'} · core ${c.ok ? 'OK' : 'KO'}`
+                        + (data.agreement ? ' · accords' : ' · désaccord (affiché tel quel)');
+                }
+            } catch (err) {
+                if (status) status.textContent = `Erreur : ${err.message}`;
             }
         }
     </script>
