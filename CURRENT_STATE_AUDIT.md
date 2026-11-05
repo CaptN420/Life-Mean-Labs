@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 761 passed, 13 skipped, 0 failed** (après P1→P6) |
+| Tests de référence | **1 765 passed, 13 skipped, 0 failed** (après P1→P7) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -348,14 +348,38 @@ Le `401` observé venait d'une sonde hors conteneur (voir §2bis) — pas d'une 
 
 ---
 
-## 6. Observation à ne pas masquer — un test instable
+## 6. Le test instable est expliqué et neutralisé (cause mesurée, plus « inconnue »)
 
-Lors d'un passage complet, `tests/test_dashboard_security.py::…::test_state_changing_with_wrong_token_is_403`
-a échoué une fois, puis :
+`tests/test_dashboard_security.py::…::test_default_bind_is_loopback` avait échoué une fois sur un passage
+complet, puis passait seul et dans tous les sous-ensembles. Il n'était ni « aléatoire » ni lié à la
+concurrence des serveurs in-process : il lisait sa cible avec `inspect.getsource`, qui décrit le fichier
+**tel qu'il était à l'import**.
 
-- passe seul (23/23 dans son fichier) ;
-- passe dans le lot `dashboard_security + http_smoke + packages_api + experimental_api` (55/55) ;
-- passe sur les passages complets ultérieurs : **1717**, **1720**, **1728**, **1736**, puis **1743 passed, 13 skipped, 0 failed**.
+Mécanisme reproduit par sonde (`scratch/linecache_probe.py`), sur `experiments/dashboard.py` réel :
 
-Classé `UNVERIFIED_FLAKE` : non reproduit, cause non identifiée, assertion **non modifiée**. À traiter en
-phase 9 (isolation des serveurs in-process) plutôt qu'à être ignoré.
+```
+A. avant réécriture  : assertion = True   | 1re ligne = 'def start_dashboard('
+B. fichier réécrit (3 lignes vides en tête, sémantique inchangée)
+   pendant le run    : assertion = False  | 1re ligne =
+                        '            self._send_error(500, f"Failed to start training: {e}", co'
+C. fichier restauré  : sha256 identique
+```
+
+Décaler les lignes invalide tous les `co_firstlineno` enregistrés à l'import : linecache relit le
+**nouveau** fichier et `getsource` le tranche aux **anciennes** lignes, donc renvoie le corps d'une autre
+fonction. Le fragment observé lors de l'échec réel était exactement de cette famille
+(`self._send_error(500, f"Failed to start training: …`) — c'est la trace laissée dans le rapport.
+
+Correction (aucune assertion affaiblie) :
+
+- `tests/source_utils.py::current_source()` relit le fichier et **retrouve la définition par nom** via
+  `ast` (`get_source_segment`), donc un décalage de lignes ne peut pas renvoyer la mauvaise fonction ;
+- les trois tests qui inspectaient du texte (`default_bind_is_loopback`, le filtre d'env du bac à sable,
+  `test_llm_never_executes_commands`) passent par ce lecteur ; le test de bind vérifie en plus le
+  **contrat réel** (`inspect.signature(...).parameters["host"].default == "127.0.0.1"`) ;
+- `tests/test_source_utils.py` pin le mécanisme : il réécrit réellement le fichier dans un sous-processus,
+  vérifie que `current_source` reste correct **et** que `inspect.getsource` renvoie bien la mauvaise
+  fonction (si CPython change un jour, ce test le dira), puis restaure le fichier et compare son sha256.
+
+Statut : `FIXED_AND_VERIFIED`. Le test n'est plus sensible à une réécriture pendant l'exécution — la
+cause du seul échec non reproduit de cet audit est donc identifiée et fermée, pas reclassée.

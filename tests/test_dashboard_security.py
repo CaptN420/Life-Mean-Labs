@@ -226,8 +226,8 @@ class TestToolExecutionIsolation:
         # We can't easily derive a failing env here; just assert the function
         # filters secret-bearing keys by inspecting its decision (regression
         # guard: the filter keyword list must include key/token/password).
-        import inspect
-        src = inspect.getsource(run_sandbox_test)
+        from tests.source_utils import current_source
+        src = current_source(run_sandbox_test)
         for kw in ("password", "secret", "key", "token"):
             assert kw in src, f"sandbox env filter missing {kw!r}"
 
@@ -255,12 +255,24 @@ class TestNetworkPosture:
     def test_default_bind_is_loopback(self):
         """start_dashboard defaults to 127.0.0.1 — never 0.0.0.0 unless the
         operator explicitly overrides for remote access (which is out of the
-        secure default contract)."""
+        secure default contract).
+
+        Asserted on the signature and the file as it is NOW, not on
+        ``inspect.getsource``: that helper describes the file as it was at
+        import time and returned a neighbouring function's body when the file
+        was being rewritten mid-run (the run that produced this file's only
+        recorded failure).
+        """
+        import inspect as _inspect
         from experiments import dashboard as d
-        code = inspect_source(d.start_dashboard)
-        assert "def start_dashboard(\n    host: str = \"127.0.0.1\"" in code or \
-               '\n    host: str = "127.0.0.1"' in code
-        assert '0.0.0.0' not in code.split('host: str = "127.0.0.1"')[0]
+        from tests.source_utils import current_source
+
+        sig = _inspect.signature(d.start_dashboard)
+        assert sig.parameters["host"].default == "127.0.0.1"
+
+        code = current_source(d.start_dashboard)
+        assert "start_dashboard" in code
+        assert '0.0.0.0' not in code
 
     def test_docker_compose_binds_loopback_only(self):
         yml = Path("docker-compose.yml").read_text(encoding="utf-8")
@@ -276,10 +288,12 @@ class TestNetworkPosture:
         assert sig.parameters["port"].default == 8080
 
 
-# helper needed above
+# helper kept for compatibility: reads the file as it is now, not as it was
+# when the module was imported (see tests/source_utils.py for the measured
+# reason — a mid-run rewrite made getsource return another function's body).
 def inspect_source(func):
-    import inspect
-    return inspect.getsource(func)
+    from tests.source_utils import current_source
+    return current_source(func)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

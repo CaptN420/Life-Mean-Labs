@@ -386,8 +386,8 @@ class TestSentinelSecurity:
     def test_llm_never_executes_commands(self, sentinel):
         """Verify Sentinel never executes commands directly."""
         # This is a design principle - verify through code inspection
-        import inspect
-        source = inspect.getsource(Sentinel)
+        from tests.source_utils import current_source
+        source = current_source(Sentinel)
         assert "os.system" not in source
         assert "subprocess" not in source
         assert "eval(" not in source
