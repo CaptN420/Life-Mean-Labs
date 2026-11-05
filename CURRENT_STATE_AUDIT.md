@@ -43,8 +43,8 @@ l'ancien code.**
 | 6 | Format de pack inconnu accepté en silence | `FIXED_AND_VERIFIED` | `PackageFormatError` explicite + test sur archive bidon |
 | 7 | Tâches `sin`/`log` → `None` silencieux | `FIXED_AND_VERIFIED` | `b9602bb` — seed 21 : `pass_rate 0.333 → 1.0` |
 | 8 | Jetons `hf_`/`xoxb-`/`AIza`/`glpat-` en clair | `FIXED_AND_VERIFIED` | `a719f12` — 4 motifs + test de régression |
-| 9 | **Image Docker obsolète** | **`CONFIRMED_BROKEN`** | `grep PackageFormatError` → 0 dans le conteneur |
-| 10 | **LM Studio renvoie 401** | **`CONFIRMED_BROKEN`** (externe) | `GET 127.0.0.1:1234/v1/models` → 401 « An LM Studio API token is required… but none was provided » |
+| 9 | **Image Docker obsolète** | `FIXED_AND_VERIFIED` | reconstruite : `grep -c PackageFormatError` dans le conteneur → **5** (avant : 0), conteneur healthy |
+| 10 | LM Studio renvoie 401 | `NOT_APPLICABLE` — artefact de sonde | voir §2bis : l'appel réel aboutit avec le token du `.env` |
 | 11 | **Aucune route HTTP pour les packages LM** | **`CONFIRMED_BROKEN`** | `/api/packages`, `/api/lmpack`, `/api/workflows` → 404 |
 | 12 | **Aucune UI pour charger un package** | **`CONFIRMED_BROKEN`** | `dashboard.html` : **0** occurrence de « package » |
 | 13 | Registres Skills/Tools vides | **`CONFIRMED_BROKEN`** | `/api/extensions/skills` et `/tools` → `total: 0` |
@@ -83,17 +83,38 @@ requête incomplète, et les registres vides le disent (`total: 0`) au lieu d'in
 
 ## 3. Providers et modèles
 
+### 2bis. Correction d'un constat de cet audit — LM Studio fonctionne
+
+Le §3 initial classait LM Studio en `CONFIRMED_BROKEN` sur la base d'un `401`. **Ce constat était faux** :
+il provenait d'une sonde lancée **depuis l'hôte**, sans en-tête d'authentification, sur un nom
+(`host.docker.internal`) qui ne résout que depuis le conteneur.
+
+Vérification faite dans l'environnement réel de l'application (`.env` chargé par `env_file`) :
+
+```
+GET  {LIFE_MEAN_LLM_BASE_URL}/models   →  HTTP 200, 29 modèles
+POST {…}/chat/completions  model=qwen3.5-2b  →  HTTP 200 en 6.59 s
+    model renvoyé : qwen3.5-2b   usage : 24 tokens (8 de raisonnement)
+GET /api/settings → provider_models[lm_studio].key_configured = true, 26+ modèles
+```
+
+Le backend local est donc **opérationnel et authentifié**. Réserve honnête : le modèle `qwen3.5-2b`
+consomme des tokens de raisonnement, donc un `max_tokens` trop court renvoie un contenu vide — ce n'est
+pas une panne mais un paramétrage à surveiller côté appels.
+
+### 3. Providers déclarés
+
 | Élément | Constat |
 |---|---|
 | Providers déclarés | `lm_studio`, `openrouter` |
 | Clé OpenRouter | configurée (`openrouter_key_configured: true`) |
 | Modèles disponibles | liste peuplée (`available_models`, 10+ entrées) |
-| LM Studio | **401** — le serveur exige un token API, aucun n'est envoyé |
+| LM Studio | **opérationnel** — 29 modèles servis, complétion réelle en 6.59 s (§2bis) |
 | Provider par défaut | `general.provider: null` — aucun provider sélectionné explicitement |
 
-**Intervention utilisateur nécessaire (phase 5)** : dans LM Studio, soit désactiver
-« Require API token » dans les réglages serveur, soit générer le token et le renseigner côté
-Life_mean (Paramètres → providers). Aucune clé ne doit être affichée ni commitée.
+**Aucune intervention nécessaire** : le `.env` contient déjà `LIFE_MEAN_LLM_BASE_URL`,
+`LIFE_MEAN_LLM_API_KEY` et `OPENROUTER_API_KEY`, et `docker-compose` les injecte via `env_file`.
+Le `401` observé venait d'une sonde hors conteneur (voir §2bis) — pas d'une configuration manquante.
 
 ---
 
