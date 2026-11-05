@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from typing import Any, Optional
+
+# A stalled backend must not freeze a debate: without this, the OpenAI client
+# default (600s, with retries) could block a single call for many minutes.
+DEFAULT_TIMEOUT_SECONDS = float(os.environ.get("LIFE_MEAN_LLM_TIMEOUT_SECONDS", "60"))
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +18,8 @@ logger = logging.getLogger(__name__)
 class LLMClient:
     """Wrapper around the OpenAI Python package for LM Studio."""
 
-    def __init__(self, base_url: str, api_key: str = "lm-studio") -> None:
+    def __init__(self, base_url: str, api_key: str = "lm-studio",
+                 timeout: Optional[float] = None) -> None:
         try:
             from openai import OpenAI
         except ImportError as exc:
@@ -23,7 +29,15 @@ class LLMClient:
 
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
-        self._client = OpenAI(base_url=self.base_url, api_key=api_key)
+        self.timeout = float(timeout) if timeout is not None else DEFAULT_TIMEOUT_SECONDS
+        # max_retries=0: a timeout is reported, not multiplied. Retries hide
+        # latency and turn one hung call into several.
+        self._client = OpenAI(
+            base_url=self.base_url,
+            api_key=api_key,
+            timeout=self.timeout,
+            max_retries=0,
+        )
         self._models: list[str] = []
         self._router: Optional[Any] = None  # Will be set from outside
         # The model actually used by the last inference (resolved via router /
@@ -63,6 +77,7 @@ class LLMClient:
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "timeout": self.timeout,
             }
 
             response = self._client.chat.completions.create(**kwargs)
@@ -86,6 +101,11 @@ class LLMClient:
             if self._router and model:
                 self._router.record_performance(model, False, duration)
 
+            if "timeout" in str(exc).lower() or "timed out" in str(exc).lower():
+                logger.error("LLM call TIMEOUT after %.1fs (limit %.0fs)",
+                             duration, self.timeout)
+                return (f"[LLM_TIMEOUT after {duration:.1f}s: no answer within "
+                        f"{self.timeout:.0f}s]"), "timeout"
             return f"[Error responding after {duration:.1f}s: {exc}]", "error"
 
     def _resolve_model(self, model: Optional[str]) -> str:

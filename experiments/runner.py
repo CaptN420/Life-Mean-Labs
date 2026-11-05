@@ -6,6 +6,8 @@ to execute tasks through the multi-agent pipeline.
 
 from __future__ import annotations
 
+import threading
+
 import logging
 import math
 import re
@@ -117,6 +119,88 @@ class ExperimentRunner:
         task: GeneratedTask,
         context: Optional[ExperimentContext] = None,
     ) -> ExperimentResult:
+        """Execute a single task, bounded by ``task_timeout_seconds``.
+
+        A stalled tool or provider used to hang the whole experiment forever
+        (nothing in core/runtime, core/workers or here had a timeout). The task
+        now runs in a worker thread with a deadline: on expiry the result is an
+        explicit ``TASK_TIMEOUT`` failure, never a silent success.
+
+        Python cannot kill a thread, so an expired worker is abandoned (daemon)
+        and its eventual result is discarded — it is NOT appended to the
+        statistics, because the task did not finish within its budget.
+        """
+        timeout = float(self.config.get("task_timeout_seconds", 120) or 0)
+        if timeout <= 0:
+            result = self._run_task_impl(task, context)
+            self._results.append(result)
+            return result
+
+        box: Dict[str, Any] = {}
+
+        def _target() -> None:
+            try:
+                box["result"] = self._run_task_impl(task, context)
+            except BaseException as exc:  # noqa: BLE001 - forwarded to the caller
+                box["error"] = exc
+
+        worker = threading.Thread(
+            target=_target, daemon=True, name=f"task-{task.task_id}",
+        )
+        worker.start()
+        worker.join(timeout)
+
+        if worker.is_alive():
+            logger.error(
+                "TASK_TIMEOUT: task %s exceeded %.1fs; abandoned "
+                "(it may still be running and its result will be ignored)",
+                task.task_id, timeout,
+            )
+            result = self._timeout_result(task, context, timeout)
+            self._results.append(result)
+            return result
+
+        if "error" in box:
+            raise box["error"]
+
+        result = box["result"]
+        self._results.append(result)
+        return result
+
+    def _timeout_result(
+        self,
+        task: GeneratedTask,
+        context: Optional[ExperimentContext],
+        timeout: float,
+    ) -> ExperimentResult:
+        """Explicit failure record for a task that exceeded its deadline."""
+        exp_id = context.experiment_id if context else ""
+        gen_id = context.generation_id if context else ""
+        return ExperimentResult(
+            run_id=f"run_{uuid.uuid4().hex[:8]}",
+            task_id=task.task_id,
+            experiment_id=exp_id,
+            generation_id=gen_id,
+            config=self.config,
+            routing_decision={},
+            workers_used=[],
+            tools_used=[],
+            answer=None,
+            ground_truth=task.ground_truth,
+            validation_result=None,
+            provenance=None,
+            error=(
+                f"TASK_TIMEOUT: task exceeded {timeout:.0f}s "
+                f"(task_timeout_seconds). No answer was produced."
+            ),
+            metadata={"timeout_seconds": timeout, "timed_out": True},
+        )
+
+    def _run_task_impl(
+        self,
+        task: GeneratedTask,
+        context: Optional[ExperimentContext] = None,
+    ) -> ExperimentResult:
         """Execute a single task through the pipeline.
 
         Args:
@@ -185,7 +269,6 @@ class ExperimentRunner:
             error=error,
         )
 
-        self._results.append(result)
         return result
 
     def run_task_with_llm_verifier(

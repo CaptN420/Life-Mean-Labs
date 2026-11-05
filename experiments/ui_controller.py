@@ -743,6 +743,8 @@ class ExperimentUIController:
             total_tasks = len(tasks)
             new_results: List[Any] = []
             stopped_early = False
+            run_limit = float(config.get("run_timeout_seconds", 0) or 0)
+            run_started = time.time()
             for index, task in enumerate(tasks):
                 if index in done_indices:
                     continue
@@ -751,6 +753,19 @@ class ExperimentUIController:
                     logger.info(
                         "Stop requested for %s before task %d/%d",
                         experiment_id, index + 1, total_tasks,
+                    )
+                    break
+                if run_limit > 0 and (time.time() - run_started) > run_limit:
+                    stopped_early = True
+                    self.add_error(
+                        experiment_id,
+                        f"RUN_TIMEOUT: l'exécution a dépassé {run_limit:.0f}s "
+                        f"(run_timeout_seconds) — arrêtée à {index}/{total_tasks} tâches ; "
+                        "les tâches enregistrées restent reprenables.",
+                    )
+                    logger.error(
+                        "RUN_TIMEOUT for %s at task %d/%d (limit %.0fs)",
+                        experiment_id, index, total_tasks, run_limit,
                     )
                     break
 

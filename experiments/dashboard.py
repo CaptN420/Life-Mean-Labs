@@ -820,7 +820,8 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
 
     def _validate_experiment_input(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Enforce whitelist and strict type conversion for experiment creation."""
-        known_keys = {"num_tasks", "seed", "deterministic", "debate", "difficulty_range", "mode"}
+        known_keys = {"num_tasks", "seed", "deterministic", "debate", "difficulty_range",
+                      "mode", "task_timeout_seconds", "run_timeout_seconds"}
         validated = {}
         
         for key in known_keys:
@@ -838,6 +839,14 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
                     validated[key] = int(val)
                 except (ValueError, TypeError):
                     raise ValueError("Seed must be an integer")
+            elif key in ("task_timeout_seconds", "run_timeout_seconds"):
+                try:
+                    seconds = float(val)
+                except (ValueError, TypeError):
+                    raise ValueError(f"{key} must be a number of seconds")
+                if seconds < 0:
+                    raise ValueError(f"{key} cannot be negative")
+                validated[key] = seconds
             elif key in ("deterministic", "debate"):
                 validated[key] = str(val).lower() in ("true", "1", "on")
             elif key == "difficulty_range":

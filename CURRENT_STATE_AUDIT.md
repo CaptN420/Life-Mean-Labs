@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 736 passed, 13 skipped, 0 failed** (après P1/P2/P3) |
+| Tests de référence | **1 743 passed, 13 skipped, 0 failed** (après P1/P2/P3/P4) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -49,7 +49,7 @@ l'ancien code.**
 | 12 | Aucune UI pour charger un package | `FIXED_AND_VERIFIED` | onglet **Packages** : catalogue, détail + double verdict, boutons Inspecter / Valider / **Importer** |
 | 13 | Registres Skills/Tools vides | **`CONFIRMED_BROKEN`** | `/api/extensions/skills` et `/tools` → `total: 0` |
 | 14 | `continue_experiment` ne reprend pas | `FIXED_AND_VERIFIED` | checkpoint par tâche ; 3/8 arrêtées → reprise exécute **5** tâches, RAW 3→8, métriques cumulées ; terminée/absente → refus motivé |
-| 15 | Aucun timeout moteur | **`CONFIRMED_BROKEN`** | aucune occurrence de `timeout` dans `core/runtime`, `core/workers`, `core/events` |
+| 15 | Aucun timeout moteur | `FIXED_AND_VERIFIED` | `task_timeout_seconds` (TASK_TIMEOUT + résultat tardif jeté), `run_timeout_seconds` (RUN_TIMEOUT, reste reprenable), client LLM borné (60 s, `max_retries=0`) |
 | 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
 | 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents |
 | 18 | Collecteurs Windows (Defender, Event Log) | `BLOCKED_EXTERNAL` | `psutil`, `win32evtlog`, `win32service` absents |
@@ -151,6 +151,38 @@ simulait un `run_batch` renvoyant deux résultats ; le simulacre a été déplac
 
 Aucun seuil abaissé, aucun test supprimé.
 
+### 4sexies. Timeouts moteur (P4)
+
+Il n'existait **aucun** timeout dans `core/runtime`, `core/workers`, `core/events`, ni dans le runner :
+un outil bloqué figeait l'expérience indéfiniment. Pire, `LLMClient` construisait
+`OpenAI(base_url=..., api_key=...)` **sans timeout** — donc le défaut de 600 s, avec retries.
+
+Trois garde-fous, tous explicites :
+
+| Garde-fou | Réglage | Comportement |
+|---|---|---|
+| Tâche | `task_timeout_seconds` (défaut 120 s, 0 = désactivé) | au-delà : résultat `TASK_TIMEOUT`, `is_valid=False`, aucune réponse inventée ; le thread abandonné est un daemon et **son résultat tardif est jeté** (jamais compté deux fois) |
+| Exécution | `run_timeout_seconds` (défaut 0 = désactivé) | au-delà : arrêt propre, erreur `RUN_TIMEOUT`, tâches déjà enregistrées **reprenables** ; le délai se réarme à chaque reprise |
+| Appel LLM | `LIFE_MEAN_LLM_TIMEOUT_SECONDS` (défaut 60 s) ou `LLMClient(timeout=…)` | `timeout` passé au client ET à chaque requête, `max_retries=0` ; dépassement → `finish_reason="timeout"` et texte `[LLM_TIMEOUT …]`, jamais un succès silencieux |
+
+Mesures réelles :
+
+```
+# client LLM, dans le conteneur, backend réel (29 modèles)
+timeout client: 60.0
+normal      -> finish_reason=length  | 1.87s
+timeout 1ms -> finish_reason=timeout | 0.01s | '[LLM_TIMEOUT after 0.00s: no answer within 0.001s]'
+
+# garde-fou d'exécution, via HTTP (run_timeout_seconds=2, 4000 tâches)
+après garde-fou : completed=1365/4000  running=False
+  RUN_TIMEOUT: l'exécution a dépassé 2s — arrêtée à 1365/4000 tâches ; les tâches enregistrées restent reprenables.
+continue        -> 200 resumed
+après reprise   : completed=2776/4000  (le délai se réarme : 2e RUN_TIMEOUT enregistré)
+```
+
+Réserve honnête : Python ne tue pas un thread. Une tâche expirée continue donc en arrière-plan
+(daemon) ; son résultat est ignoré, mais elle consomme encore du CPU/IO jusqu'à sa fin naturelle.
+
 ---
 
 ## 2. Sondes HTTP réelles (serveur démarré)
@@ -244,7 +276,7 @@ a échoué une fois, puis :
 
 - passe seul (23/23 dans son fichier) ;
 - passe dans le lot `dashboard_security + http_smoke + packages_api + experimental_api` (55/55) ;
-- passe sur les passages complets ultérieurs : **1717**, **1720**, **1728**, puis **1736 passed, 13 skipped, 0 failed**.
+- passe sur les passages complets ultérieurs : **1717**, **1720**, **1728**, **1736**, puis **1743 passed, 13 skipped, 0 failed**.
 
 Classé `UNVERIFIED_FLAKE` : non reproduit, cause non identifiée, assertion **non modifiée**. À traiter en
 phase 9 (isolation des serveurs in-process) plutôt qu'à être ignoré.

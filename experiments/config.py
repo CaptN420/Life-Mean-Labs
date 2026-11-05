@@ -35,6 +35,11 @@ class ExperimentConfig:
     seed: int = 42
     prompt: str = ""  # Optional custom prompt for the experiment
 
+    # Bounded execution: a stalled tool or provider must not freeze a run.
+    # 0 disables the guard (the previous behaviour).
+    task_timeout_seconds: float = 120.0
+    run_timeout_seconds: float = 0.0
+
     # Reproducibility
     generator_version: str = "1.0.0"
     prompt_version: str = "1.0.0"
@@ -65,6 +70,8 @@ class ExperimentConfig:
             "num_tasks": self.num_tasks,
             "seed": self.seed,
             "prompt": self.prompt,
+            "task_timeout_seconds": self.task_timeout_seconds,
+            "run_timeout_seconds": self.run_timeout_seconds,
             "generator_version": self.generator_version,
             "prompt_version": self.prompt_version,
             "experiment_id": self.experiment_id,
@@ -86,6 +93,8 @@ class ExperimentConfig:
             difficulty_range=tuple(data.get("difficulty_range", [1, 5])),
             num_tasks=data.get("num_tasks", 100),
             seed=data.get("seed", 42),
+            task_timeout_seconds=data.get("task_timeout_seconds", 120.0),
+            run_timeout_seconds=data.get("run_timeout_seconds", 0.0),
             prompt=data.get("prompt", ""),
             generator_version=data.get("generator_version", "1.0.0"),
             prompt_version=data.get("prompt_version", "1.0.0"),
