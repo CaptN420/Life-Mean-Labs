@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 806 passed, 13 skipped, 0 failed** (après P1→P10, avec `pipeline_inspector/tests`) |
+| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 787 passed** sur `tests/` seul (après P11) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -51,8 +51,8 @@ l'ancien code.**
 | 14 | `continue_experiment` ne reprend pas | `FIXED_AND_VERIFIED` | checkpoint par tâche ; 3/8 arrêtées → reprise exécute **5** tâches, RAW 3→8, métriques cumulées ; terminée/absente → refus motivé |
 | 15 | Aucun timeout moteur | `FIXED_AND_VERIFIED` | `task_timeout_seconds` (TASK_TIMEOUT + résultat tardif jeté), `run_timeout_seconds` (RUN_TIMEOUT, reste reprenable), client LLM borné (60 s, `max_retries=0`) |
 | 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
-| 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents |
-| 18 | Collecteurs Windows (Defender, Event Log) | `BLOCKED_EXTERNAL` | `psutil`, `win32evtlog`, `win32service` absents |
+| 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents (aucun collecteur à écrire : c'est une dépendance lourde, décision utilisateur) |
+| 18 | Collecteurs Windows (Defender, Event Log) | `FIXED_AND_VERIFIED` | **mauvais classement** : aucun collecteur n'existait dans le dépôt, et `psutil`/`win32*` n'étaient pas nécessaires — `powershell`/`wevtutil` suffisent (voir §4duodecies) |
 | 19 | Feature Pool à 987/989 non observées | `FIXED_AND_VERIFIED` (mesure) / `PARTIAL` (couverture) | l'échantillon était non représentatif : **2 → 14** observées sur la base locale, couverture déclarée ; statuts inchangés (voir §4undecies) |
 | 20 | Pipeline Inspector | `FIXED_AND_VERIFIED` | `a719f12` — 392 151 événements, idempotent, 28 tests |
 | 21 | `/api/agents` en dur + création non persistée | `FIXED_AND_VERIFIED` | registre réel (12 agents), toggle vérifié par relecture, doublon → 409 |
@@ -351,6 +351,49 @@ Reste ouvert et assumé : **987 fonctionnalités non observées** sur 989. Ce n'
 corriger par du code : la majorité du pool (widgets Qt, stores, classes de sécurité) n'est jamais
 instanciée par les pipelines qui tournent ici. Le rapport continue de dire « usage observé ≠
 validation » et ne modifie aucun statut.
+
+### 4duodecies. « Collecteurs Windows bloqués » était un mauvais classement (P11)
+
+L'audit rangeait les collecteurs Defender / Event Log en `BLOCKED_EXTERNAL` au motif que `psutil`,
+`win32evtlog` et `win32service` étaient absents. Deux erreurs dans ce constat :
+
+1. **Aucun collecteur n'existait dans le dépôt** (`grep -rn "Defender\|win32evtlog\|collector"` sur tout
+   le code : rien de système — seul `core/router/evidence.py` utilise le mot « collector » pour des
+   preuves de raisonnement). Ce n'était donc pas « bloqué par une dépendance », mais **non écrit**.
+2. **Les dépendances ne sont pas nécessaires** : Windows fournit `powershell` et `wevtutil`. Un
+   `pip install psutil pywin32` aurait ajouté du poids pour deux appels système ponctuels.
+
+Nouveau module `core/safety/os_collectors.py` (zéro dépendance pip) :
+
+- `defender_status()` → `Get-MpComputerStatus` (protection temps réel, antivirus, date de signature) ;
+- `recent_events(log, count)` → `wevtutil qe … /f:xml` parsé en `{event_id, level, provider,
+  time_created, computer}` ;
+- `os_snapshot()` → les deux, avec `degraded` listant ce qui n'a pas répondu.
+
+Contrat tenu : aucune exception ne remonte, sortie bornée (≤ 50 événements, 512 Ko, timeout),
+`ok`/`error` explicites, et **jamais** de valeur inventée quand la source ne répond pas.
+
+Mesures réelles, route `GET /api/sentinel/os` :
+
+```
+dashboard hôte (Windows 11) :
+  host platform Windows, supported true, degraded []
+  defender: ok true, real_time_protection true, antivirus_enabled true, signature 1793882711
+  event_log: ok true, count 3
+             {"event_id":"10016","level":"warning","provider":"Microsoft-Windows-DistributedCOM", ...}
+             {"event_id":"19","level":"information","provider":"…WindowsUpdateClient", ...}
+
+conteneur Docker (WSL2, Linux) :
+  host platform Linux, supported false, degraded ["defender","event_log"]
+  defender: ok false, error "not a Windows host"
+```
+
+Le conteneur ne peut pas lire le Defender de l'hôte : il le **dit** (`supported: false`) au lieu de
+renvoyer un état plausible. La route est utile sur le dashboard hôte (`--port 8082`), ce qui est
+exactement là où la télémétrie système a un sens.
+
+Reste `BLOCKED_EXTERNAL` : le GPU / l'inférence locale (#17) — dépendances lourdes (`torch`,
+`llama_cpp`), décision d'installation qui revient à l'utilisateur, rien à corriger dans le code.
 
 ## 2. Sondes HTTP réelles (serveur démarré)
 

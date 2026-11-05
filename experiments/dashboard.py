@@ -262,6 +262,8 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             self._agents_test(agent_id, data)
         elif parsed.path == "/api/sentinel/status":
             self._sentinel_status()
+        elif parsed.path == "/api/sentinel/os":
+            self._sentinel_os_status(_int_param(parsed, "events", 5))
         elif parsed.path == "/api/sentinel/config":
             self._sentinel_config_get()
         elif parsed.path.startswith("/api/sentinel/alerts"):
@@ -1334,6 +1336,20 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
         logger.debug(f"{self.address_string()} - {format % args}")
 
     # ── Sentinel API ────────────────────────────────────────────────────────
+
+    def _sentinel_os_status(self, events: int = 5) -> None:
+        """GET /api/sentinel/os — télémétrie réelle du système (lecture seule).
+
+        Aucune dépendance pip : `powershell Get-MpComputerStatus` et `wevtutil`
+        existent déjà sur Windows. Une plateforme non Windows ou un journal
+        inaccessible renvoie `ok: false` avec la raison, jamais un état inventé.
+        """
+        try:
+            from core.safety.os_collectors import os_snapshot
+        except Exception as exc:  # noqa: BLE001 - a missing module must be reported
+            self._send_error(500, f"os collectors unavailable: {exc}", code="collector_unavailable")
+            return
+        self._send_json(os_snapshot(events=events))
 
     def _sentinel_status(self) -> None:
         """GET /api/sentinel/status — current Sentinel status."""
