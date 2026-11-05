@@ -16,6 +16,12 @@ _SECRET_PATTERNS = [
     (re.compile(r"\bsk-or-[A-Za-z0-9_\-]{12,}\b"), "sk-or-***REDACTED***"),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), "gh***REDACTED***"),
     (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"), "github_pat_***REDACTED***"),
+    # Autres fournisseurs dont les jetons circulent en clair dans les logs :
+    # un `hf_…`/`xoxb-…`/`AIza…`/`glpat-…` n'est un secret que s'il est reconnu.
+    (re.compile(r"\bhf_[A-Za-z0-9]{20,}\b"), "hf_***REDACTED***"),
+    (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "xox***REDACTED***"),
+    (re.compile(r"\bAIza[0-9A-Za-z_\-]{20,}\b"), "AIza***REDACTED***"),
+    (re.compile(r"\bglpat-[A-Za-z0-9_\-]{15,}\b"), "glpat-***REDACTED***"),
     (re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._\-]{12,}"), r"\1 ***REDACTED***"),
     # Toute valeur non vide après un mot-clé sensible, sans exiger 8 caractères :
     # `password=hunter2` (7 caractères) passait auparavant en clair.

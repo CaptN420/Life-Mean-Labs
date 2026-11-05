@@ -121,6 +121,24 @@ def test_redaction_masks_short_passwords_and_keys():
     assert out.count("***REDACTED***") >= 2
 
 
+def test_redaction_masks_provider_tokens_recognized_at_first_sight():
+    """L1 : `hf_…`, `xoxb-…`, `AIza…`, `glpat-…` passaient en clair sans mot-clé.
+
+    Un jeton présent dans les logs ne doit pas dépendre de la présence du mot
+    « token » à côté de lui pour être masqué.
+    """
+    tokens = [
+        "hf_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345",
+        "xoxb-123456789012-abcdefghijkl",
+        "AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M",
+        "glpat-ABCDEFGHIJKLMNOPQRST",
+    ]
+    for token in tokens:
+        out = redact_text(f"debug: {token} end")
+        assert token not in out, f"jeton laissé en clair : {token[:6]}…"
+        assert "***REDACTED***" in out
+
+
 def test_redaction_payload_nested():
     payload = {"api_key": "sk-xyz1234567890abc", "nested": {"token": "abc"}, "ok": 1}
     out = redact_value(payload)
