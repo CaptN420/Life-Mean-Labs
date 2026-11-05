@@ -9,6 +9,14 @@ A .lmpack file is a zip archive containing:
 - sessions/: Example debate sessions (JSON files)
 - README.md: Human-readable documentation
 
+Two layouts exist in the wild and BOTH are read here:
+- the ``personas/personas.json`` layout written by this packager;
+- the ``manifest.json`` + ``agents/<id>.json`` layout written by Life_mean
+  Studio and used by the packs shipped in ``lmpack/``.
+
+An archive whose layout is recognised by neither raises ``PackageFormatError``
+instead of returning a silently empty pack that only fails later at validation.
+
 Usage:
     packager = LLMPackager("my_pack")
     packager.add_persona(persona_config)
@@ -27,10 +35,60 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from ..personas.schema import ModelSpec, PersonaConfig, ProviderType
+from ..personas.schema import ModelSpec, PersonaConfig, PersonaType, ProviderType
 from ..personas.network import PersonaNetwork
 
 logger = logging.getLogger("core.packager")
+
+
+class PackageFormatError(RuntimeError):
+    """Raised when a .lmpack archive uses a layout this reader cannot serve.
+
+    A pack that loads as "zero personas" is worse than an error: validation
+    later reports "pack without personas" as if the pack were the problem.
+    """
+
+
+def _persona_from_agent_entry(data: Any, entry_name: str) -> Optional[PersonaConfig]:
+    """Map a Studio `agents/<id>.json` entry onto a :class:`PersonaConfig`.
+
+    Studio stores one file per agent with ``id``, ``name``, ``persona``,
+    ``role``, ``provider`` and ``system_prompt``. Returns ``None`` when the
+    entry cannot serve as a persona (no system prompt), so the caller can tell
+    "wrong format" from "agent without prompt".
+    """
+    if not isinstance(data, dict):
+        return None
+
+    prompt = str(data.get("system_prompt") or "").strip()
+    if not prompt:
+        return None
+
+    stem = Path(entry_name).stem
+    role_id = str(data.get("id") or stem).strip() or stem
+
+    raw_type = str(data.get("persona") or "unknown").strip().lower()
+    try:
+        persona_type = PersonaType(raw_type)
+    except ValueError:
+        persona_type = PersonaType.OTHER
+
+    metadata: Dict[str, Any] = {"raw_persona_type": raw_type}
+    if data.get("provider"):
+        metadata["provider"] = data["provider"]
+    if data.get("config"):
+        metadata["config"] = data["config"]
+    if data.get("role"):
+        metadata["role"] = data["role"]
+
+    return PersonaConfig(
+        role_id=role_id,
+        name=str(data.get("name") or role_id),
+        persona_type=persona_type,
+        description=str(data.get("role") or ""),
+        system_prompt=prompt,
+        metadata=metadata,
+    )
 
 
 # ── Pack Manifest ────────────────────────────────────────────────────────────
@@ -288,6 +346,30 @@ class LLMPackager:
             except KeyError:
                 pass
 
+            # Layout B — `agents/<id>.json` (Life_mean Studio, packs in lmpack/).
+            # Read only when the first layout produced nothing, so a pack that
+            # carries both is still read the canonical way.
+            if not packager._personas:
+                agent_entries = [n for n in zf.namelist()
+                                 if n.startswith("agents/") and n.lower().endswith(".json")]
+                for name in sorted(agent_entries):
+                    try:
+                        data = json.loads(zf.read(name))
+                    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                        raise PackageFormatError(
+                            f"{path.name}: unreadable agent entry {name!r}: {exc}"
+                        ) from exc
+                    persona = _persona_from_agent_entry(data, name)
+                    if persona is not None:
+                        packager._personas[persona.role_id] = persona
+
+                if agent_entries and not packager._personas:
+                    raise PackageFormatError(
+                        f"{path.name}: {len(agent_entries)} agent file(s) found but none "
+                        f"carries a usable system_prompt (expected keys: id, name, "
+                        f"system_prompt)"
+                    )
+
             # Read providers
             try:
                 with zf.open("providers/providers.json") as f:
@@ -324,7 +406,20 @@ class LLMPackager:
                 with zf.open("README.md") as f:
                     packager._readme = f.read().decode("utf-8")
             except KeyError:
-                pass
+                # Studio-written packs ship README.txt instead.
+                try:
+                    with zf.open("README.txt") as f:
+                        packager._readme = f.read().decode("utf-8", errors="replace")
+                except KeyError:
+                    pass
+
+            if not (packager._personas or packager._providers
+                    or packager._models or packager._network):
+                raise PackageFormatError(
+                    f"{path.name}: unrecognised .lmpack layout — expected "
+                    f"personas/personas.json or agents/*.json next to manifest.json "
+                    f"(entries: {sorted(zf.namelist())[:8]})"
+                )
 
         logger.info("Loaded package from %s", path)
         return packager

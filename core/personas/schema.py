@@ -40,6 +40,11 @@ class PersonaType(str, enum.Enum):
     NEUTRAL_JUDGE = "neutral_judge"
     INTERDISCIPLINARY_RESEARCHER = "interdisciplinary_researcher"
 
+    # Fallback for packs written by other tools (e.g. Studio's `agents/*.json`
+    # uses free-form values like "general"). Recording it honestly as OTHER
+    # beats silently mapping it onto a persona it is not.
+    OTHER = "other"
+
 
 class ProviderType(str, enum.Enum):
     """Types of LLM providers supported."""
