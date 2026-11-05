@@ -65,6 +65,18 @@ def resolve_package(name: str) -> Path:
     return resolved
 
 
+def studio_db_path() -> Path:
+    """Studio SQLite location (override: LIFE_MEAN_STUDIO_DB).
+
+    Reported by the API so an import never looks durable when the database
+    actually lives somewhere ephemeral (a read-only image, a tmpfs).
+    """
+    override = os.environ.get("LIFE_MEAN_STUDIO_DB")
+    if override:
+        return Path(override).expanduser().resolve()
+    return (Path(__file__).resolve().parents[1] / "life_mean_studio_data.db").resolve()
+
+
 def _redact(text: str) -> str:
     try:
         from pipeline_inspector.redaction import redact_text
@@ -199,7 +211,18 @@ def inspect_package(path: Path) -> Dict[str, Any]:
 
 
 class PackagesApiMixin:
-    """Mixin providing /api/packages* handlers (read-only)."""
+    """Mixin providing /api/packages* handlers."""
+
+    _studio_storage = None  # injectable (tests); lazily created otherwise
+
+    # ── Studio storage ──────────────────────────────────────────────────────
+    def _storage(self):
+        if PackagesApiMixin._studio_storage is None:
+            from life_mean_studio.engine.storage import StudioStorage
+
+            PackagesApiMixin._studio_storage = StudioStorage(str(studio_db_path()))
+        return PackagesApiMixin._studio_storage
+
 
     # ── helpers ─────────────────────────────────────────────────────────────
     def _packages_list(self) -> None:
@@ -243,6 +266,40 @@ class PackagesApiMixin:
         self._send_json(inspect_package(path))
 
     # ── POST ────────────────────────────────────────────────────────────────
+    def _packages_import(self, payload: Dict[str, Any]) -> None:
+        """Import a pack's agents into Studio's registry.
+
+        Never reports success when nothing was written: an already-imported pack
+        comes back as ``success: false`` with the conflicts listed, and the
+        database path travels with every answer so the caller can see where the
+        data actually landed.
+        """
+        raw_path = (payload or {}).get("path") or (payload or {}).get("file") or ""
+        try:
+            path = resolve_package(raw_path)
+        except PackagePathError as exc:
+            self._send_error(404, str(exc), code="package_not_found")
+            return
+
+        try:
+            from life_mean_studio.engine.package_manager import PackageManager
+
+            result = PackageManager(storage=self._storage()).import_package(str(path))
+        except Exception as exc:  # noqa: BLE001 - surface, never swallow
+            self._send_error(500, f"{type(exc).__name__}: {exc}", code="import_failed")
+            return
+
+        self._send_json({
+            "file": path.name,
+            "success": bool(result.success),
+            "message": result.message,
+            "agents_imported": int(getattr(result, "agents_imported", 0) or 0),
+            "workflows_imported": int(getattr(result, "workflows_imported", 0) or 0),
+            "conflicts": list(getattr(result, "conflicts", []) or []),
+            "errors": list(getattr(result, "errors", []) or []),
+            "database": str(studio_db_path()),
+        })
+
     def _packages_validate(self, payload: Dict[str, Any]) -> None:
         raw_path = (payload or {}).get("path") or (payload or {}).get("file") or ""
         try:

@@ -176,6 +176,19 @@ class PackageManager:
                 package_info.description = manifest.get("description", "")
                 package_info.created_at = manifest.get("created_at", "")
 
+                # Identity of an agent inside a pack is its NAME. create_agent()
+                # assigns a fresh UUID, so the package id can never match — the
+                # old id-only check made conflicts undetectable and re-importing
+                # the same pack silently duplicated every agent.
+                existing_names = set()
+                try:
+                    for row in self.storage.list_agents():
+                        name = str((row or {}).get("name") or "").strip().lower()
+                        if name:
+                            existing_names.add(name)
+                except Exception:  # noqa: BLE001 - a failing list must not block import
+                    existing_names = set()
+
                 # Import agents
                 if "agents" in manifest:
                     for agent_spec in manifest["agents"]:
@@ -216,6 +229,14 @@ class PackageManager:
                             errors.append(f"Invalid agent JSON for {agent_id}: {e}")
                             continue
 
+                        # Name-based conflict check (see existing_names above).
+                        agent_name = str(agent_data.get("name") or agent_id).strip()
+                        if agent_name.lower() in existing_names:
+                            conflicts.append(
+                                f"Agent '{agent_name}' already exists — skipping"
+                            )
+                            continue
+
                         # Import agent
                         try:
                             self.storage.create_agent(
@@ -229,6 +250,7 @@ class PackageManager:
                                 tools=agent_data.get("tools", []),
                             )
                             agents_imported += 1
+                            existing_names.add(agent_name.lower())
                         except Exception as e:
                             errors.append(f"Failed to import agent '{agent_id}': {e}")
 
@@ -276,6 +298,15 @@ class PackageManager:
             return ImportResult(False, f"Import failed: {e}", errors=[str(e)])
 
         if not errors and agents_imported == 0 and workflows_imported == 0:
+            if conflicts:
+                # "No content imported" would be a lie: the content is there, it
+                # was already present. Say what actually happened.
+                return ImportResult(
+                    False,
+                    f"Nothing new: {len(conflicts)} item(s) already present",
+                    package_info=package_info,
+                    conflicts=conflicts,
+                )
             return ImportResult(False, "No content imported", errors=["Package contained no importable agents or workflows"])
 
         success = len(errors) == 0

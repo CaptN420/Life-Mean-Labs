@@ -180,3 +180,59 @@ def test_fixture_pack_is_validated_independently_of_shipped_ones(tmp_path, monke
     assert payload["verdicts"]["studio"]["agents_count"] == 2
     assert payload["verdicts"]["core"]["persona_count"] == 2
     assert packages_root() == tmp_path.resolve()
+
+
+# ── import dans le registre Studio ─────────────────────────────────────────
+
+
+@pytest.fixture
+def studio_db(tmp_path, monkeypatch):
+    """Isolated Studio registry — never the developer's real database."""
+    db = tmp_path / "studio.db"
+    monkeypatch.setenv("LIFE_MEAN_STUDIO_DB", str(db))
+    PackagesApiMixin._studio_storage = None
+    yield db
+    PackagesApiMixin._studio_storage = None
+
+
+def _agent_count(db: Path) -> int:
+    import sqlite3
+
+    with sqlite3.connect(str(db)) as conn:
+        return conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
+
+
+def test_import_creates_agents_and_reports_the_database(studio_db):
+    handler = _FakeHandler()
+    handler._packages_import({"path": SHIPPED[0].name})
+
+    assert handler._code == 200
+    payload = handler._json
+    assert payload["success"] is True
+    assert payload["agents_imported"] == 11
+    assert payload["conflicts"] == []
+    assert payload["database"].endswith("studio.db")
+    assert _agent_count(studio_db) == 11
+
+
+def test_second_import_is_refused_and_creates_no_duplicate(studio_db):
+    """The bug this pins: create_agent() mints a UUID, so the old id-based
+    conflict check never matched and re-importing doubled the registry."""
+    handler = _FakeHandler()
+    handler._packages_import({"path": SHIPPED[0].name})
+    handler._packages_import({"path": SHIPPED[0].name})
+
+    payload = handler._json
+    assert payload["success"] is False
+    assert payload["agents_imported"] == 0
+    assert len(payload["conflicts"]) == 11
+    assert "already present" in payload["message"]
+    assert _agent_count(studio_db) == 11
+
+
+def test_import_refuses_paths_outside_the_packages_root(studio_db):
+    handler = _FakeHandler()
+    handler._packages_import({"path": "../../.env"})
+    assert handler._code == 404
+    assert handler._err_code == "package_not_found"
+    assert not studio_db.exists() or _agent_count(studio_db) == 0

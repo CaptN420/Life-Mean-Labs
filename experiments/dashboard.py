@@ -485,6 +485,8 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             self._send_json(self.pipeline_reports())
         elif parsed.path == "/api/packages/validate":
             self._packages_validate(data if isinstance(data, dict) else {})
+        elif parsed.path == "/api/packages/import":
+            self._packages_import(data if isinstance(data, dict) else {})
         elif parsed.path == "/api/pipeline/export":
             self._send_json(self.pipeline_export())
         else:

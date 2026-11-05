@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 702 passed, 13 skipped, 0 failed** |
+| Tests de référence | **1 720 passed, 13 skipped, 0 failed** (après P1) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -45,11 +45,34 @@ l'ancien code.**
 | 8 | Jetons `hf_`/`xoxb-`/`AIza`/`glpat-` en clair | `FIXED_AND_VERIFIED` | `a719f12` — 4 motifs + test de régression |
 | 9 | **Image Docker obsolète** | `FIXED_AND_VERIFIED` | reconstruite : `grep -c PackageFormatError` dans le conteneur → **5** (avant : 0), conteneur healthy |
 | 10 | LM Studio renvoie 401 | `NOT_APPLICABLE` — artefact de sonde | voir §2bis : l'appel réel aboutit avec le token du `.env` |
-| 11 | Aucune route HTTP pour les packages LM | `FIXED_AND_VERIFIED` | `experiments/packages_api.py` : `GET /api/packages`, `GET /api/packages/inspect`, `POST /api/packages/validate` — sondes live 200 |
-| 12 | Aucune UI pour charger un package | `FIXED_AND_VERIFIED` (consultation) | onglet **Packages** : 2 packages, 22 agents, détail + double verdict ; **import dans Studio toujours absent** |
+| 11 | Aucune route HTTP pour les packages LM | `FIXED_AND_VERIFIED` | `experiments/packages_api.py` : `GET /api/packages`, `GET /api/packages/inspect`, `POST /api/packages/validate`, `POST /api/packages/import` — sondes live 200 |
+| 12 | Aucune UI pour charger un package | `FIXED_AND_VERIFIED` | onglet **Packages** : catalogue, détail + double verdict, boutons Inspecter / Valider / **Importer** |
 | 13 | Registres Skills/Tools vides | **`CONFIRMED_BROKEN`** | `/api/extensions/skills` et `/tools` → `total: 0` |
 | 14 | `continue_experiment` ne reprend pas | **`CONFIRMED_BROKEN`** (statique) | relance `start_experiment`/`restart_experiment`, aucun curseur de reprise |
 | 15 | Aucun timeout moteur | **`CONFIRMED_BROKEN`** | aucune occurrence de `timeout` dans `core/runtime`, `core/workers`, `core/events` |
+
+### 4bis. Défaut découvert pendant P1 : import qui dupliquait le registre
+
+`PackageManager.import_package()` vérifiait les conflits avec `storage.get_agent(agent_id)`, alors que
+`create_agent()` attribue un **UUID**. Le test ne pouvait donc jamais correspondre :
+
+- import #1 → 11 agents ; import #2 du **même** pack → **22 agents**, `success: true`, `conflicts: 0`.
+
+Reproduit sur base temporaire avant correction, puis corrigé :
+
+- détection par **nom** (identité réelle d'un agent dans un pack), insensible à la casse ;
+- ré-import → `success: false`, `"Nothing new: 11 item(s) already present"`, 11 conflits, **11 agents** en base ;
+- le message d'échec à zéro import ne dit plus « No content imported » quand la vérité est « déjà présent ».
+
+Persistance vérifiée : `LIFE_MEAN_STUDIO_DB=/app/studio_data/life_mean_studio_data.db` + volume nommé
+`life_mean_studio_data` (l'image est `read_only: true`, sans volume l'import échouait). Contrôle réel :
+11 agents en base, puis `docker compose restart` → **toujours 11**.
+
+### 4ter. Défaut connexe, non corrigé (hors périmètre P1)
+
+`GET /api/agents` renvoie une **liste codée en dur** de 4 modèles d'agents, pas le registre Studio.
+C'est honnête dans la mesure où ce sont des *templates*, mais rien n'affiche les 11 agents réellement
+importés. Classé `CONFIRMED_BROKEN` (lecture du registre), à traiter avec la page Agents.
 | 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
 | 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents |
 | 18 | Collecteurs Windows (Defender, Event Log) | `BLOCKED_EXTERNAL` | `psutil`, `win32evtlog`, `win32service` absents |
@@ -149,7 +172,7 @@ a échoué une fois, puis :
 
 - passe seul (23/23 dans son fichier) ;
 - passe dans le lot `dashboard_security + http_smoke + packages_api + experimental_api` (55/55) ;
-- passe sur un second passage complet : **1717 passed, 13 skipped, 0 failed**.
+- passe sur des passages complets ultérieurs : **1717**, puis **1720 passed, 13 skipped, 0 failed**.
 
 Classé `UNVERIFIED_FLAKE` : non reproduit, cause non identifiée, assertion **non modifiée**. À traiter en
 phase 9 (isolation des serveurs in-process) plutôt qu'à être ignoré.

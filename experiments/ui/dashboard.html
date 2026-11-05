@@ -1508,7 +1508,9 @@
         <div class="card" style="margin-bottom:1rem;">
             <h2>Packages LM (.lmpack)</h2>
             <p class="subtitle" style="font-size:.84rem;line-height:1.5;">
-                Catalogue local, lecture seule. Un ZIP qui s'ouvre n'est pas un package valide :
+                Catalogue local. Inspection et validation sont en lecture seule ; l'import écrit
+                dans le registre Studio et n'écrase jamais un agent existant (un nom déjà présent est
+                signalé comme conflit). Un ZIP qui s'ouvre n'est pas un package valide :
                 le statut <em>valide</em> exige un lecteur qui accepte l'archive <strong>et</strong> au moins un agent.
                 Les deux lecteurs (Studio et core) sont affichés séparément — jamais moyennés.
             </p>
@@ -5730,6 +5732,7 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                         <td style="white-space:nowrap;">
                             <button class="btn-sm" onclick="pkInspect('${pkEsc(p.file)}')">Inspecter</button>
                             <button class="btn-sm" onclick="pkValidate('${pkEsc(p.file)}')">Valider</button>
+                            <button class="btn-sm" onclick="pkImport('${pkEsc(p.file)}')">Importer</button>
                         </td>
                     </tr>`).join('');
 
@@ -5785,6 +5788,34 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                     </table>`;
             } catch (err) {
                 body.innerHTML = `<p class="subtitle">Erreur : ${pkEsc(err.message)}</p>`;
+            }
+        }
+
+        async function pkImport(file) {
+            const msg = `Importer les agents de ${file} dans le registre Studio ?\n\n`
+                + `Aucun agent existant n'est écrasé : un nom déjà présent est signalé comme conflit.`;
+            if (!window.confirm(msg)) return;
+            const status = document.getElementById('pk-status');
+            if (status) status.textContent = `Import de ${file}…`;
+            try {
+                const res = await fetch(`${PK_BASE}/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: file }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const parts = [`${file} : ${data.success ? 'importé' : 'non importé'} — ${data.message}`];
+                if ((data.conflicts || []).length) {
+                    parts.push(`${data.conflicts.length} conflit(s) : ${data.conflicts.slice(0, 3).join(' · ')}`
+                        + `${data.conflicts.length > 3 ? ' …' : ''}`);
+                }
+                if ((data.errors || []).length) parts.push(`erreurs : ${data.errors.slice(0, 2).join(' · ')}`);
+                parts.push(`base : ${data.database}`);
+                if (status) status.textContent = parts.join('  |  ');
+                if (data.success) pkLoad();
+            } catch (err) {
+                if (status) status.textContent = `Erreur : ${err.message}`;
             }
         }
 

@@ -11,7 +11,7 @@ services:
     entrypoint: ["sh", "-c"]
     command:
       - >-
-        chown -R 999:999 /app/debate_lab_runs /app/code_lab_runs
+        chown -R 999:999 /app/debate_lab_runs /app/code_lab_runs /app/studio_data
         /app/philosophical_council/storage/raw_data;
         echo "ownership fixed"; ls -ld /app/debate_lab_runs /app/code_lab_runs
     security_opt:
@@ -20,6 +20,7 @@ services:
       - life_mean_code_lab_runs:/app/code_lab_runs
       - life_mean_debate_lab_runs:/app/debate_lab_runs
       - life_mean_philosophical_council:/app/philosophical_council/storage/raw_data
+      - life_mean_studio_data:/app/studio_data
     restart: "no"
 
   dashboard:
@@ -36,6 +37,8 @@ services:
         required: false
     environment:
       PORT: "8080"
+      # Studio's registry must survive rebuilds: read_only image + named volume.
+      LIFE_MEAN_STUDIO_DB: /app/studio_data/life_mean_studio_data.db
     ports:
       - "127.0.0.1:${LIFE_MEAN_PORT:-8080}:8080"
     # No host bind mounts. These are Docker-managed volumes, not C: paths.
@@ -49,6 +52,7 @@ services:
       - life_mean_code_lab_runs:/app/code_lab_runs
       - life_mean_debate_lab_runs:/app/debate_lab_runs
       - life_mean_philosophical_council:/app/philosophical_council/storage/raw_data
+      - life_mean_studio_data:/app/studio_data
     read_only: true
     restart: unless-stopped
     security_opt:
@@ -69,3 +73,4 @@ volumes:
   life_mean_code_lab_runs:
   life_mean_debate_lab_runs:
   life_mean_philosophical_council:
+  life_mean_studio_data:
