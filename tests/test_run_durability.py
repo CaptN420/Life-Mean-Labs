@@ -102,7 +102,12 @@ def test_no_runs_dir_is_not_an_error(monkeypatch, tmp_path):
 
 def test_rehydrated_run_still_exports_a_manifest(monkeypatch, tmp_path):
     """After a restart the manifest must exist and be honest: exact config and
-    seed, explicitly empty events/traces, rehydrated flag set."""
+    seed, rehydrated flag set, and the persisted events restored.
+
+    (P0.4 changed this: events used to be lost on restart — the assertion here
+    said ``events == []``. They are now persisted as a bounded copy, so the
+    test asserts the new contract instead of the old limitation. Traces stay
+    empty because the engine never records them.)"""
     runs_dir = tmp_path / "runs"
     _run_one(monkeypatch, runs_dir)
 
@@ -113,9 +118,11 @@ def test_rehydrated_run_still_exports_a_manifest(monkeypatch, tmp_path):
     assert manifest["rehydrated"] is True
     assert manifest["config"]["seed"] == 13
     assert manifest["reproducibility"]["seed"] == 13
-    assert manifest["events"] == [] and manifest["traces"] == []
+    assert manifest["events"], "events are persisted now, not lost on restart"
+    assert manifest["traces"] == []
+    assert manifest["traces_absent_reason"]
     assert manifest["reproducibility_fingerprint"]
-    assert "not persisted" in manifest["note"]
+    assert "bounded copies" in manifest["note"]
 
     # an unknown id is still a real 404, never an empty manifest
     assert fresh.export_experiment_manifest("exp_nope") is None

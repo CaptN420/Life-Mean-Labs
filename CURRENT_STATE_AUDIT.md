@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 743 passed, 13 skipped, 0 failed** (après P1/P2/P3/P4) |
+| Tests de référence | **1 761 passed, 13 skipped, 0 failed** (après P1→P6) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -38,7 +38,7 @@ l'ancien code.**
 | 1 | Runs perdus au redémarrage | `FIXED_AND_VERIFIED` | `f381c35` — run `exp_adb44a31` revu après `docker compose restart` : `rehydrated: true`, 3 tâches |
 | 2 | Manifeste sans version moteur/deps/git | `FIXED_AND_VERIFIED` | manifeste live : engine 1.0.0, seed 21, `dependencies.combined_sha256`, `reproducibility_fingerprint` |
 | 3 | Designs d'expérience non persistants | `FIXED_AND_VERIFIED` | un fichier atomique par `(id, version, statut)` ; `history()` ; FROZEN non écrasé |
-| 4 | Événements et traces absents après restart | `PARTIAL` | assumé et signalé : `events: []`/`traces: []` + note renvoyant au RAW (pas d'invention) |
+| 4 | Événements et traces absents après restart | `FIXED_AND_VERIFIED` | summary enrichi (events/traces/agents bornés), restaurés après restart ; traces vides **déclarées** avec leur cause (voir §4octies) |
 | 5 | `core/packager` incapable de lire les packs livrés | `FIXED_AND_VERIFIED` | `4779743` — `valid: True`, 11 personas sur les 2 packs (avant : `False`, 0) |
 | 6 | Format de pack inconnu accepté en silence | `FIXED_AND_VERIFIED` | `PackageFormatError` explicite + test sur archive bidon |
 | 7 | Tâches `sin`/`log` → `None` silencieux | `FIXED_AND_VERIFIED` | `b9602bb` — seed 21 : `pass_rate 0.333 → 1.0` |
@@ -225,6 +225,44 @@ Réserve honnête : `skills` reste à **0** — il n'existe aucune source de ski
 croire à une panne.
 
 ---
+
+### 4octies. Événements/traces après restart (P6) — persister, ou dire pourquoi c'est vide
+
+Le summary de run ne stockait que `state` + `config`. Après un restart, le manifeste répondait donc
+`events: []` / `traces: []` : honnête, mais le dashboard ne pouvait plus dire **pourquoi** un run
+s'était terminé ainsi.
+
+Ce qui a changé :
+
+- le summary porte maintenant un bloc `observability` : `agents`, `events` (plafond 500) et `traces`
+  (plafond 200), plus `totals`, `truncated` et `limits` — une troncature est toujours déclarée ;
+- `rehydrate_from_summaries()` restaure ce bloc ; `GET /api/experiments/{id}/observability` et
+  `/manifest` renvoient la même forme qu'un tracker vivant, avec `rehydrated: true`.
+
+Relevé réel (conteneur, run `exp_d58c53de`) :
+
+```
+avant restart  fichier /app/data/experiments/runs/exp_d58c53de.json
+               events 2, traces 0, agents 3, limits {events:500, traces:200}
+docker compose restart dashboard
+après restart  GET /manifest -> rehydrated True
+               events restaurés 2 (experiment_started, experiment_completed), agents 3
+               note « (2 of 2 events, 0 of 0 traces) »
+               progress: COMPLETED, tasks_completed 3
+```
+
+**Défaut trouvé en chemin, non corrigé car hors périmètre** : les traces déterministes ne sont
+**jamais produites**. `record_transition()` et `record_rule_application()` existent dans
+`experiments/observability.py` mais n'ont **aucun appelant** dans le dépôt (`grep` sur tout le code
+hors `observability.py` : 0 hit). Les manifestes annonçaient donc une section « traces » toujours vide
+sans le dire. La réponse porte désormais `traces_absent_reason` (manifeste vivant **et** rehydraté) :
+un build qui ne produit pas de traces le déclare au lieu de laisser croire à une perte. Les événements,
+eux, sont réels mais rares : 2 à 3 par run (`experiment_started` / `experiment_completed`), l'essentiel
+de la preuve vivant dans le RAW jsonl.
+
+Second point relevé pendant la manipulation HTTP : `POST /api/experiments` ne fait que **créer** le run
+(`status: created`) ; il faut ensuite `POST /api/experiments/{id}/start`. Un run « terminé » avec
+`tasks_completed: 0` vu juste après la création vient de là, pas d'un bug du moteur.
 
 ## 2. Sondes HTTP réelles (serveur démarré)
 

@@ -404,6 +404,14 @@ class AutopilotObservability:
                 "agents": {aid: arec.to_dict() for aid, arec in self._agents.items()},
                 "events": [e.to_dict() for e in self._events],
                 "traces": [t.to_dict() for t in self._traces],
+                # An empty trace list is a property of this build, not a loss:
+                # nothing calls record_transition()/record_rule_application().
+                "traces_absent_reason": None if self._traces else (
+                    "This build records events but no deterministic traces: the "
+                    "execution engine never calls record_transition()/"
+                    "record_rule_application(). The RAW jsonl under "
+                    "data/raw_debates holds the per-task evidence."
+                ),
                 "progress": self._progress.to_dict() if self._progress else None,
                 "reproducibility": reproducibility,
                 "reproducibility_fingerprint": manifest_fingerprint(reproducibility),

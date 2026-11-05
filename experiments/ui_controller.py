@@ -16,6 +16,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("ExperimentUI")
 
+# Stated wherever a payload could otherwise look like "we lost the traces".
+_TRACES_ABSENT_REASON = (
+    "This build records events but no deterministic traces: the execution engine "
+    "never calls record_transition()/record_rule_application(). The RAW jsonl "
+    "under data/raw_debates holds the per-task evidence."
+)
+
 
 @dataclass
 class ExperimentState:
@@ -88,6 +95,15 @@ class ExperimentUIController:
         self._observability: Dict[str, Any] = {}
         self._obs_completion_order: List[str] = []
         self._obs_retention = 20
+        # Bounded copies written in the run summary (the RAW keeps the exhaust).
+        self._persist_event_limit = int(
+            __import__("os").environ.get("LIFE_MEAN_PERSIST_EVENTS", "500")
+        )
+        self._persist_trace_limit = int(
+            __import__("os").environ.get("LIFE_MEAN_PERSIST_TRACES", "200")
+        )
+        # Restored observability snapshots for runs reborn from disk.
+        self._rehydrated_observability: Dict[str, Dict[str, Any]] = {}
 
     def register_experiment(
         self,
@@ -864,11 +880,46 @@ class ExperimentUIController:
             config = dict(self._configurations.get(experiment_id, {}))
             if state is None:
                 return
+            # Events/traces used to be dropped here, so a rehydrated run could
+            # only say "not persisted". They are bounded copies: the RAW jsonl
+            # stays the exhaust, this keeps the run readable after a restart.
+            obs = self._observability.get(experiment_id)
+            events: List[Dict[str, Any]] = []
+            traces: List[Dict[str, Any]] = []
+            agents: Dict[str, Any] = {}
+            counts = {"events": 0, "traces": 0, "agents": 0}
+            if obs is not None:
+                try:
+                    events = obs.get_events(limit=self._persist_event_limit)
+                    traces = obs.get_traces(limit=self._persist_trace_limit)
+                    agents = {aid: rec.to_dict() for aid, rec in obs.get_agents().items()}
+                    counts = {
+                        "events": len(obs.get_events(limit=10 ** 6)),
+                        "traces": len(obs.get_traces(limit=10 ** 6)),
+                        "agents": len(agents),
+                    }
+                except Exception as exc:  # noqa: BLE001 - a snapshot must not kill the run
+                    logger.error("could not snapshot observability for %s: %s",
+                                 experiment_id, exc)
             payload = {
                 "schema": "experiment-run/1",
                 "experiment_id": experiment_id,
                 "state": state.to_dict(),
                 "config": config,
+                "observability": {
+                    "agents": agents,
+                    "events": events,
+                    "traces": traces,
+                    "totals": counts,
+                    "truncated": {
+                        "events": counts["events"] > len(events),
+                        "traces": counts["traces"] > len(traces),
+                    },
+                    "limits": {
+                        "events": self._persist_event_limit,
+                        "traces": self._persist_trace_limit,
+                    },
+                },
                 "finished_at": time.time(),
             }
         try:
@@ -926,6 +977,9 @@ class ExperimentUIController:
                 )
                 self._experiments[exp_id] = state
                 self._configurations[exp_id] = dict(raw.get("config", {}) or {})
+                block = raw.get("observability") or {}
+                if block:
+                    self._rehydrated_observability[exp_id] = dict(block)
             restored += 1
         if restored:
             logger.info("rehydrated %d experiment(s) from %s", restored, directory)
@@ -1039,7 +1093,25 @@ class ExperimentUIController:
         with self._lock:
             obs = self._observability.get(experiment_id)
             if obs is None:
-                return None
+                restored = self._rehydrated_observability.get(experiment_id)
+                if restored is None:
+                    return None
+                # Same shape as a live tracker, plus a flag saying where it came
+                # from and what the bounds cut off.
+                return {
+                    "config": dict(self._configurations.get(experiment_id, {}) or {}),
+                    "prompt": str(
+                        (self._configurations.get(experiment_id, {}) or {}).get("prompt", "")
+                    ),
+                    "agents": dict(restored.get("agents", {}) or {}),
+                    "events": list(restored.get("events", []) or []),
+                    "traces": list(restored.get("traces", []) or []),
+                    "progress": (self._experiments.get(experiment_id).to_dict()
+                                 if self._experiments.get(experiment_id) else None),
+                    "rehydrated": True,
+                    "restored_totals": dict(restored.get("totals", {}) or {}),
+                    "truncated": dict(restored.get("truncated", {}) or {}),
+                }
             return {
                 "config": obs.get_config(),
                 "prompt": obs.get_prompt(),
@@ -1067,6 +1139,12 @@ class ExperimentUIController:
             if state is None:
                 return None
             progress = state.to_dict()
+            restored = self._rehydrated_observability.get(experiment_id) or {}
+            restored_events = list(restored.get("events", []) or [])
+            restored_traces = list(restored.get("traces", []) or [])
+            restored_agents = dict(restored.get("agents", {}) or {})
+            restored_totals = dict(restored.get("totals", {}) or {})
+            truncated = dict(restored.get("truncated", {}) or {})
 
         from experiments.reproducibility import (
             build_reproducibility_block,
@@ -1078,17 +1156,26 @@ class ExperimentUIController:
             "experiment_id": experiment_id,
             "prompt": config.get("prompt", ""),
             "config": config,
-            "agents": {},
-            "events": [],
-            "traces": [],
+            "agents": restored_agents,
+            "events": restored_events,
+            "traces": restored_traces,
             "progress": progress,
             "reproducibility": reproducibility,
             "reproducibility_fingerprint": manifest_fingerprint(reproducibility),
             "rehydrated": True,
+            "restored_totals": restored_totals,
+            "truncated": truncated,
+            # Empty traces are a fact of this build, not a lost file: the engine
+            # never calls record_transition/record_rule_application.
+            "traces_absent_reason": None if restored_traces else _TRACES_ABSENT_REASON,
             "note": (
-                "Rebuilt from the persisted run summary after a restart: config, "
-                "seed and final state are exact; events/traces are not persisted "
-                "(the RAW jsonl under data/raw_debates holds the evidence)."
+                "Rebuilt from the persisted run summary after a restart. Config, seed "
+                "and final state are exact; events/traces are the bounded copies "
+                "written at the end of the run ({} of {} events, {} of {} traces). "
+                "The RAW jsonl under data/raw_debates holds the full evidence."
+            ).format(
+                len(restored_events), restored_totals.get("events", 0),
+                len(restored_traces), restored_totals.get("traces", 0),
             ),
             "exported_at": time.time(),
         }
