@@ -20,7 +20,14 @@ class _FakeHandler(ExperimentalApiMixin):
     """Minimal handler exposing just the JSON/error sinks the mixin needs."""
 
     def __init__(self):
-        self.experimental_store = ExperimentDesignStore()
+        # Isolated root: the store is durable now, so a shared default directory
+        # would make each test see designs left by earlier tests.
+        import tempfile
+        from pathlib import Path
+
+        self.experimental_store = ExperimentDesignStore(
+            Path(tempfile.mkdtemp(prefix="designs_api_"))
+        )
         self.experimental_engine = None  # falls back to build_engine()
         self._status = None
         self._json = None
@@ -129,8 +136,10 @@ def test_api_capabilities_lists_connected_executors():
     assert "debate" not in h._json["connected_executors"]  # not connected now
 
 
-def test_api_store_dict_isolation():
-    store = ExperimentDesignStore()
+def test_api_store_dict_isolation(tmp_path):
+    # Durable store: isolate the root so the assertion is about THIS design,
+    # not about whatever earlier runs persisted in the default directory.
+    store = ExperimentDesignStore(tmp_path)
     d = store.save(_frozen_tool_design())
     got = store.get(d.design_id)
     assert got.design_id == d.design_id and got.is_frozen

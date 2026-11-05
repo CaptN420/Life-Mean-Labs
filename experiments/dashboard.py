@@ -1314,6 +1314,15 @@ def start_dashboard(
     """
     controller = ui_controller or ExperimentUIController()
     DashboardHandler.ui_controller = controller
+    # Restore finished runs from disk so a restart does not present an empty
+    # dashboard while the RAW evidence sits on the volume. Best-effort: a
+    # failure here must never stop the server from starting.
+    try:
+        restored = controller.rehydrate_from_summaries()
+        if restored:
+            logger.info("Rehydrated %d experiment(s) from run summaries", restored)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Run-summary rehydration failed: %s", exc)
     if code_lab_controller is None and _CODE_LAB_AVAILABLE:
         code_lab_controller = CodeLabController()
     DashboardHandler.code_lab_controller = code_lab_controller

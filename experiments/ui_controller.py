@@ -11,6 +11,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger("ExperimentUI")
@@ -31,6 +32,9 @@ class ExperimentState:
     avg_novelty_score: float = 0.0
     errors: List[str] = field(default_factory=list)
     mode: str = "deterministic"
+    # True when the entry was rebuilt from a persisted run summary after a
+    # restart (the run itself is over; nothing is executing).
+    rehydrated: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         # Lifecycle status is DERIVED from real state (GOAL 5/8) so the UI
@@ -59,6 +63,7 @@ class ExperimentState:
             "pass_rate": self.current_pass_rate,
             "avg_novelty_score": self.avg_novelty_score,
             "errors": self.errors[-10:],  # Last 10 errors
+            "rehydrated": self.rehydrated,
         }
 
 
@@ -596,7 +601,104 @@ class ExperimentUIController:
                         oldest = self._obs_completion_order.pop(0)
                         if oldest != experiment_id:
                             self._observability.pop(oldest, None)
+            # Persist a run summary so the experiment survives a restart: RAW
+            # holds the evidence, this holds the state that makes it listable.
+            self._write_run_summary(experiment_id)
             self._notify_callbacks(experiment_id, "stopped")
+
+    def _runs_dir(self) -> Path:
+        """Directory holding one run summary per finished experiment.
+
+        ``LIFE_MEAN_RUNS_DIR`` overrides; default is ``<repo>/data/experiments/
+        runs`` (inside the dashboard's mounted ``/app/data`` volume).
+        """
+        import os as _os
+
+        env = _os.environ.get("LIFE_MEAN_RUNS_DIR")
+        if env:
+            return Path(env).expanduser()
+        return Path(__file__).resolve().parent.parent / "data" / "experiments" / "runs"
+
+    def _write_run_summary(self, experiment_id: str) -> None:
+        """Persist the finished run's state so a restart can list it again.
+
+        Never raises into the caller: a summary failure must not turn a
+        completed run into a failed one, but it IS logged (no silent loss).
+        """
+        import json as _json
+        import os as _os
+
+        with self._lock:
+            state = self._experiments.get(experiment_id)
+            config = dict(self._configurations.get(experiment_id, {}))
+            if state is None:
+                return
+            payload = {
+                "schema": "experiment-run/1",
+                "experiment_id": experiment_id,
+                "state": state.to_dict(),
+                "config": config,
+                "finished_at": time.time(),
+            }
+        try:
+            directory = self._runs_dir()
+            directory.mkdir(parents=True, exist_ok=True)
+            target = directory / f"{experiment_id}.json"
+            tmp = target.with_suffix(".json.tmp")
+            tmp.write_text(_json.dumps(payload, indent=2, sort_keys=True, default=str),
+                           encoding="utf-8")
+            _os.replace(tmp, target)
+        except OSError as exc:
+            logger.error("could not persist run summary for %s: %s", experiment_id, exc)
+
+    def rehydrate_from_summaries(self) -> int:
+        """Rebuild the in-memory registry from persisted run summaries.
+
+        Called at server start: without it a restart shows an empty dashboard
+        while RAW evidence sits on disk. Rehydrated entries are marked
+        ``rehydrated=True`` and are never reported as running. Returns the
+        number of runs restored.
+        """
+        import json as _json
+
+        directory = self._runs_dir()
+        if not directory.exists():
+            return 0
+        restored = 0
+        for path in sorted(directory.glob("*.json")):
+            try:
+                raw = _json.loads(path.read_text(encoding="utf-8"))
+                if raw.get("schema") != "experiment-run/1":
+                    logger.warning("skipping run summary %s: unknown schema", path.name)
+                    continue
+                exp_id = str(raw["experiment_id"])
+                saved = raw.get("state", {}) or {}
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                logger.warning("skipping unreadable run summary %s: %s", path.name, exc)
+                continue
+            with self._lock:
+                if exp_id in self._experiments:
+                    continue
+                state = ExperimentState(
+                    experiment_id=exp_id,
+                    is_running=False,
+                    start_time=saved.get("start_time"),
+                    tasks_generated=int(saved.get("tasks_generated", 0) or 0),
+                    tasks_completed=int(saved.get("tasks_completed", 0) or 0),
+                    tasks_valid=int(saved.get("tasks_valid", 0) or 0),
+                    tasks_invalid=int(saved.get("tasks_invalid", 0) or 0),
+                    current_pass_rate=float(saved.get("pass_rate", 0.0) or 0.0),
+                    avg_novelty_score=float(saved.get("avg_novelty_score", 0.0) or 0.0),
+                    errors=list(saved.get("errors", []) or []),
+                    mode=str(saved.get("mode", "deterministic")),
+                    rehydrated=True,
+                )
+                self._experiments[exp_id] = state
+                self._configurations[exp_id] = dict(raw.get("config", {}) or {})
+            restored += 1
+        if restored:
+            logger.info("rehydrated %d experiment(s) from %s", restored, directory)
+        return restored
 
     def _ensure_observability(self, experiment_id: str, config: Dict[str, Any]) -> Any:
         """Create (once) the observability tracker for an experiment.
@@ -717,9 +819,45 @@ class ExperimentUIController:
             }
 
     def export_experiment_manifest(self, experiment_id: str) -> Optional[Dict[str, Any]]:
-        """Export complete experiment manifest for reproducibility."""
+        """Export complete experiment manifest for reproducibility.
+
+        After a restart the live observability tracker is gone (events/traces are
+        not persisted), but the run summary holds the config and final state. In
+        that case we return a manifest that says so explicitly instead of a
+        misleading 404 or a manifest that pretends to carry traces.
+        """
         with self._lock:
             obs = self._observability.get(experiment_id)
-            if obs is None:
+            if obs is not None:
+                return obs.export_manifest()
+
+            state = self._experiments.get(experiment_id)
+            config = dict(self._configurations.get(experiment_id, {}) or {})
+            if state is None:
                 return None
-            return obs.export_manifest()
+            progress = state.to_dict()
+
+        from experiments.reproducibility import (
+            build_reproducibility_block,
+            manifest_fingerprint,
+        )
+
+        reproducibility = build_reproducibility_block(config=config)
+        return {
+            "experiment_id": experiment_id,
+            "prompt": config.get("prompt", ""),
+            "config": config,
+            "agents": {},
+            "events": [],
+            "traces": [],
+            "progress": progress,
+            "reproducibility": reproducibility,
+            "reproducibility_fingerprint": manifest_fingerprint(reproducibility),
+            "rehydrated": True,
+            "note": (
+                "Rebuilt from the persisted run summary after a restart: config, "
+                "seed and final state are exact; events/traces are not persisted "
+                "(the RAW jsonl under data/raw_debates holds the evidence)."
+            ),
+            "exported_at": time.time(),
+        }

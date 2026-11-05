@@ -227,7 +227,10 @@ class AutopilotObservability:
                         agent_id=agent_id,
                         persona=agent_cfg.get("persona", ""),
                         role=agent_cfg.get("role", ""),
-                        model=agent_cfg.get("model", ""),
+                        # `model_assignment` is the model this agent is pinned
+                        # to; a record without it would hide the model from the
+                        # reproducibility manifest.
+                        model=agent_cfg.get("model") or agent_cfg.get("model_assignment") or "",
                         provider=agent_cfg.get("provider", "local"),
                         status=AgentStatus.WAITING.value,
                     )
@@ -374,15 +377,35 @@ class AutopilotObservability:
             return None
 
     def export_manifest(self) -> Dict[str, Any]:
-        """Export complete experiment manifest for reproducibility."""
+        """Export complete experiment manifest for reproducibility.
+
+        Carries the reproducibility block (engine/env/deps/git/seed/models) so a
+        manifest states WHAT produced the result, not only its config.
+        """
         with self._lock:
+            config = dict(self._config_snapshot)
+            models = [
+                rec.model
+                for rec in self._agents.values()
+                if getattr(rec, "model", None)
+            ]
+            from experiments.reproducibility import (
+                build_reproducibility_block,
+                manifest_fingerprint,
+            )
+
+            reproducibility = build_reproducibility_block(
+                config=config, models=models,
+            )
             return {
                 "experiment_id": self._progress.experiment_id if self._progress else "",
                 "prompt": self._prompt_snapshot,
-                "config": self._config_snapshot,
+                "config": config,
                 "agents": {aid: arec.to_dict() for aid, arec in self._agents.items()},
                 "events": [e.to_dict() for e in self._events],
                 "traces": [t.to_dict() for t in self._traces],
                 "progress": self._progress.to_dict() if self._progress else None,
+                "reproducibility": reproducibility,
+                "reproducibility_fingerprint": manifest_fingerprint(reproducibility),
                 "exported_at": time.time(),
             }

@@ -252,3 +252,34 @@ Critère global : aucun élément n'est déclaré opérationnel sans un test ex�
 - Pas de refonte visuelle de Life_mean Studio.
 - Pas de promesse de déterminisme sur les exécuteurs LLM (backend non déterministe, et ici non joignable).
 - Pas de simulation : les exécuteurs non connectés restent déclarés non connectés.
+
+---
+
+## 9. P0 LIVRÉ — preuves d'exécution (2026-11-05)
+
+### P0.1 — Persistance des designs (`experimental/store.py`)
+
+- Un fichier **par snapshot** `(design_id, version, statut)` : `DESIGN-XXX.v1.DRAFT.json`, `…v1.FROZEN.json`, etc. Un snapshot FROZEN n'est jamais écrasé.
+- Écriture **atomique** (`tmp` + `os.replace`), rechargement au démarrage, `history()` expose toutes les versions.
+- Échec d'écriture → `DesignStoreError` (aucun faux succès). Fichier corrompu → ignoré avec avertissement, jamais deviné.
+- Racine configurable (`LIFE_MEAN_DESIGNS_DIR`), par défaut `data/experiments/designs` (volume Docker `life_mean_data`).
+- Vérifié : save → nouvelle instance → `get()` identique ; 4 snapshots DRAFT/REVIEWED/APPROVED/FROZEN ; `frozen_hash` préservé ; transition depuis FROZEN refusée.
+
+### P0.2 — Manifeste de reproductibilité (`experiments/reproducibility.py`)
+
+Bloc ajouté au manifeste : `engine{name,version}`, `environment{python,system,machine}`, `dependencies{sha256 pyproject+uv.lock, combined}`, `git{commit,dirty}`, `seed`, `deterministic`, `models`, `tools`, `generator_version`, `prompt_version`, plus `reproducibility_fingerprint` (hash stable des conditions).
+Aucun secret : uniquement versions/ids/hashes (test dédié avec variables d'env piégées).
+
+**Vérifié en live sur Docker** — run `exp_adb44a31` (seed 21) : manifeste 200, `engine = {'name': 'life_mean_lab', 'version': '1.0.0'}`, `seed = 21`, `dependencies.combined_sha256 = 4ba90b152122…`.
+
+### P0.3 — Durabilité du registre (constat §5bis fermé)
+
+- Chaque run terminé écrit un *run summary* atomique (`data/experiments/runs/<exp>.json` : config, état final, compteurs, mode, seed).
+- `ExperimentUIController.rehydrate_from_summaries()` reconstruit le registre au démarrage ; entrées marquées `rehydrated: true`, jamais `running`.
+- Manifeste d'un run réhydraté : 200, avec `rehydrated: true`, config/seed exacts, `events`/`traces` explicitement vides et une note expliquant que la preuve est dans le RAW (jamais de manifeste qui ferait semblant).
+
+**Vérifié en live** : run `exp_adb44a31` → `docker compose restart dashboard` → `GET /api/experiments` renvoie toujours `total_experiments: 1`, statut `COMPLETED`, `rehydrated: true`, 3 tâches ; `GET …/manifest` → 200, `seed: 21`, `rehydrated: true`.
+
+### Résultat des tests
+
+**1679 passed, 13 skipped, 0 failed** (dont 25 nouveaux tests ciblés : `test_experimental_store_persistence.py`, `test_reproducibility.py`, `test_run_durability.py`).
