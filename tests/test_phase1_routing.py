@@ -32,9 +32,10 @@ class TestToolDetection:
         from library.tools.detection import detect_tool
         result = detect_tool("calculate gcd of 12 and 8")
         assert result is not None
-        # gcd is now routed to coding_generator (code generation task)
-        assert "coding_generator" in result["tool_name"]
-        assert result["domain"] == "coding"
+        # gcd is routed to the SPECIFIC math tool (verified live: the Docker run
+        # auto-detected math_gcd and answered correctly). It is not a coding task.
+        assert "math_gcd" in result["tool_name"]
+        assert result["domain"] == "math"
 
     def test_detect_physics_force(self):
         from library.tools.detection import detect_tool

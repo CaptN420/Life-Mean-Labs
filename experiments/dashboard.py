@@ -284,6 +284,30 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             self._send_json(self.pipeline_errors())
         elif parsed.path == "/api/pipeline/features":
             self._send_json(self.pipeline_features())
+        elif parsed.path == "/api/training/runs":
+            self._training_list_runs()
+        elif parsed.path.startswith("/api/training/runs/"):
+            run_id = parsed.path.strip("/").split("/")[-1]
+            self._training_get_run(run_id)
+        elif parsed.path == "/api/models":
+            self._models_list()
+        elif parsed.path.startswith("/api/models/"):
+            model_id = parsed.path.strip("/").split("/")[-1]
+            self._models_get(model_id)
+        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/observability"):
+            exp_id = parsed.path.split("/")[-2]
+            obs_data = self.ui_controller.get_observability(exp_id)
+            if obs_data is None:
+                self._send_error(404, f"Observability data not found for {exp_id}", code="not_found")
+            else:
+                self._send_json(obs_data)
+        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/manifest"):
+            exp_id = parsed.path.split("/")[-2]
+            manifest = self.ui_controller.export_experiment_manifest(exp_id)
+            if manifest is None:
+                self._send_error(404, f"Manifest not found for {exp_id}", code="not_found")
+            else:
+                self._send_json(manifest)
         elif parsed.path in ("/dashboard", "/dashboard.html"):
             self._serve_dashboard()
         else:
@@ -375,20 +399,6 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
                     self._send_error(500, "Failed to continue experiment", code="server")
         elif parsed.path == "/api/training/run":
             self._training_start(data)
-        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/observability"):
-            exp_id = parsed.path.split("/")[-2]
-            obs_data = self.ui_controller.get_observability(exp_id)
-            if obs_data is None:
-                self._send_error(404, f"Observability data not found for {exp_id}", code="not_found")
-            else:
-                self._send_json(obs_data)
-        elif parsed.path.startswith("/api/experiments/") and parsed.path.endswith("/manifest"):
-            exp_id = parsed.path.split("/")[-2]
-            manifest = self.ui_controller.export_experiment_manifest(exp_id)
-            if manifest is None:
-                self._send_error(404, f"Manifest not found for {exp_id}", code="not_found")
-            else:
-                self._send_json(manifest)
         elif parsed.path == "/api/experimental/designs":
             self._experimental_design_create(data)
         elif parsed.path == "/api/experimental/harness":
@@ -509,16 +519,6 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
                 self._send_json({"status": "deleted", "role": role, "settings": result})
             except Exception as e:
                 self._send_error(500, str(e), code="server")
-        elif parsed.path == "/api/training/runs":
-            self._training_list_runs()
-        elif parsed.path.startswith("/api/training/runs/"):
-            run_id = parsed.path.strip("/").split("/")[-1]
-            self._training_get_run(run_id)
-        elif parsed.path == "/api/models":
-            self._models_list()
-        elif parsed.path.startswith("/api/models/"):
-            model_id = parsed.path.strip("/").split("/")[-1]
-            self._models_get(model_id)
         else:
             self._send_error(404, "Not found")
 

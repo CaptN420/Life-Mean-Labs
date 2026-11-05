@@ -76,8 +76,13 @@ class ExperimentUIController:
         self._autopilots: Dict[str, Any] = {}
         self._stop_requested: Dict[str, bool] = {}
         self._worker_threads: Dict[str, threading.Thread] = {}
-        # Observability tracker per experiment (live debate transcript, traces)
+        # Observability tracker per experiment (live debate transcript, traces).
+        # Retained after completion so /observability and /manifest remain
+        # readable AFTER a run — a manifest that only exists mid-run cannot
+        # serve reproducibility. Bounded to `_obs_retention` finished runs.
         self._observability: Dict[str, Any] = {}
+        self._obs_completion_order: List[str] = []
+        self._obs_retention = 20
 
     def register_experiment(
         self,
@@ -471,6 +476,11 @@ class ExperimentUIController:
 
             logger.info(f"Generated {len(tasks)} tasks for experiment {experiment_id}")
 
+            # Observability exists for EVERY mode, not only debates: the
+            # reproducibility manifest must be exportable for deterministic
+            # runs too (they are the reproducible ones).
+            self._ensure_observability(experiment_id, config)
+
             # BEHAVIOR SELECTION — reuse the existing stable core (rule 1/3).
             #   debate=True  → AutoPilot → DebateEngine (real multi-agent path)
             #   else         → ExperimentRunner → SmartRouter + ToolWorker (deterministic)
@@ -494,19 +504,11 @@ class ExperimentUIController:
                     raise RuntimeError(msg)
                 from experiments.autopilot import AutoPilot
                 autopilot = AutoPilot()
+                # Observability is created BEFORE taking the lock (the helper
+                # acquires the same non-reentrant lock -> would deadlock here).
+                self._ensure_observability(experiment_id, config)
                 with self._lock:
                     self._autopilots[experiment_id] = autopilot
-                    # Initialize observability tracker
-                    from experiments.observability import AutopilotObservability
-                    obs = AutopilotObservability()
-                    # Build agent list from config or defaults
-                    agents_cfg = config.get("agents", [
-                        {"agent_id": "agent_1", "persona": "existentialist", "role": "advocate"},
-                        {"agent_id": "agent_2", "persona": "stoic", "role": "skeptic"},
-                        {"agent_id": "agent_3", "persona": "nihilist", "role": "synthesizer"},
-                    ])
-                    obs.start_experiment(experiment_id, config, prompt=config.get("prompt", ""), agents=agents_cfg)
-                    self._observability[experiment_id] = obs
                 # Deterministic validator is the authority; AutoPilot reuses it
                 # via _validate_response AFTER the debate.
                 debate_results = autopilot.run_experiment(
@@ -583,11 +585,44 @@ class ExperimentUIController:
                 self._stop_requested.pop(experiment_id, None)
                 self._worker_threads.pop(experiment_id, None)
                 self._autopilots.pop(experiment_id, None)
-                # Complete observability tracking
-                obs = self._observability.pop(experiment_id, None)
+                # Complete observability tracking but KEEP it readable: the
+                # manifest is only useful after the run, so it must survive it.
+                obs = self._observability.get(experiment_id)
                 if obs:
                     obs.complete_experiment(status="COMPLETED")
+                    if experiment_id not in self._obs_completion_order:
+                        self._obs_completion_order.append(experiment_id)
+                    while len(self._obs_completion_order) > self._obs_retention:
+                        oldest = self._obs_completion_order.pop(0)
+                        if oldest != experiment_id:
+                            self._observability.pop(oldest, None)
             self._notify_callbacks(experiment_id, "stopped")
+
+    def _ensure_observability(self, experiment_id: str, config: Dict[str, Any]) -> Any:
+        """Create (once) the observability tracker for an experiment.
+
+        Called before the run so the tracker captures the whole execution, and
+        kept after completion so `/observability` and `/manifest` stay readable
+        (bounded by `_obs_retention`). Safe to call twice: returns the existing
+        tracker. Acquires `_lock` -> never call it while already holding it.
+        """
+        with self._lock:
+            existing = self._observability.get(experiment_id)
+            if existing is not None:
+                return existing
+            from experiments.observability import AutopilotObservability
+            obs = AutopilotObservability()
+            agents_cfg = config.get("agents", [
+                {"agent_id": "agent_1", "persona": "existentialist", "role": "advocate"},
+                {"agent_id": "agent_2", "persona": "stoic", "role": "skeptic"},
+                {"agent_id": "agent_3", "persona": "nihilist", "role": "synthesizer"},
+            ])
+            obs.start_experiment(
+                experiment_id, config,
+                prompt=config.get("prompt", ""), agents=agents_cfg,
+            )
+            self._observability[experiment_id] = obs
+            return obs
 
     def _is_stop_requested(self, experiment_id: str) -> bool:
         """True if a Stop/Delete was requested for this experiment."""

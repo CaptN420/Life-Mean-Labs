@@ -161,6 +161,45 @@ def test_deterministic_create_start_raw_end_to_end(server, tmp_path):
     assert first["provenance"]["run_id"]
 
 
+def test_completed_run_keeps_observability_and_manifest_live(server):
+    """A finished deterministic run must still expose /observability and
+    /manifest over GET (the endpoints the dashboard frontend calls).
+
+    Regression: observability was created only in debate mode AND dropped in
+    the run's `finally`, so both endpoints 404'd for every finished run — the
+    reproducibility manifest was unreachable exactly when it is needed.
+    """
+    base, _ui = server
+    status, body = _req(
+        base, "/api/experiments", method="POST",
+        body={"domain": "math", "difficulty_range": [1, 1], "num_tasks": 2,
+              "seed": 11, "deterministic": True, "prompt": "gcd probe"},
+    )
+    assert status == 200, body
+    exp_id = body["experiment_id"]
+    status, sbody = _req(base, f"/api/experiments/{exp_id}/start", method="POST")
+    assert status == 200, sbody
+
+    for _ in range(40):
+        time.sleep(0.5)
+        _, bench = _req(base, "/api/experiments")
+        e = bench["experiments"].get(exp_id, {})
+        if not e.get("is_running") and e.get("tasks_completed", 0) >= 2:
+            break
+    assert not e.get("is_running"), e
+
+    st, obs = _req(base, f"/api/experiments/{exp_id}/observability")
+    assert st == 200, obs
+    assert obs["config"], obs
+    assert obs["progress"] is not None
+
+    st, manifest = _req(base, f"/api/experiments/{exp_id}/manifest")
+    assert st == 200, manifest
+    assert manifest["config"]["seed"] == 11
+    assert manifest["experiment_id"] == exp_id
+    assert manifest["prompt"] == "gcd probe"
+
+
 def test_codelab_run_endpoint_live(server):
     base, _ = server
     status, body = _req(
@@ -195,3 +234,26 @@ def test_experimental_create_draft_never_runs_http(server):
     design_id = body["design_id"]
     st2, body2 = _req(base, f"/api/experimental/designs/{design_id}/run", method="POST", body={})
     assert st2 == 400 and body2.get("code") == "DESIGN_INVALID", body2
+
+
+def test_training_and_models_get_routes_are_served(server):
+    """Regression: /api/training/runs and /api/models must answer GET.
+
+    They were once registered inside do_DELETE, so GET returned 404 while the
+    handlers existed — a route table that is cited but unreachable.
+    """
+    base, _ = server
+    status, body = _req(base, "/api/training/runs", method="GET")
+    assert status == 200, body
+    assert "runs" in body and "total" in body
+
+    status, body = _req(base, "/api/models", method="GET")
+    assert status == 200, body
+    assert "models" in body and "total" in body
+
+
+def test_unknown_route_returns_404_json(server):
+    """An unregistered API path 404s as JSON (never a silent 200)."""
+    base, _ = server
+    status, body = _req(base, "/api/definitely-not-a-route", method="GET")
+    assert status == 404, body

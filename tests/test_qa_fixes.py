@@ -150,11 +150,17 @@ def test_do_DELETE_route():
     h._code = None
     h.do_DELETE()
     h.path = "/api/experiments/exp_qa"
-    # route is matched by calling do_DELETE on the right path
+    # route is matched by calling do_DELETE on the right path.
+    # State-changing routes are CSRF-gated (double-submit), so the fake handler
+    # must carry a matching cookie + header — exactly what the dashboard JS does.
     hdo = _FakeHandler()
     hdo.ui_controller = ui
     hdo.path = "/api/experiments/exp_qa"
     hdo.rfile = type("R", (), {"read": lambda self, n: b""})()
+    hdo.headers = {
+        "Cookie": "lifemean_csrf=tok123",
+        "X-Lifemean-CSRF": "tok123",
+    }
     hdo.do_DELETE()
     assert hdo._code == 200
     assert hdo._resp.get("status") == "deleted"
