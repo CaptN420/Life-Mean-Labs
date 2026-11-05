@@ -556,6 +556,38 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             return
         if parsed.path == "/api/settings":
             self._settings_put(data)
+        elif _ext_id := self.match_extension_id(parsed.path):
+            # The mixin documents PUT /approve, /activate, /disable for skills and
+            # tools, but do_PUT only knew /api/settings -> every human approval
+            # over HTTP returned 404. Routed here now.
+            kind, resource_id = _ext_id
+            sub = parsed.path.split("/")[-1]
+            if kind == "skills":
+                if sub == "approve":
+                    self._extensions_skill_approve(resource_id, data)
+                elif sub == "activate":
+                    self._extensions_skill_activate(resource_id)
+                elif sub == "disable":
+                    self._extensions_skill_disable(resource_id)
+                else:
+                    self._send_error(404, "Not found")
+            else:
+                if sub == "approve":
+                    self._extensions_tool_approve(resource_id, data)
+                elif sub == "activate":
+                    self._extensions_tool_activate(resource_id)
+                elif sub == "disable":
+                    self._extensions_tool_disable(resource_id)
+                else:
+                    self._send_error(404, "Not found")
+        elif _pipe_id := self.match_pipeline_id(parsed.path):
+            sub = parsed.path.split("/")[-1]
+            if sub == "approve":
+                self._extensions_pipeline_approve(_pipe_id, data)
+            elif sub == "activate":
+                self._extensions_pipeline_activate(_pipe_id)
+            else:
+                self._send_error(404, "Not found")
         else:
             self._send_error(404, "Not found")
 

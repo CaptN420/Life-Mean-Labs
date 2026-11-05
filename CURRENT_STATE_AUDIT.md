@@ -47,7 +47,7 @@ l'ancien code.**
 | 10 | LM Studio renvoie 401 | `NOT_APPLICABLE` — artefact de sonde | voir §2bis : l'appel réel aboutit avec le token du `.env` |
 | 11 | Aucune route HTTP pour les packages LM | `FIXED_AND_VERIFIED` | `experiments/packages_api.py` : `GET /api/packages`, `GET /api/packages/inspect`, `POST /api/packages/validate`, `POST /api/packages/import` — sondes live 200 |
 | 12 | Aucune UI pour charger un package | `FIXED_AND_VERIFIED` | onglet **Packages** : catalogue, détail + double verdict, boutons Inspecter / Valider / **Importer** |
-| 13 | Registres Skills/Tools vides | **`CONFIRMED_BROKEN`** | `/api/extensions/skills` et `/tools` → `total: 0` |
+| 13 | Registres Skills/Tools vides | `FIXED_AND_VERIFIED` | `/tools` expose les **60** outils réels (`catalog`) séparément du registre ; état persisté (`data/extensions/registries.json`), survit au redémarrage |
 | 14 | `continue_experiment` ne reprend pas | `FIXED_AND_VERIFIED` | checkpoint par tâche ; 3/8 arrêtées → reprise exécute **5** tâches, RAW 3→8, métriques cumulées ; terminée/absente → refus motivé |
 | 15 | Aucun timeout moteur | `FIXED_AND_VERIFIED` | `task_timeout_seconds` (TASK_TIMEOUT + résultat tardif jeté), `run_timeout_seconds` (RUN_TIMEOUT, reste reprenable), client LLM borné (60 s, `max_retries=0`) |
 | 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
@@ -182,6 +182,47 @@ après reprise   : completed=2776/4000  (le délai se réarme : 2e RUN_TIMEOUT e
 
 Réserve honnête : Python ne tue pas un thread. Une tâche expirée continue donc en arrière-plan
 (daemon) ; son résultat est ignoré, mais elle consomme encore du CPU/IO jusqu'à sa fin naturelle.
+
+### 4septies. Registres d'extension (P5) — trois défauts, pas un « total: 0 »
+
+Le rapport annonçait « registres vides ». En creusant, `total: 0` était à la fois **vrai** et
+**trompeur**, et deux bugs empêchaient de le peupler :
+
+1. **60 outils réels invisibles.** `library/tools` fournit 60 outils déterministes, utilisés à chaque
+   exécution par `ToolWorker`, mais le registre d'auto-extension n'en connaissait aucun. Désormais la
+   réponse sépare explicitement `catalog` (les 60, `in_registry: false`) de `all`/`stats` (le registre
+   d'approbation). Faire apparaître un outil n'est pas l'activer — c'est écrit dans la réponse.
+2. **Aucune persistance.** Les registres vivaient en mémoire : `POST /api/extensions/tools` répondait
+   `proposed` et tout disparaissait au redémarrage. Ajout de `life_mean_extensions/store.py`
+   (`data/extensions/registries.json`, écriture atomique, `.bak` conservé), rechargé à la création de
+   la couche. Un échec d'écriture ne devient jamais un succès : `500 persistence_failed`
+   (« applied in memory but NOT persisted »).
+3. **Porte d'approbation injoignable.** Deux causes cumulées : `_ID_RE` n'acceptait pas le suffixe
+   d'action (`/approve` → 404) et `do_PUT` ne routait que `/api/settings`. Corrigées : le cycle
+   complet fonctionne maintenant en HTTP.
+
+Mesures réelles contre le conteneur :
+
+```
+GET  /api/extensions/tools   -> registre total 0, catalogue 60  (avant toute proposition)
+POST /api/extensions/tools   -> 200 tool-183485ab | persisted True
+POST /api/extensions/tools   -> 200 tool-5ca351b9 | ids distincts (avant : un seul id partagé)
+PUT  .../tool-183485ab/approve  -> 200 approved  persisted True
+PUT  .../tool-183485ab/activate -> 200 active    persisted True
+PUT  .../tool-183485ab/disable  -> 200 disabled  persisted True
+docker compose restart
+GET  /api/extensions/tools   -> 3 tools conservés (2 proposed, 1 disabled)
+```
+
+Troisième bug trouvé en chemin : `POST /api/extensions/tools` **coupait la connexion** au lieu de
+répondre, parce que `OSError` (système de fichiers en lecture seule) s'échappait du handler avant
+l'envoi. Le bac à sable des outils générés vivait dans `/app/sandbox` (image en lecture seule) ; il est
+maintenant sous `data/sandbox/` (volume inscriptible) et les erreurs de proposition renvoient
+`500 proposal_failed`.
+
+Réserve honnête : `skills` reste à **0** — il n'existe aucune source de skills dans ce dépôt
+(pas de `skills/`, rien dans les `.lmpack`). La réponse liste les sources vérifiées au lieu de laisser
+croire à une panne.
 
 ---
 

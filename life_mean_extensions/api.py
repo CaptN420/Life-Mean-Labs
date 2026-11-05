@@ -32,10 +32,16 @@ Endpoints:
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Dict, List, Optional
 
-_ID_RE = re.compile(r"^/api/extensions/(skills|tools)/([^/]+)$")
+logger = logging.getLogger("life_mean_extensions.api")
+
+# The optional action suffix is REQUIRED: without it this pattern only matched
+# /api/extensions/tools/<id>, so every /approve, /activate and /disable URL fell
+# through to 404 and the human approval gate could not be reached over HTTP.
+_ID_RE = re.compile(r"^/api/extensions/(skills|tools)/([^/]+)(?:/(approve|activate|disable|delete))?$")
 _PIPELINE_RE = re.compile(r"^/api/extensions/pipeline/([^/]+)$")
 
 
@@ -73,6 +79,28 @@ class ExtensionsApiMixin:
     def _pipeline(self):
         return self._ext_layer()["pipeline"]
 
+    @property
+    def _store(self):
+        return self._ext_layer()["store"]
+
+    def _save_layer(self) -> Dict[str, Any]:
+        """Persist skills + tools, and report whether it actually worked."""
+        ok = self._store.save({
+            "skills": self._skills.export_state(),
+            "tools": self._tools.export_state(),
+        })
+        return {"persisted": ok, "storage": self._store.describe()}
+
+    def _fail_unpersisted(self, what: str) -> None:
+        """A mutation that could not be stored must not look successful."""
+        self._send_error(
+            500,
+            f"{what} applied in memory but NOT persisted "
+            f"({self._store.last_error or 'unknown storage error'}) — "
+            "it will disappear on restart.",
+            code="persistence_failed",
+        )
+
     # ── GET handlers ───────────────────────────────────────────────────────
     def _extensions_skills_list(self) -> None:
         skills = list(self._skills.list_active())
@@ -82,6 +110,17 @@ class ExtensionsApiMixin:
             "active": [s.to_dict() for s in skills],
             "all": [s.to_dict() for s in all_skills],
             "stats": stats,
+            "sources_checked": [
+                "skills/ (absent du dépôt)",
+                "life_mean_studio/skills (absent)",
+                "manifestes .lmpack (aucune clé 'skills')",
+            ],
+            "note": (
+                "Registre d'auto-extension : un skill n'apparaît ici qu'après "
+                "proposition puis approbation humaine. Aucune source de skills "
+                "n'existe dans ce dépôt — le total 0 est réel, pas une panne."
+            ),
+            "storage": self._store.describe(),
         })
 
     def _extensions_skill_get(self, skill_id: str) -> None:
@@ -95,11 +134,42 @@ class ExtensionsApiMixin:
         tools = list(self._tools.list_active())
         all_tools = list(self._tools._tools.values())
         stats = self._tools.stats()
+        registered = {t.id for t in all_tools}
         self._send_json({
             "active": [t.to_dict() for t in tools],
             "all": [t.to_dict() for t in all_tools],
             "stats": stats,
+            # Discovery is NOT activation: these tools ship with the repo and are
+            # used by ToolWorker, but they never passed through the extension
+            # gate, so they are not in the registry.
+            "catalog": self._tool_catalog(registered),
+            "catalog_total": len(self._tool_catalog(registered)),
+            "note": (
+                "Le registre d'auto-extension ne contient que ce qui a été "
+                "proposé/approuvé. Les outils ci-dessus ('catalog') existent "
+                "déjà dans library/tools et sont utilisés par ToolWorker — "
+                "découvrir n'est pas activer."
+            ),
+            "storage": self._store.describe(),
         })
+
+    @staticmethod
+    def _tool_catalog(registered: set) -> List[Dict[str, Any]]:
+        """The real deterministic tools shipped in library/tools."""
+        try:
+            from library.tools.detection import list_all_tools
+            return [
+                {
+                    "name": t.get("name", ""),
+                    "domain": t.get("domain", ""),
+                    "description": t.get("description", ""),
+                    "in_registry": t.get("name", "") in registered,
+                }
+                for t in list_all_tools()
+            ]
+        except Exception as exc:  # noqa: BLE001 - reported, never invented
+            logger.error("tool catalog unavailable: %s", exc)
+            return []
 
     def _extensions_tool_get(self, tool_id: str) -> None:
         t = self._tools.get(tool_id)
@@ -141,14 +211,27 @@ class ExtensionsApiMixin:
             dependencies=list((data or {}).get("dependencies", []) or []),
             test_cases=list((data or {}).get("test_cases", []) or []),
         )
-        skill = self._factories["skill"].propose_from_need(
-            self._detector._needs.get(need_id) if need_id else None, spec
-        )
+        try:
+            skill = self._factories["skill"].propose_from_need(
+                self._detector._needs.get(need_id) if need_id else None, spec
+            )
+        except Exception as exc:  # noqa: BLE001 - an unwritten proposal is not a success
+            # Without this, an OSError escaped the handler and the client saw a
+            # dropped connection instead of an error.
+            logger.error("skill proposal failed: %s", exc)
+            self._send_error(500, f"Skill proposal failed: {type(exc).__name__}: {exc}",
+                             code="proposal_failed")
+            return
         # Also create a pipeline item
         pipe_item = self._pipeline.create_item(need_id or skill.id, "skill")
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Skill {skill.id}")
+            return
         self._send_json({
             "skill_id": skill.id, "status": skill.status.value,
             "pipeline_item_id": pipe_item.id,
+            **save,
         })
 
     def _extensions_tool_create(self, data: Dict[str, Any]) -> None:
@@ -169,14 +252,25 @@ class ExtensionsApiMixin:
             dependencies=list((data or {}).get("dependencies", []) or []),
             test_cases=list((data or {}).get("test_cases", []) or []),
         )
-        tool = self._factories["tool"].propose_from_need(
-            self._detector._needs.get(need_id) if need_id else None, spec
-        )
+        try:
+            tool = self._factories["tool"].propose_from_need(
+                self._detector._needs.get(need_id) if need_id else None, spec
+            )
+        except Exception as exc:  # noqa: BLE001 - report instead of dropping the connection
+            logger.error("tool proposal failed: %s", exc)
+            self._send_error(500, f"Tool proposal failed: {type(exc).__name__}: {exc}",
+                             code="proposal_failed")
+            return
         pipe_item = self._pipeline.create_item(need_id or tool.id, "tool")
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Tool {tool.id}")
+            return
         self._send_json({
             "tool_id": tool.id, "status": tool.status.value,
             "sandbox_path": str(tool.sandbox_path) if tool.sandbox_path else None,
             "pipeline_item_id": pipe_item.id,
+            **save,
         })
 
     def _extensions_capabilities_analyze(self, data: Dict[str, Any]) -> None:
@@ -210,7 +304,11 @@ class ExtensionsApiMixin:
         pipe_item = self._pipeline.get_item(f"pipe-skill-{skill_id}")
         if pipe_item:
             self._pipeline.approve(pipe_item.id, by=by, resource_id=skill_id)
-        self._send_json({"skill_id": skill_id, "status": s.status.value})
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Approval of skill {skill_id}")
+            return
+        self._send_json({"skill_id": skill_id, "status": s.status.value, **save})
 
     def _extensions_skill_activate(self, skill_id: str) -> None:
         s = self._skills.activate(skill_id)
@@ -220,14 +318,22 @@ class ExtensionsApiMixin:
         pipe_item = self._pipeline.get_item(f"pipe-skill-{skill_id}")
         if pipe_item:
             self._pipeline.activate(pipe_item.id)
-        self._send_json({"skill_id": skill_id, "status": s.status.value})
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Activation of skill {skill_id}")
+            return
+        self._send_json({"skill_id": skill_id, "status": s.status.value, **save})
 
     def _extensions_skill_disable(self, skill_id: str) -> None:
         s = self._skills.disable(skill_id)
         if s is None:
             self._send_error(404, f"Skill {skill_id} not found", code="not_found")
             return
-        self._send_json({"skill_id": skill_id, "status": s.status.value})
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Disable of skill {skill_id}")
+            return
+        self._send_json({"skill_id": skill_id, "status": s.status.value, **save})
 
     def _extensions_tool_approve(self, tool_id: str, data: Dict[str, Any]) -> None:
         by = (data or {}).get("by", "human")
@@ -239,7 +345,11 @@ class ExtensionsApiMixin:
         pipe_item = self._pipeline.get_item(f"pipe-tool-{tool_id}")
         if pipe_item:
             self._pipeline.approve(pipe_item.id, by=by, resource_id=tool_id)
-        self._send_json({"tool_id": tool_id, "status": t.status.value})
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Approval of tool {tool_id}")
+            return
+        self._send_json({"tool_id": tool_id, "status": t.status.value, **save})
 
     def _extensions_tool_activate(self, tool_id: str) -> None:
         t = self._tools.activate(tool_id)
@@ -249,14 +359,22 @@ class ExtensionsApiMixin:
         pipe_item = self._pipeline.get_item(f"pipe-tool-{tool_id}")
         if pipe_item:
             self._pipeline.activate(pipe_item.id)
-        self._send_json({"tool_id": tool_id, "status": t.status.value})
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Activation of tool {tool_id}")
+            return
+        self._send_json({"tool_id": tool_id, "status": t.status.value, **save})
 
     def _extensions_tool_disable(self, tool_id: str) -> None:
         t = self._tools.disable(tool_id)
         if t is None:
             self._send_error(404, f"Tool {tool_id} not found", code="not_found")
             return
-        self._send_json({"tool_id": tool_id, "status": t.status.value})
+        save = self._save_layer()
+        if not save["persisted"]:
+            self._fail_unpersisted(f"Disable of tool {tool_id}")
+            return
+        self._send_json({"tool_id": tool_id, "status": t.status.value, **save})
 
     def _extensions_capabilities_resolve(self, need_id: str, data: Dict[str, Any]) -> None:
         approved = bool((data or {}).get("approved", False))

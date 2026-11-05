@@ -247,19 +247,32 @@ class ApprovalPipeline:
 # --------------------------------------------------------------------------
 
 def create_extension_layer(
-    skill_registry=None, tool_registry=None, detector=None,
+    skill_registry=None, tool_registry=None, detector=None, store=None,
 ) -> Dict[str, Any]:
     """Create the full extension layer and return components.
 
     This is the entry point for connecting the modular self-extension system
     to the existing Life_mean debate engine.
+
+    Registry state is loaded from ``store`` (JSON on disk) when available. The
+    registries used to be memory-only, so every proposal/approval vanished on
+    restart while the API had reported success.
     """
     from .registries import SkillRegistry, ToolRegistry, CapabilityDetector
     from .factories import SkillFactory, ToolFactory
     from .pipeline import ApprovalPipeline
+    from .store import ExtensionStore
 
     skills = skill_registry or SkillRegistry()
     tools = tool_registry or ToolRegistry()
+    extension_store = store or ExtensionStore()
+
+    restored = {"skills": 0, "tools": 0}
+    stored = extension_store.load()
+    if stored:
+        restored["skills"] = skills.import_state(stored.get("skills") or [])
+        restored["tools"] = tools.import_state(stored.get("tools") or [])
+
     detector = detector or CapabilityDetector(skills, tools)
     factories = {
         "skill": SkillFactory(skills),
@@ -273,4 +286,6 @@ def create_extension_layer(
         "detector": detector,
         "factories": factories,
         "pipeline": pipeline,
+        "store": extension_store,
+        "restored": restored,
     }

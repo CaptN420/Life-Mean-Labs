@@ -22,6 +22,18 @@ _SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
 _FALLBACK_ID = "generated-tool"
 
 
+def _stable_id(prefix: str, text: str) -> str:
+    """Deterministic id for a proposal that has no capability need.
+
+    Without this, every hand-made proposal inherited the same id
+    (``tool-generated-tool``) and silently bumped the version of the previous
+    one instead of creating a new tool.
+    """
+    import hashlib as _hashlib
+    digest = _hashlib.sha1((text or "unnamed").encode("utf-8")).hexdigest()[:8]
+    return f"{prefix}-{digest}"
+
+
 def _sanitize_id(raw: str, prefix: str) -> str:
     """Return a filesystem/registry-safe id derived from caller input.
 
@@ -59,8 +71,13 @@ class SkillFactory:
     def propose_from_need(self, need: CapabilityNeed, spec: Optional[SkillSpec] = None) -> SkillDef:
         if spec is None:
             spec = SkillSpec(need_id=need.id, description=f"Auto-generated skill for: {need.evidence[:100]}")
+        skill_id = (
+            _sanitize_id(spec.need_id.replace("need-", "skill-"), "skill")
+            if spec.need_id
+            else _stable_id("skill", spec.description)
+        )
         skill = SkillDef(
-            id=_sanitize_id(spec.need_id.replace("need-", "skill-"), "skill"),
+            id=skill_id,
             description=spec.description,
             input_schema=spec.input_schema,
             output_schema=spec.output_schema,
@@ -71,12 +88,16 @@ class SkillFactory:
         self.registry.propose(skill)
         return skill
 
-    def _generate_instructions(self, need: CapabilityNeed, spec: SkillSpec) -> str:
+    def _generate_instructions(self, need: Optional[CapabilityNeed], spec: SkillSpec) -> str:
+        # Same trap as the tool stub: a hand-made proposal has no capability need.
+        need_ref = getattr(need, "id", "") or spec.need_id or "manual"
+        priority = getattr(need, "priority", "manual")
+        evidence = getattr(need, "evidence", spec.description)
         return textwrap.dedent(f"""\
             # Skill: {spec.description}
-            Generated from capability need: {need.id}
-            Priority: {need.priority}
-            Evidence: {need.evidence[:200]}
+            Generated from capability need: {need_ref}
+            Priority: {priority}
+            Evidence: {str(evidence)[:200]}
 
             ## Purpose
             Address the missing capability detected during debate/tool execution.
@@ -119,13 +140,29 @@ class ToolFactory:
 
     def __init__(self, registry, sandbox_root: Optional[Path] = None) -> None:
         self.registry = registry
-        self.sandbox_root = sandbox_root or Path(__file__).parent.parent / "sandbox" / "tools"
+        if sandbox_root is None:
+            import os as _os
+            env = _os.environ.get("LIFE_MEAN_SANDBOX_DIR")
+            if env:
+                sandbox_root = Path(env).expanduser()
+            else:
+                # The image is read-only: keeping the sandbox inside it made every
+                # proposal fail with EROFS. data/ is the writable volume.
+                data_dir = _os.environ.get("LIFE_MEAN_DATA_DIR") or (
+                    str(Path(__file__).parent.parent / "data")
+                )
+                sandbox_root = Path(data_dir) / "sandbox" / "tools"
+        self.sandbox_root = sandbox_root
         self.sandbox_root.mkdir(parents=True, exist_ok=True)
 
     def propose_from_need(self, need: CapabilityNeed, spec: Optional[ToolSpec] = None) -> ToolDef:
         if spec is None:
             spec = ToolSpec(need_id=need.id, description=f"Auto-generated tool for: {need.evidence[:100]}")
-        tool_id = _sanitize_id(spec.need_id.replace("need-", "tool-"), "tool")
+        tool_id = (
+            _sanitize_id(spec.need_id.replace("need-", "tool-"), "tool")
+            if spec.need_id
+            else _stable_id("tool", spec.description)
+        )
         sandbox_path = self.sandbox_root / tool_id
         sandbox_path.mkdir(parents=True, exist_ok=True)
 
@@ -159,9 +196,13 @@ class ToolFactory:
         self.registry.propose(tool)
         return tool
 
-    def _generate_stub(self, need: CapabilityNeed, spec: ToolSpec) -> str:
+    def _generate_stub(self, need: Optional[CapabilityNeed], spec: ToolSpec) -> str:
+        # A proposal made by hand has no detected need: dereferencing ``need.id``
+        # here used to raise AttributeError, so POST /api/extensions/tools
+        # returned 500 for every proposal that was not tied to a capability need.
+        need_ref = getattr(need, "id", "") or spec.need_id or "manual"
         return textwrap.dedent(f"""\
-            # Auto-generated tool from capability need: {need.id}
+            # Auto-generated tool from capability need: {need_ref}
             # Description: {spec.description}
             # WARNING: This code has NOT been approved for production use.
 

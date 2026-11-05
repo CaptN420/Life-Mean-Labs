@@ -60,6 +60,20 @@ class Version:
         return Version(m, n, p, t)
 
 
+def version_from_str(value: str) -> Version:
+    """Rebuild a Version from its ``major.minor.patch[-tag]`` form."""
+    text = str(value or "0.0.0")
+    tag = ""
+    if "-" in text:
+        text, tag = text.split("-", 1)
+    parts = (text.split(".") + ["0", "0", "0"])[:3]
+    try:
+        major, minor, patch = (int(p) for p in parts)
+    except ValueError:
+        major, minor, patch = 0, 0, 0
+    return Version(major, minor, patch, tag)
+
+
 # --------------------------------------------------------------------------
 # Skill registry
 # --------------------------------------------------------------------------
@@ -88,6 +102,23 @@ class SkillDef:
             "version": str(self.version), "created_at": self.created_at,
             "approved_by": self.approved_by, "approval_note": self.approval_note,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SkillDef":
+        return cls(
+            id=str(data.get("id", "")),
+            description=str(data.get("description", "")),
+            input_schema=dict(data.get("input_schema") or {}),
+            output_schema=dict(data.get("output_schema") or {}),
+            instructions=str(data.get("instructions", "")),
+            dependencies=list(data.get("dependencies") or []),
+            tests=list(data.get("tests") or []),
+            status=ResourceStatus(data.get("status", "proposed")),
+            version=version_from_str(data.get("version", "0.0.0")),
+            created_at=float(data.get("created_at") or time.time()),
+            approved_by=data.get("approved_by"),
+            approval_note=str(data.get("approval_note", "")),
+        )
 
 
 class SkillRegistry:
@@ -147,6 +178,25 @@ class SkillRegistry:
             logger.info("Skill rolled back: %s", skill_id)
         return s
 
+    def export_state(self) -> List[Dict[str, Any]]:
+        """Serializable snapshot (persistence, not a promotion)."""
+        return [s.to_dict() for s in self._skills.values()]
+
+    def import_state(self, items: List[Dict[str, Any]]) -> int:
+        """Restore a snapshot. Unreadable entries are skipped and logged."""
+        restored = 0
+        for item in items or []:
+            try:
+                skill = SkillDef.from_dict(item)
+            except (ValueError, TypeError, KeyError) as exc:
+                logger.warning("skipping unreadable stored skill %r: %s", item.get("id"), exc)
+                continue
+            if not skill.id:
+                continue
+            self._skills[skill.id] = skill
+            restored += 1
+        return restored
+
     def stats(self) -> Dict[str, int]:
         counts = {s.value: 0 for s in ResourceStatus}
         for s in self._skills.values():
@@ -185,6 +235,25 @@ class ToolDef:
             "approval_note": self.approval_note,
             "sandbox_path": str(self.sandbox_path) if self.sandbox_path else None,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolDef":
+        sandbox = data.get("sandbox_path")
+        return cls(
+            id=str(data.get("id", "")),
+            description=str(data.get("description", "")),
+            input_schema=dict(data.get("input_schema") or {}),
+            output_schema=dict(data.get("output_schema") or {}),
+            source_code=str(data.get("source_code", "")),
+            dependencies=list(data.get("dependencies") or []),
+            tests=list(data.get("tests") or []),
+            status=ResourceStatus(data.get("status", "proposed")),
+            version=version_from_str(data.get("version", "0.0.0")),
+            created_at=float(data.get("created_at") or time.time()),
+            approved_by=data.get("approved_by"),
+            approval_note=str(data.get("approval_note", "")),
+            sandbox_path=Path(sandbox) if sandbox else None,
+        )
 
 
 class ToolRegistry:
@@ -241,6 +310,25 @@ class ToolRegistry:
         if t:
             logger.info("Tool rolled back: %s", tool_id)
         return t
+
+    def export_state(self) -> List[Dict[str, Any]]:
+        """Serializable snapshot (persistence, not a promotion)."""
+        return [t.to_dict() for t in self._tools.values()]
+
+    def import_state(self, items: List[Dict[str, Any]]) -> int:
+        """Restore a snapshot. Unreadable entries are skipped and logged."""
+        restored = 0
+        for item in items or []:
+            try:
+                tool = ToolDef.from_dict(item)
+            except (ValueError, TypeError, KeyError) as exc:
+                logger.warning("skipping unreadable stored tool %r: %s", item.get("id"), exc)
+                continue
+            if not tool.id:
+                continue
+            self._tools[tool.id] = tool
+            restored += 1
+        return restored
 
     def stats(self) -> Dict[str, int]:
         counts = {s.value: 0 for s in ResourceStatus}
