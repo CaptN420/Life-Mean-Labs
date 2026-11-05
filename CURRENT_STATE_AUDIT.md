@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 720 passed, 13 skipped, 0 failed** (après P1) |
+| Tests de référence | **1 728 passed, 13 skipped, 0 failed** (après P1/P2) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -68,16 +68,33 @@ Persistance vérifiée : `LIFE_MEAN_STUDIO_DB=/app/studio_data/life_mean_studio_
 `life_mean_studio_data` (l'image est `read_only: true`, sans volume l'import échouait). Contrôle réel :
 11 agents en base, puis `docker compose restart` → **toujours 11**.
 
-### 4ter. Défaut connexe, non corrigé (hors périmètre P1)
+### 4ter. Agent Builder : deux faux succès, corrigés
 
-`GET /api/agents` renvoie une **liste codée en dur** de 4 modèles d'agents, pas le registre Studio.
-C'est honnête dans la mesure où ce sont des *templates*, mais rien n'affiche les 11 agents réellement
-importés. Classé `CONFIRMED_BROKEN` (lecture du registre), à traiter avec la page Agents.
+`GET /api/agents` renvoyait **4 templates codés en dur** ; `POST /api/agents` fabriquait un id
+(`agent_xxxx`), répondait `status: "created"` et **n'écrivait rien**. L'UI alertait « Agent created ».
+Rien n'affichait donc les 11 agents importés.
+
+Corrigé et vérifié sur le conteneur :
+
+```
+GET  /api/agents        -> 200 | source: studio_registry | total: 12 | actifs: 12
+                              base: /app/studio_data/life_mean_studio_data.db
+POST /api/agents/{id}/toggle {enabled:false} -> 200 enabled=False verified=True
+                              actifs 12 -> 11, puis retour à 12
+POST /api/agents/inconnu/toggle -> 404 agent_not_found
+POST /api/agents (doublon)      -> 409 agent_exists
+POST /api/agents (nouveau)      -> 200 persisted=True verified=True (UUID réel en base)
+```
+
+L'import conserve désormais le `role` du pack (ex. « Transformation ») dans `description` : il était
+jeté, ce qui laissait 11 cartes identiques « general ». Réserve honnête : les 11 agents déjà importés
+avant cette correction gardent une description vide — aucun rattrapage silencieux n'a été fait.
 | 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
 | 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents |
 | 18 | Collecteurs Windows (Defender, Event Log) | `BLOCKED_EXTERNAL` | `psutil`, `win32evtlog`, `win32service` absents |
 | 19 | Feature Pool à 987/989 non observées | `PARTIAL` | usage observé ≠ validation, statuts inchangés |
 | 20 | Pipeline Inspector | `FIXED_AND_VERIFIED` | `a719f12` — 392 151 événements, idempotent, 28 tests |
+| 21 | `/api/agents` en dur + création non persistée | `FIXED_AND_VERIFIED` | registre réel (12 agents), toggle vérifié par relecture, doublon → 409 |
 
 ---
 
@@ -172,7 +189,7 @@ a échoué une fois, puis :
 
 - passe seul (23/23 dans son fichier) ;
 - passe dans le lot `dashboard_security + http_smoke + packages_api + experimental_api` (55/55) ;
-- passe sur des passages complets ultérieurs : **1717**, puis **1720 passed, 13 skipped, 0 failed**.
+- passe sur les passages complets ultérieurs : **1717**, **1720**, puis **1728 passed, 13 skipped, 0 failed**.
 
 Classé `UNVERIFIED_FLAKE` : non reproduit, cause non identifiée, assertion **non modifiée**. À traiter en
 phase 9 (isolation des serveurs in-process) plutôt qu'à être ignoré.

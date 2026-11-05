@@ -1709,7 +1709,10 @@
                     <button class="btn-sm" onclick="testAgent()" style="margin-left:0.5rem;">Test Agent</button>
                 </div>
                 <div>
-                    <h3 style="margin-top:1rem;">Created Agents</h3>
+                    <h3 style="margin-top:1rem;">Registre Studio</h3>
+                    <div id="agents-meta" class="subtitle" style="font-size:.78rem;margin-bottom:.5rem;">
+                        Chargement du registre…
+                    </div>
                     <div id="agents-list">
                         <div class="empty-state">No agents created yet.</div>
                     </div>
@@ -1807,6 +1810,7 @@
             if (name === 'skills') { loadSkillsPanel(); }
             if (name === 'pipeline') { piLoadAll(); }
             if (name === 'packages') { pkLoad(); }
+            if (name === 'agent-builder') { loadAgents(); }
             if (name === 'experiments') switchToManagedExperiments();
         }
 
@@ -5298,29 +5302,64 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
 
         // ── Agent Builder functions ──────────────────────────────────────────────
         async function loadAgents() {
+            // Reads the real Studio registry. This used to render four hardcoded
+            // templates while imported agents were invisible.
+            const list = el('agents-list');
+            if (!list) return;
+            const meta = el('agents-meta');
             try {
                 const resp = await fetch(`${API_BASE}/agents`);
                 const data = await resp.json();
+                if (!resp.ok) {
+                    list.innerHTML = `<div class="empty-state">Registre indisponible (${resp.status}) : ${esc(data.error || '')}</div>`;
+                    if (meta) meta.textContent = '';
+                    return;
+                }
                 const agents = data.agents || [];
-                const list = el('agents-list');
-                if (!list) return;
+                if (meta) {
+                    meta.textContent = `${data.total ?? agents.length} agent(s) · ${data.enabled_count ?? 0} actif(s)`
+                        + ` · source : ${data.source || '?'} · ${data.database || ''}`;
+                }
                 if (agents.length === 0) {
-                    list.innerHTML = '<div class="empty-state">No agents created yet.</div>';
+                    list.innerHTML = "<div class=\"empty-state\">Registre vide — importez un package depuis l'onglet Packages.</div>";
                     return;
                 }
                 list.innerHTML = agents.map(a => `
-                    <div style="padding:0.75rem;border-left:3px solid var(--accent);margin-bottom:0.5rem;background:#f8f9fa;">
-                        <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div style="padding:0.6rem;border-left:3px solid ${a.enabled ? 'var(--accent)' : '#bbb'};margin-bottom:0.5rem;background:#f8f9fa;">
+                        <div style="display:flex;justify-content:space-between;align-items:start;gap:0.5rem;">
                             <strong>${esc(a.name || a.id)}</strong>
-                            <span class="experiment-stat">${esc(a.type || 'unknown')}</span>
+                            <span class="experiment-stat">${esc(a.persona || a.type || '')}</span>
                         </div>
-                        <div style="font-size:0.8rem;color:var(--muted-foreground);margin-top:0.25rem;">
-                            ${esc((a.system_prompt || '').slice(0, 100))}
+                        <div style="font-size:0.78rem;color:var(--muted-foreground);margin-top:0.2rem;">
+                            ${esc(a.description || '')}${a.description ? ' · ' : ''}${esc(a.provider || 'provider —')} · ${esc(a.model || 'modèle —')} · ${a.prompt_chars || 0} car.
                         </div>
+                        <div style="font-size:0.75rem;color:var(--muted-foreground);margin-top:0.2rem;">
+                            ${esc((a.prompt_preview || '').slice(0, 110))}
+                        </div>
+                        <button class="btn-sm" style="margin-top:0.35rem;"
+                            onclick="toggleAgent('${esc(a.id)}', ${a.enabled ? 'false' : 'true'})">
+                            ${a.enabled ? 'Désactiver' : 'Activer'}
+                        </button>
                     </div>
                 `).join('');
             } catch (err) {
-                console.error('Failed to load agents:', err);
+                list.innerHTML = `<div class="empty-state">Échec de lecture du registre : ${esc(err.message)}</div>`;
+            }
+        }
+
+        async function toggleAgent(id, enabled) {
+            try {
+                const resp = await fetch(`${API_BASE}/agents/${encodeURIComponent(id)}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) { alert(`Échec : ${data.error || resp.status}`); return; }
+                if (!data.verified) { alert("Le changement n'a pas été confirmé par la base."); return; }
+                loadAgents();
+            } catch (err) {
+                alert('Échec : ' + err.message);
             }
         }
 
@@ -5350,10 +5389,12 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                     body: JSON.stringify({ name, type, system_prompt: prompt, config })
                 });
                 const data = await resp.json();
-                if (data.id || data.name) {
-                    alert('Agent created: ' + (data.name || data.id));
-                    loadAgents();
+                if (!resp.ok) {
+                    alert(`Échec : ${data.error || resp.status}`);
+                    return;
                 }
+                alert(`Agent enregistré : ${data.name} (${data.id})`);
+                loadAgents();
             } catch (err) {
                 alert('Failed to create agent: ' + err.message);
             }

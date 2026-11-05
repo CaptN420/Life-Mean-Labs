@@ -77,6 +77,34 @@ def studio_db_path() -> Path:
     return (Path(__file__).resolve().parents[1] / "life_mean_studio_data.db").resolve()
 
 
+_STORAGE_CACHE: Dict[str, Any] = {}
+
+
+def studio_storage():
+    """Process-wide Studio storage for the current database path.
+
+    Cached per path so two API mixins never open two handles on the same SQLite
+    file (Windows locks it). Tests point LIFE_MEAN_STUDIO_DB at a temp file and
+    call ``reset_studio_storage()``.
+    """
+    key = str(studio_db_path())
+    if key not in _STORAGE_CACHE:
+        from life_mean_studio.engine.storage import StudioStorage
+
+        _STORAGE_CACHE[key] = StudioStorage(key)
+    return _STORAGE_CACHE[key]
+
+
+def reset_studio_storage() -> None:
+    """Drop cached handles (used by tests between temp databases)."""
+    for storage in _STORAGE_CACHE.values():
+        try:
+            storage.close()
+        except Exception:  # noqa: BLE001 - closing is best effort
+            pass
+    _STORAGE_CACHE.clear()
+
+
 def _redact(text: str) -> str:
     try:
         from pipeline_inspector.redaction import redact_text
@@ -213,15 +241,9 @@ def inspect_package(path: Path) -> Dict[str, Any]:
 class PackagesApiMixin:
     """Mixin providing /api/packages* handlers."""
 
-    _studio_storage = None  # injectable (tests); lazily created otherwise
-
     # ── Studio storage ──────────────────────────────────────────────────────
     def _storage(self):
-        if PackagesApiMixin._studio_storage is None:
-            from life_mean_studio.engine.storage import StudioStorage
-
-            PackagesApiMixin._studio_storage = StudioStorage(str(studio_db_path()))
-        return PackagesApiMixin._studio_storage
+        return studio_storage()
 
 
     # ── helpers ─────────────────────────────────────────────────────────────

@@ -477,6 +477,9 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
             self._extensions_capabilities_resolve(need_id, data)
         elif parsed.path == "/api/agents":
             self._agents_create(data)
+        elif parsed.path.startswith("/api/agents/") and parsed.path.endswith("/toggle"):
+            agent_id = parsed.path.split("/")[-2]
+            self._agents_toggle(agent_id, data)
         # ── Pipeline Inspector (actions explicites, jamais automatiques) ────
         elif parsed.path == "/api/pipeline/ingest":
             full = bool(data.get("full_rescan")) if isinstance(data, dict) else False
@@ -1031,14 +1034,77 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
 
     # ── Agent Builder API ──────────────────────────────────────────────────
     def _agents_list(self) -> None:
-        """GET /api/agents — list available agent templates."""
-        agents = [
-            {"id": "researcher", "name": "Researcher", "description": "Fact-finding and synthesis", "type": "research"},
-            {"id": "analyst", "name": "Analyst", "description": "Critical evaluation and analysis", "type": "analysis"},
-            {"id": "writer", "name": "Writer", "description": "Content creation and documentation", "type": "creative"},
-            {"id": "coder", "name": "Coder", "description": "Code generation and review", "type": "technical"},
-        ]
-        self._send_json({"agents": agents})
+        """GET /api/agents — the real Studio registry, not a template list.
+
+        Until this change this endpoint returned four hardcoded templates while
+        11 agents could sit in the database, invisible. Fields keep the old
+        shape (`type`) so the existing UI keeps working, and add the honest ones
+        (persona, provider, enabled, database).
+        """
+        from experiments.packages_api import studio_db_path, studio_storage
+
+        try:
+            rows = studio_storage().list_agents()
+        except Exception as exc:  # noqa: BLE001 - never answer with an empty fake
+            self._send_error(500, f"{type(exc).__name__}: {exc}", code="registry_unavailable")
+            return
+
+        agents = []
+        personas: Dict[str, int] = {}
+        for row in rows:
+            prompt = str(row.get("system_prompt") or "")
+            persona = row.get("persona") or "general"
+            personas[persona] = personas.get(persona, 0) + 1
+            agents.append({
+                "id": row.get("id"),
+                "name": row.get("name"),
+                "type": persona,          # legacy field the UI already reads
+                "persona": persona,
+                "description": row.get("description") or "",
+                "provider": row.get("provider") or "",
+                "model": row.get("model") or "",
+                "enabled": bool(row.get("enabled", 1)),
+                "prompt_chars": len(prompt),
+                "prompt_preview": prompt[:160],
+                "created_at": row.get("created_at") or "",
+            })
+
+        self._send_json({
+            "source": "studio_registry",
+            "database": str(studio_db_path()),
+            "total": len(agents),
+            "enabled_count": sum(1 for a in agents if a["enabled"]),
+            "personas": personas,
+            "agents": agents,
+        })
+
+    def _agents_toggle(self, agent_id: str, data: Dict[str, Any]) -> None:
+        """POST /api/agents/{id}/toggle — enable/disable, never delete."""
+        from experiments.packages_api import studio_storage
+
+        if "enabled" not in data or not isinstance(data.get("enabled"), bool):
+            self._send_error(400, "Field 'enabled' (boolean) is required", code="invalid")
+            return
+
+        try:
+            storage = studio_storage()
+            if storage.get_agent(agent_id) is None:
+                self._send_error(404, f"Unknown agent: {agent_id}", code="agent_not_found")
+                return
+            if not storage.update_agent(agent_id, {"enabled": 1 if data["enabled"] else 0}):
+                self._send_error(409, "Storage refused the update", code="update_refused")
+                return
+            stored = storage.get_agent(agent_id) or {}
+        except Exception as exc:  # noqa: BLE001
+            self._send_error(500, f"{type(exc).__name__}: {exc}", code="registry_unavailable")
+            return
+
+        # Read back: never claim a change that is not on disk.
+        self._send_json({
+            "id": agent_id,
+            "enabled": bool(stored.get("enabled", 0)),
+            "verified": bool(stored.get("enabled", 0)) == data["enabled"],
+        })
 
     def _agents_test(self, agent_id: str, data: Dict[str, Any]) -> None:
         """POST /api/agents/{id}/test — test an agent with a prompt."""
@@ -1066,41 +1132,56 @@ class DashboardHandler(PipelineApiMixin, ExperimentalApiMixin, CompareApiMixin, 
         self._send_json(result)
 
     def _agents_create(self, data: Dict[str, Any]) -> None:
-        """POST /api/agents — create a custom agent."""
-        name = data.get("name", "")
-        prompt = data.get("prompt", "")
-        model = data.get("model", "")
-        
+        """POST /api/agents — create an agent **in the registry**.
+
+        This used to mint a random id, return ``status: "created"`` and persist
+        nothing: a fake success the UI displayed as a real agent. It now writes
+        through StudioStorage and reads back before answering.
+        """
+        from experiments.packages_api import studio_storage
+
+        name = str(data.get("name") or "").strip()
+        prompt = str(data.get("system_prompt") or data.get("prompt") or "")
+
         if not name or not prompt:
-            self._send_error(400, "Name and prompt are required", code="invalid")
+            self._send_error(400, "Name and system_prompt are required", code="invalid")
             return
-        
-        from experiments.settings import get_settings
-        settings = get_settings()
-        provider = settings.get("llm_provider", "openrouter")
-        
-        if provider == "openrouter":
-            api_key = settings.get("llm_api_key", "")
-            if not api_key or api_key.startswith("sk-or-v1"):
-                self._send_error(400, "OpenRouter API key not configured", code="invalid_config")
+
+        try:
+            storage = studio_storage()
+            existing = {str((r or {}).get("name") or "").strip().lower()
+                        for r in storage.list_agents()}
+            if name.lower() in existing:
+                self._send_error(409, f"Agent '{name}' already exists", code="agent_exists")
                 return
-        elif provider == "lmstudio":
-            base_url = settings.get("llm_base_url", "")
-            if not base_url or "localhost" not in base_url:
-                self._send_error(400, "LM Studio URL not configured", code="invalid_config")
-                return
-        
-        import uuid
-        agent_id = f"agent_{uuid.uuid4().hex[:8]}"
-        result = {
+
+            agent_id = storage.create_agent(
+                name=name,
+                system_prompt=prompt,
+                persona=str(data.get("persona") or data.get("type") or "general"),
+                description=str(data.get("description") or ""),
+                model=data.get("model") or None,
+                provider=data.get("provider") or None,
+                config=data.get("config") or None,
+                tools=data.get("tools") or None,
+            )
+            stored = storage.get_agent(agent_id)
+        except Exception as exc:  # noqa: BLE001 - report, never fake an id
+            self._send_error(500, f"{type(exc).__name__}: {exc}", code="create_failed")
+            return
+
+        if stored is None:
+            self._send_error(500, "Agent was not found after creation", code="create_failed")
+            return
+
+        self._send_json({
             "id": agent_id,
-            "name": name,
-            "prompt": prompt,
-            "model": model,
-            "provider": provider,
-            "status": "created"
-        }
-        self._send_json(result)
+            "name": stored.get("name"),
+            "persona": stored.get("persona"),
+            "provider": stored.get("provider") or "",
+            "persisted": True,
+            "verified": True,
+        })
 
     def _serve_dashboard(self) -> None:
         """Serve the dashboard HTML from package resources.

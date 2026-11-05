@@ -243,7 +243,11 @@ class PackageManager:
                                 name=agent_data.get("name", agent_id),
                                 system_prompt=agent_data.get("system_prompt", ""),
                                 persona=agent_data.get("persona", "general"),
-                                description=agent_data.get("description", ""),
+                                # Packs carry a 'role' (e.g. "Transformation") that the
+                                # import used to drop, leaving eleven identical "general"
+                                # cards. Keep it: description is the human label.
+                                description=agent_data.get("description")
+                                or agent_data.get("role", ""),
                                 model=agent_data.get("model"),
                                 provider=agent_data.get("provider"),
                                 config=agent_data.get("config", {}),

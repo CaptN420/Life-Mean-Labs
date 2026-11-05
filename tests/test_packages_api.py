@@ -17,6 +17,7 @@ import pytest
 
 from experiments.packages_api import (
     PackagePathError,
+    reset_studio_storage,
     PackagesApiMixin,
     inspect_package,
     packages_root,
@@ -190,9 +191,9 @@ def studio_db(tmp_path, monkeypatch):
     """Isolated Studio registry — never the developer's real database."""
     db = tmp_path / "studio.db"
     monkeypatch.setenv("LIFE_MEAN_STUDIO_DB", str(db))
-    PackagesApiMixin._studio_storage = None
+    reset_studio_storage()
     yield db
-    PackagesApiMixin._studio_storage = None
+    reset_studio_storage()
 
 
 def _agent_count(db: Path) -> int:
