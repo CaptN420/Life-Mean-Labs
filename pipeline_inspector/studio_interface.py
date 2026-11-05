@@ -155,14 +155,84 @@ class PipelineInspector:
         return payload
 
     def features(self) -> Dict[str, Any]:
+        """Usage observé des fonctionnalités, échantillonné par population.
+
+        L'ancienne version ne lisait que les N événements les plus récents par
+        type. Sur une base réelle (837 k événements), la fenêtre récente était
+        monopolisée par un seul producteur (5 005 événements `captn_experiences`)
+        et le rapport annonçait « 2 fonctionnalités observées sur 989 » alors que
+        272 k appels d'outils et 31 agents distincts existaient plus loin dans
+        l'historique. Ce n'était pas un manque d'usage : c'était un échantillon
+        non représentatif.
+        """
         from .schemas import EventType as _ET
-        events = self._events_for(event_types=[_ET.TOOL_CALL.value], limit=20000)
-        events += self._events_for(event_types=[_ET.AGENT_SELECTED.value], limit=5000)
-        events += self._events_for(event_types=[_ET.MODEL_RESPONSE.value], limit=5000)
-        events += self._events_for(event_types=[_ET.TEST_RESULT.value], limit=5000)
+
+        types = [
+            _ET.TOOL_CALL.value,
+            _ET.AGENT_SELECTED.value,
+            _ET.MODEL_RESPONSE.value,
+            _ET.TEST_RESULT.value,
+        ]
+        events, coverage = self._stratified_events(types, per_group=300, max_groups=60)
         payload = self.bridge.usage(events)
         payload['sample'] = self._sample(events, 35000)
+        payload['coverage'] = coverage
         return payload
+
+    def _stratified_events(
+        self,
+        event_types: List[str],
+        per_group: int = 300,
+        max_groups: int = 60,
+    ) -> tuple:
+        """Échantillon réparti sur les couples (source, agent) de la base.
+
+        Chaque population reçoit le même quota, plafonné globalement. Le
+        résultat porte sa couverture (`coverage`) pour qu'un compte ne soit
+        jamais lu comme un total exhaustif.
+        """
+        agents = self.store.distinct_values("agent", event_types=event_types, limit=max_groups)
+        # les événements sans agent restent visibles : ils sont échantillonnés
+        # par source, sinon un producteur sans identité d'agent disparaît.
+        sources = self.store.distinct_values("source", event_types=event_types, limit=max_groups)
+
+        collected: Dict[str, Dict[str, Any]] = {}
+        groups: List[Dict[str, Any]] = []
+
+        for entry in agents:
+            agent = entry["value"]
+            batch = self.store.query(
+                event_types=event_types, agent=agent, limit=per_group, order="desc"
+            )
+            groups.append({"agent": agent, "events_in_db": entry["events"], "sampled": len(batch)})
+            for ev in batch:
+                collected[ev["event_id"]] = ev
+
+        for entry in sources:
+            source = entry["value"]
+            batch = self.store.query(
+                event_types=event_types, source=source, limit=per_group, order="desc"
+            )
+            groups.append({"source": source, "events_in_db": entry["events"], "sampled": len(batch)})
+            for ev in batch:
+                collected[ev["event_id"]] = ev
+
+        events = sorted(collected.values(), key=lambda e: e.get("timestamp") or 0)
+        total_in_db = sum(g["events_in_db"] for g in groups)
+        return events, {
+            "strategy": "stratified par agent puis par source",
+            "groups_sampled": len(groups),
+            "per_group_limit": per_group,
+            "events_sampled": len(events),
+            "events_in_sampled_populations": total_in_db,
+            "truncated": total_in_db > len(events),
+            "window": f"{len(events)} événements répartis sur {len(groups)} populations",
+            "note": (
+                "Compte un usage observé sur un échantillon déclaré, jamais un "
+                "total exhaustif ; aucune fonctionnalité n'est validée par ce compte."
+            ),
+            "groups": groups[:60],
+        }
 
     def correlation_summary(self) -> Dict[str, Any]:
         return correlation.correlation_summary(self._all_events())

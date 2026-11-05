@@ -210,6 +210,12 @@ class ReportGenerator:
             f"(`{features.get('feature_pool_source')}`)\n"
             f"- Features observées dans les logs : **{features.get('features_observed', 0)}**\n"
             f"- Non observées : **{features.get('features_not_observed', 0)}**\n\n"
+            # Sans la couverture, « 14 observées » se lit comme un total exhaustif
+            # alors que c'est un échantillon déclaré.
+            f"- Échantillon : **{(features.get('coverage') or {}).get('window', 'non déclaré')}**\n"
+            f"- Événements dans les populations échantillonnées : "
+            f"**{(features.get('coverage') or {}).get('events_in_sampled_populations', 0)}**"
+            f" (tronqué : {(features.get('coverage') or {}).get('truncated')})\n\n"
             "> Usage observé ≠ validation. Aucun statut Feature Pool n'a été modifié.\n\n"
             "## Détail\n\n" +
             _table(features.get("rows", []),

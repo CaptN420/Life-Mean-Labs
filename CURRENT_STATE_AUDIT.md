@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 773 passed, 13 skipped, 0 failed** (après P1→P9) |
+| Tests de référence | **1 806 passed, 13 skipped, 0 failed** (après P1→P10, avec `pipeline_inspector/tests`) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -53,7 +53,7 @@ l'ancien code.**
 | 16 | « Concurrence » du scheduler | `NOT_APPLICABLE` (simulation assumée) | ni thread ni asyncio : horloge virtuelle |
 | 17 | GPU / inférence locale | `BLOCKED_EXTERNAL` | `torch`, `llama_cpp`, `transformers`, `onnxruntime` absents |
 | 18 | Collecteurs Windows (Defender, Event Log) | `BLOCKED_EXTERNAL` | `psutil`, `win32evtlog`, `win32service` absents |
-| 19 | Feature Pool à 987/989 non observées | `PARTIAL` | usage observé ≠ validation, statuts inchangés |
+| 19 | Feature Pool à 987/989 non observées | `FIXED_AND_VERIFIED` (mesure) / `PARTIAL` (couverture) | l'échantillon était non représentatif : **2 → 14** observées sur la base locale, couverture déclarée ; statuts inchangés (voir §4undecies) |
 | 20 | Pipeline Inspector | `FIXED_AND_VERIFIED` | `a719f12` — 392 151 événements, idempotent, 28 tests |
 | 21 | `/api/agents` en dur + création non persistée | `FIXED_AND_VERIFIED` | registre réel (12 agents), toggle vérifié par relecture, doublon → 409 |
 
@@ -316,6 +316,41 @@ AVEC drain (corrigé)             : 403 reçus 60/60, connexions avortées 0/60
 Correctif : `_drain_request_body()` lit et jette le corps (plafonné à 1 Mo) avant toute réponse 403 des
 trois verbes ; un test de régression martèle 25 fois la même requête et exige 25 fois 403. Le fichier
 passe désormais 10/10 exécutions consécutives (avant : 1 échec sur 12).
+
+### 4undecies. « 2 fonctionnalités observées sur 989 » était un artefact d'échantillon (P10)
+
+`GET /api/pipeline/features` ne lisait que les **N événements les plus récents par type**
+(`limit=20000` sur `TOOL_CALL`, `5000` sur les trois autres). Sur la base réelle du poste
+(837 054 événements), cette fenêtre était monopolisée par un seul producteur : 5 005 événements
+`captn_experiences`/`captn_runtime`. Les 815 991 événements `raw_debates` — ceux qui portent
+`tool_worker`, `math_validation_worker`, `router`, `bug_worker`… — n'étaient jamais lus.
+
+Mesure avant/après sur la base locale :
+
+```
+avant : features_observed 2   / 989   | events scannés 5 005
+après : features_observed 14  / 989   | events scannés 4 500 sur 25 populations
+        populations en base : 1 112 272 événements (tronqué : oui)
+        top : CriticAgent 442, IntegrationPlanner 304, SyntaxWorker 300, BugWorker 300,
+              PolyglotCoder 300, DeterministicCoder 300, Worker 300, FixGenerator 300
+```
+
+Correctif : `EventStore.distinct_values()` (colonnes en liste blanche — une valeur d'API ne devient
+jamais un nom de colonne SQL) et `PipelineInspector._stratified_events()` qui échantillonne **par
+population** (agent, puis source), avec un quota identique par groupe. Le payload et le rapport
+Markdown portent désormais `coverage` : stratégie, nombre de populations, quota, événements dans les
+populations échantillonnées, `truncated`.
+
+**Chiffres conteneur, différents et honnêtes** : la base du conteneur ne contient que **18 447**
+événements (`text_log` + `captn_experiences`) — `/app/data` est un volume qui masque
+`data/raw_debates`, donc les 815 k événements `raw_debates` n'y sont pas ingérés. Le conteneur affiche
+donc `features_observed: 2` avec `groups_sampled: 6`, ce qui est cohérent avec SA base : ce n'est plus
+un artefact d'échantillonnage mais un manque de données, et la réponse le déclare (`coverage`).
+
+Reste ouvert et assumé : **987 fonctionnalités non observées** sur 989. Ce n'est pas un défaut à
+corriger par du code : la majorité du pool (widgets Qt, stores, classes de sécurité) n'est jamais
+instanciée par les pipelines qui tournent ici. Le rapport continue de dire « usage observé ≠
+validation » et ne modifie aucun statut.
 
 ## 2. Sondes HTTP réelles (serveur démarré)
 

@@ -241,6 +241,39 @@ class EventStore:
             out.append(d)
         return out
 
+    # Colonnes autorisées pour les agrégats : une valeur d'API ne doit jamais
+    # devenir un nom de colonne SQL.
+    GROUPABLE = ("agent", "source", "model", "event_type", "status")
+
+    def distinct_values(
+        self,
+        column: str,
+        event_types: Optional[List[str]] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Valeurs distinctes d'une colonne avec leur nombre d'événements.
+
+        Sert à échantillonner par population (agent, source) au lieu de ne
+        regarder que les N événements les plus récents — une fenêtre récente
+        peut être monopolisée par un seul producteur et faire croire qu'aucun
+        autre composant n'a jamais tourné.
+        """
+        if column not in self.GROUPABLE:
+            raise ValueError(f"column not groupable: {column!r} (allowed: {self.GROUPABLE})")
+        where = ["value IS NOT NULL", "value != ''"]
+        params: List[Any] = []
+        if event_types:
+            where.append(f"event_type IN ({','.join('?' * len(event_types))})")
+            params.extend(event_types)
+        sql = (
+            f"SELECT {column} AS value, COUNT(*) AS events FROM events "
+            f"WHERE {' AND '.join(where)} GROUP BY {column} ORDER BY events DESC LIMIT ?"
+        )
+        params.append(max(1, min(int(limit), 500)))
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [{"value": r["value"], "events": r["events"]} for r in rows]
+
     def sessions(self, limit: int = 200) -> List[Dict[str, Any]]:
         """Sessions = regroupement par session_id observé (jamais inventé)."""
         with self._conn() as conn:
