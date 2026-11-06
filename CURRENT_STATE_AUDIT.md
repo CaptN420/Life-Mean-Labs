@@ -571,6 +571,30 @@ carte   : {status: COMPLETED, tasks_valid: 18, pass_rate: 1.0, error_count: 0, e
 familles: cos, log, log10, pow, sin, sqrt, tan, exp, ln
 ```
 
+### 4novodecies. Navigation complète + télémétrie système prouvée (P18)
+
+Deux constats de terrain :
+
+1. **16 onglets dans une seule rangée flex sans wrap** : `Système` et `Traces` existaient dans le DOM
+   (`visible: true`, largeur 99 px) mais sortaient de la fenêtre — présents, invisibles, non cliquables.
+   Corrigé (`flex-wrap: wrap`, 3 rangées mesurées) : les 16 onglets sont atteignables.
+2. **« Collecteurs Windows bloqués » n'était plus vrai** : `core/safety/os_collectors.py` n'ajoute aucune
+   dépendance pip (`powershell Get-MpComputerStatus`, `wevtutil`) mais il n'avait jamais été exécuté contre
+   l'hôte réel. Vérifié sur le serveur hôte (`--port 8083`) :
+
+```
+host     : {platform: Windows, node: CN, release: 11, supported: true}
+degraded : []                       (aucune source indisponible)
+defender : real_time_protection=true, antivirus=true, signature 05/11/2026 19:50:28
+event_log: ok, 5 événements réels (6013 EventLog, 33 Volsnap, 5 IsolatedUserMode)
+```
+
+L'onglet **Système** affiche ces valeurs (capture vérifiée), et `tests/test_os_collectors.py` +
+`tests/test_dashboard_ui.py` : 34 passed.
+
+Limite explicite : dans le conteneur Docker (Linux), `supported` vaut `false` et l'onglet le dit — la
+télémétrie Windows n'est lisible que par le serveur hôte (`:8082`/`:8083`).
+
 ## 2. Sondes HTTP réelles (serveur démarré)
 
 | Route | Code | Charge utile |
@@ -643,7 +667,7 @@ Le `401` observé venait d'une sonde hors conteneur (voir §2bis) — pas d'une 
 | **P2** | Aucun timeout moteur | 6 |
 | **P2** | Registres Skills/Tools vides | 7 |
 | **P3** | Feature Pool 987/989 non observées | 7 |
-| **Externe** | GPU, collecteurs Windows | 6 / hors périmètre |
+| **Externe** | GPU (torch/llama_cpp non installés) | 6 / hors périmètre |
 
 ---
 
