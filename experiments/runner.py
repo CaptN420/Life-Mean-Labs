@@ -455,12 +455,39 @@ class ExperimentRunner:
         # For now, use ToolWorker for deterministic execution
         from core.workers.tool import ToolWorker
         from library.tools.detection import detect_tool
+        from library.tools.math_expressions import parse_math_task
 
         worker = ToolWorker(self.event_bus)
         worker.initialize()
 
         # Auto-detect tool and extract parameters from task description
         detection = detect_tool(task.description)
+
+        # ── Expression mathématique : analyse fermée, jamais d'eval ──────────
+        # Le parseur dit QUOI appeler et AVEC QUOI. Il prime sur la détection par
+        # mots-clés, qui ne sait pas extraire un signe, un décimal ou une base.
+        # Le parseur ne tranche que dans un contexte mathématique : une tâche de
+        # code qui contient « sqrt(x) » ne doit pas être détournée vers l'outil.
+        _math_context = (
+            (task.domain or "").lower() in ("math", "mathematics")
+            or (detection or {}).get("domain") == "math"
+            or detection is None
+        )
+        math_call = parse_math_task(task.description) if _math_context else None
+        if math_call is not None and not math_call.ok:
+            raise UnsupportedTaskError(
+                f"{math_call.error_code}: {math_call.error} "
+                f"(expression={math_call.expression!r})"
+            )
+        if math_call is not None and math_call.ok:
+            detection = {
+                **(detection or {}),
+                "tool_name": f"math_{math_call.tool_name}",
+                "param_key": math_call.param_key,
+                "kwargs": {},
+                "score": (detection or {}).get("score", 20),
+                "domain": "math",
+            }
         if detection:
             # Enregistré ici, pas après coup : c'est le SEUL outil réellement
             # sélectionné (les listes de famille du routeur en annoncent cinq).
@@ -499,7 +526,13 @@ class ExperimentRunner:
                 if m:
                     tool_kwargs["formula"] = m.group(1)
 
-            # ── Math: two-number / single-number tools ──
+            # ── Math: paramètres déjà analysés (expression exacte) ──
+            elif math_call is not None and math_call.ok:
+                # Le parseur a validé arité, littéraux et unité : rien à deviner,
+                # et surtout pas de balayage `\d+` qui perdait le signe.
+                tool_kwargs.update(math_call.kwargs or {})
+
+            # ── Math: two-number / single-number tools (sans expression) ──
             else:
                 numbers = [int(x) for x in re.findall(r'\d+', task.description)]
                 # For GCD/LCM we need both numbers, for others we need just one
@@ -536,6 +569,11 @@ class ExperimentRunner:
                 "reasoning_type": task.reasoning_type,
                 "ground_truth": task.ground_truth,
                 "kwargs": tool_kwargs,  # ToolWorker expects kwargs in this key
+                # L'outil est déjà décidé ici (déterministe). Sans ce champ, le
+                # worker re-détectait depuis la description : `2^8` n'a aucun
+                # mot-clé, donc il répondait « no tool » et le runner rendait
+                # None — une tâche résolvable devenait un échec silencieux.
+                "tool_name": detection.get("tool_name", ""),
             },
         )
 
@@ -553,6 +591,28 @@ class ExperimentRunner:
                     # Extract the actual answer from tool result dict
                     # Tool results are dicts like {'valid': True, 'a': 13, 'b': 45, 'gcd': 1, 'lcm': 585}
                     if isinstance(raw_answer, dict):
+                        # Un refus de l'outil est un VERDICT, pas une réponse :
+                        # sans ce garde, le dict d'erreur finissait tel quel dans
+                        # `answer` — `ln(0)` renvoyait
+                        # {'valid': False, 'error': 'value>0'} comme « réponse ».
+                        if raw_answer.get("valid") is False:
+                            if math_call is not None:
+                                self._emit_trace(
+                                    "MathExpressionRule",
+                                    {"expression": task.description,
+                                     "tool": detection.get("tool_name")},
+                                    {"parameters": dict(tool_kwargs),
+                                     "unit": math_call.unit,
+                                     "verdict": "rejected",
+                                     "reason": raw_answer.get("error")},
+                                )
+                            raise UnsupportedTaskError(
+                                f"MATH_DOMAIN_ERROR: tool "
+                                f"'{detection.get('tool_name')}' rejected "
+                                f"expression={task.description[:120]!r}: "
+                                f"{raw_answer.get('error') or 'invalid input'}"
+                            )
+
                         # Try to find the primary answer key based on task type
                         desc = task.description.lower()
 
@@ -601,11 +661,41 @@ class ExperimentRunner:
                                 answer = raw_answer  # Return the whole dict if no match
 
                         if answer is None:
+                            # `tan(90°)` : sin/cos ont une valeur, tan n'en a pas.
+                            # L'outil le dit (`tan_undefined`) — on ne comble pas.
+                            if raw_answer.get("tan_undefined"):
+                                raise UnsupportedTaskError(
+                                    f"MATH_DOMAIN_ERROR: tool "
+                                    f"'{detection.get('tool_name')}' rejected "
+                                    f"expression={task.description[:120]!r}: "
+                                    f"{raw_answer.get('note') or 'tan undefined'}"
+                                )
                             raise UnsupportedTaskError(
                                 f"NO_ANSWER: tool '{detection.get('tool_name')}' returned "
                                 f"no usable value (keys={sorted(raw_answer)})"
                             )
+                        # Traçabilité de l'expression : demandée, outil retenu,
+                        # paramètres normalisés, résultat, unité.
+                        if math_call is not None:
+                            self._emit_trace(
+                                "MathExpressionRule",
+                                {"expression": task.description,
+                                 "tool": detection.get("tool_name")},
+                                {"parameters": dict(tool_kwargs),
+                                 "unit": math_call.unit,
+                                 "answer": answer,
+                                 "verdict": "answered"},
+                            )
                         return answer
+                    if isinstance(raw_answer, dict) is False and isinstance(tool_result, dict) \
+                            and tool_result.get("valid") is False:
+                        # Le worker a refusé (outil inconnu, mauvais paramètre) :
+                        # c'est un échec explicite, pas une absence de réponse.
+                        raise UnsupportedTaskError(
+                            f"NO_ANSWER: tool worker refused "
+                            f"expression={task.description[:120]!r}: "
+                            f"{tool_result.get('error') or 'unknown reason'}"
+                        )
                     return raw_answer
         except UnsupportedTaskError:
             raise

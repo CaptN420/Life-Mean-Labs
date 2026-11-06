@@ -108,11 +108,47 @@ def quadratic(a, b, c) -> Dict[str, Any]:
     return {"valid": True, "real": False, "x1": f"{rp:.4f}+{ip:.4f}i", "x2": f"{rp:.4f}-{ip:.4f}i", "discriminant": round(d, 6)}
 
 
-def trig(sine=None, cosine=None, angle_deg=None) -> Dict[str, Any]:
-    if angle_deg is not None:
-        r = math.radians(angle_deg)
-        t = "inf" if abs(math.cos(angle_deg)) < 1e-12 else round(math.tan(r), 6)
-        return {"valid": True, "sin": round(math.sin(r), 6), "cos": round(math.cos(r), 6), "tan": t}
+def trig(sine=None, cosine=None, angle_deg=None, angle_rad=None) -> Dict[str, Any]:
+    """sin/cos/tan d'un angle, en degrés OU en radians — jamais implicitement.
+
+    `angle_deg` et `angle_rad` sont deux entrées distinctes : rien ne devine
+    l'unité. `tan` est indéfini quand cos = 0 (90° + k·180°) et le dit, au lieu
+    de renvoyer une valeur astronomique issue d'un cos calculé dans la mauvaise
+    unité.
+    """
+    if angle_deg is not None and angle_rad is not None:
+        return {"valid": False, "error": "give angle_deg or angle_rad, not both"}
+    if angle_deg is not None or angle_rad is not None:
+        if angle_deg is not None:
+            r = math.radians(angle_deg)
+            unit = "degrees"
+            original = angle_deg
+        else:
+            r = float(angle_rad)
+            unit = "radians"
+            original = angle_rad
+        cos_r = math.cos(r)
+        if abs(cos_r) < 1e-12:
+            # sin et cos restent valides ici : seul tan est indéfini. Refuser tout
+            # le tableau rendait `sin(90 degrees)` — parfaitement calculable —
+            # impossible. `tan: None` est explicite, jamais approximé.
+            return {
+                "valid": True,
+                "unit": unit,
+                "angle": original,
+                "sin": round(math.sin(r), 6),
+                "cos": round(cos_r, 12),
+                "tan": None,
+                "tan_undefined": True,
+                "note": f"tan is undefined at {original} {unit} (cos = 0)",
+            }
+        return {
+            "valid": True,
+            "unit": unit,
+            "sin": round(math.sin(r), 6),
+            "cos": round(cos_r, 6),
+            "tan": round(math.tan(r), 6),
+        }
     if sine is not None:
         a = math.degrees(math.asin(min(1, max(-1, sine))))
         return {"valid": True, "sin": sine, "angle_deg": round(a, 4)}
@@ -123,6 +159,17 @@ def trig(sine=None, cosine=None, angle_deg=None) -> Dict[str, Any]:
 
 
 def log_(value=1, base=10) -> Dict[str, Any]:
+    """Logarithme d'une valeur STRICTEMENT positive dans une base donnée.
+
+    Base : le défaut de l'outil est **10** (compatibilité des appels directs).
+    Les tâches passent ``base`` explicitement, et ``library.tools.math_expressions``
+    documente la convention : ``ln(x)`` et ``log(x)`` = naturel (base e),
+    ``log10(x)`` = base 10, ``log(x, b)`` = base b. Aucun appel ne laisse
+    l'unité implicite.
+
+    Domaine : ``value`` doit être > 0 et ``base`` > 0 et ≠ 1 ; sinon l'outil
+    renvoie ``valid: False`` avec la raison — il n'invente jamais un résultat.
+    """
     if value <= 0:
         return {"valid": False, "error": "value>0"}
     if base <= 0 or base == 1:
@@ -222,7 +269,7 @@ MATH_TOOLS: Dict[str, Dict[str, Any]] = {
     "distance": {"fn": distance, "desc": "Euclidean 2D"},
     "midpoint": {"fn": midpoint, "desc": "Midpoint"},
     "quadratic": {"fn": quadratic, "desc": "ax^2+bx+c=0 roots"},
-    "trig": {"fn": trig, "desc": "sin/cos/tan table"},
+    "trig": {"fn": trig, "desc": "sin/cos/tan (angle_deg or angle_rad, explicit)"},
     "log": {"fn": log_, "desc": "Logarithm"},
     "sqrt": {"fn": sqrt_, "desc": "Square root"},
     "exp": {"fn": exp_, "desc": "Exponential"},

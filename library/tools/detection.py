@@ -104,6 +104,15 @@ TOOL_DETECTION: Dict[str, List[Dict[str, Any]]] = {
     "logarithm": [{"tool": "math_log", "param": "value", "score": 20}],
     "square root": [{"tool": "math_sqrt", "param": "x", "score": 20}],
     "sqrt": [{"tool": "math_sqrt", "param": "x", "score": 18}],
+    # `log10`/`ln` doivent battre `log` (score supérieur) : ce sont des bases
+    # différentes, et la base n'est jamais devinée en aval.
+    "log10": [{"tool": "math_log", "param": "value", "score": 24}],
+    "log2": [{"tool": "math_log", "param": "value", "score": 24}],
+    "ln": [{"tool": "math_log", "param": "value", "score": 22}],
+    "exponential": [{"tool": "math_exp", "param": "x", "score": 20}],
+    "exp": [{"tool": "math_exp", "param": "x", "score": 20}],
+    "power": [{"tool": "math_pow", "param": "base", "score": 18}],
+    "pow": [{"tool": "math_pow", "param": "base", "score": 18}],
 
     # ── Physics ──
     "force": [{"tool": "physics_force", "param": "mass", "score": 12}],
@@ -155,6 +164,8 @@ DOMAIN_MAP: Dict[str, str] = {
     "trig": "math", "logarithm": "math", "bayes": "math",
     "gcd": "math", "lcm": "math", "factorial": "math", "prime": "math", "fibonacci": "math",
     "sin": "math", "cos": "math", "tan": "math", "log": "math",
+    "log10": "math", "log2": "math", "ln": "math",
+    "exp": "math", "exponential": "math", "pow": "math", "power": "math",
     "sqrt": "math", "square root": "math",
     "integrate": "math", "taylor": "math", "limit": "math",
     # Physics

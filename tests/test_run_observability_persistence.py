@@ -173,5 +173,10 @@ def test_live_manifest_carries_the_deterministic_traces(monkeypatch, tmp_path):
     manifest = ui.export_experiment_manifest("exp_obs")
     assert manifest["events"]
     assert manifest["traces"], "RoutingRule/ValidationRule traces must be recorded"
-    assert {t["rule_name"] for t in manifest["traces"]} == {"RoutingRule", "ValidationRule"}
+    # Les deux règles structurantes doivent être là. `MathExpressionRule`
+    # s'ajoute pour les tâches mathématiques (expression, paramètres, verdict) :
+    # la comparaison est donc un sous-ensemble exigé, pas une égalité stricte.
+    rules = {t["rule_name"] for t in manifest["traces"]}
+    assert {"RoutingRule", "ValidationRule"} <= rules
+    assert rules <= {"RoutingRule", "ValidationRule", "MathExpressionRule"}
     assert manifest["traces_absent_reason"] is None

@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 803 passed** sur `tests/` seul (après P15) |
+| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 864 passed** sur `tests/` seul (après P16) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -490,6 +490,46 @@ permissif — l'écart est le faux positif retiré), **1 161 exécutions runtime
 non appariables (`math_gcd` 169, `math_fibonacci` 129, `math_factorial` 91…) restent listés dans
 `unmapped_entities` : ce sont des fonctions, pas des classes du pool — le dire vaut mieux que les
 rattacher de force.
+
+### 4septiesdecies. Outils mathématiques : analyse exacte, refus explicites (P16)
+
+Mission dédiée (rapport d'audit) : `sin(144 degrees)` et `log(28)` doivent produire un nombre,
+toute opération non prise en charge doit échouer explicitement.
+
+État à l'ouverture : `sin`/`cos`/`tan`/`log`/`sqrt` étaient détectés et `log` recevait déjà `base=e`.
+**Trois défauts réels trouvés en exécutant, pas en relisant** :
+
+| Cas | Avant | Après |
+|---|---|---|
+| `sqrt(-1)` | **réponse 1.0** (le `re.findall(r"\d+")` perdait le signe) | `MATH_DOMAIN_ERROR`, aucun nombre |
+| `tan(90 degrees)` | `1.633e16` (cos calculé en degrés, `tan: "inf"`) | `tan: None` + `tan_undefined`, `MATH_DOMAIN_ERROR` |
+| `2^8` | `answer None` sans erreur (worker re-détectait, aucun mot-clé) | `256.0`, via `tool_name` transmis |
+
+Nouveau module `library/tools/math_expressions.py` : grammaire **fermée**, sans `eval` ni LLM —
+`nom(args)` et `a^b` sur littéraux, `pi`, `e`. Il dit quoi appeler **et** avec quoi (arité, unité,
+base), ce que la détection par mots-clés ne savait pas faire. Unités explicites : `degrees`/`deg`/`°`,
+`radians`/`rad`, et un littéral en π sans unité vaut des radians (`sin(pi/2)`), jamais des degrés.
+Bases documentées : `ln(x)` = `log(x)` = naturel, `log10(x)` = 10, `log2(x)` = 2, `log(x, b)` = b.
+
+Ajouts d'outils/détection : `exp`, `pow`, `ln`, `log10`, `log2` (scores > `log` pour que la base ne soit
+pas devinée en aval) ; `trig` accepte `angle_rad` à côté de `angle_deg` et refuse les deux à la fois.
+
+Refus structurés conservant l'expression : `UNSUPPORTED_MATH_OPERATION` (opération inconnue, arité
+fausse, argument non littéral, expression incomplète) et `MATH_DOMAIN_ERROR` (verdict de l'outil :
+`sqrt(-1)`, `log(0)`, `log(-5)`, `tan(90°)`). Un dict d'erreur ne peut plus devenir une « réponse » —
+`ln(0)` renvoyait `{'valid': False, 'error': 'value>0'}` dans `answer`.
+
+Traçabilité : nouvelle règle `MathExpressionRule` (expression demandée, outil retenu, paramètres
+normalisés, unité, verdict, raison). Vérifiée en exécution réelle via le contrôleur :
+
+```
+expr: Calculate sin(144 degrees) | tool: math_trig | params: {'angle_deg': 144.0} | answer: 0.587785
+expr: Calculate log(28)          | tool: math_log  | params: {'value': 28.0, 'base': 2.718…} | answer: 3.332205
+```
+
+61 tests dédiés (`tests/test_math_expressions.py`) : analyse, unités, bases, domaines invalides,
+entrées malformées, opérations inconnues, traçabilité, non-régression `gcd`/`lcm`/`factorial`/
+`fibonacci`/`is_prime`.
 
 ## 2. Sondes HTTP réelles (serveur démarré)
 
