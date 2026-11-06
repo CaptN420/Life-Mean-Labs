@@ -719,6 +719,25 @@ class ExperimentUIController:
 
                 runner.trace_sink = _trace_sink
 
+            # Journal d'usage runtime : une ligne par worker/outil réellement
+            # exécuté, pour que l'observation ne dépende plus des logs ingérés.
+            try:
+                from experiments.usage_recorder import FeatureUsageRecorder
+                _usage = FeatureUsageRecorder()
+
+                def _usage_sink(item: Dict[str, Any], _usage=_usage,
+                                _exp=experiment_id) -> None:
+                    _usage.record(
+                        str(item.get("kind", "")), str(item.get("name", "")),
+                        experiment_id=_exp,
+                        task_id=str((item.get("extra") or {}).get("task_id", "")),
+                        ok=item.get("ok"),
+                    )
+
+                runner.usage_sink = _usage_sink
+            except Exception as exc:  # noqa: BLE001 - recording is best-effort, and said so
+                logger.warning("usage recorder unavailable for %s: %s", experiment_id, exc)
+
             # Create experiment context
             context = ExperimentContext(
                 experiment_id=experiment_id,

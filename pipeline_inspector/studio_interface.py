@@ -174,7 +174,18 @@ class PipelineInspector:
             _ET.TEST_RESULT.value,
         ]
         events, coverage = self._stratified_events(types, per_group=300, max_groups=60)
-        payload = self.bridge.usage(events)
+
+        # Journal d'usage runtime : preuve directe de ce qui a tourné (les logs
+        # ingérés ne contiennent que ce que l'ingestion a bien voulu garder).
+        runtime_records: List[Dict[str, Any]] = []
+        try:
+            from experiments.usage_recorder import FeatureUsageRecorder
+            runtime_records = FeatureUsageRecorder().read(limit=50000)
+        except Exception as exc:  # noqa: BLE001 - l'absence de journal n'est pas une panne
+            coverage["runtime_journal_error"] = f"{type(exc).__name__}: {exc}"
+        coverage["runtime_records"] = len(runtime_records)
+
+        payload = self.bridge.usage(events, runtime_records=runtime_records)
         payload['sample'] = self._sample(events, 35000)
         payload['coverage'] = coverage
         return payload

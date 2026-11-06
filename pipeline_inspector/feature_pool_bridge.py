@@ -80,13 +80,22 @@ class FeaturePoolBridge:
         key = normalize_name(entity)
         if key in self._index:
             return self._index[key]
-        # tolérance : suffixe/prefixe évident (worker/agent)
+        # Tolérance : suffixe/préfixe évident (worker/agent). Les DEUX côtés
+        # doivent être assez longs : sans le garde sur `candidate_key`, une
+        # fonctionnalité nommée « C » (ou tout nom court) était retournée pour
+        # n'importe quelle entité la contenant — `math_gcd` comptait comme usage
+        # de la feature « C ».
         for candidate_key, fid in self._index.items():
-            if len(key) >= 6 and (key in candidate_key or candidate_key in key):
+            if (len(key) >= 6 and len(candidate_key) >= 6
+                    and (key in candidate_key or candidate_key in key)):
                 return fid
         return None
 
-    def usage(self, events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    def usage(
+        self,
+        events: Iterable[Dict[str, Any]],
+        runtime_records: Optional[Iterable[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
         per_feature: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
             "events": 0, "ok": 0, "fail": 0,
             "first_seen": None, "last_seen": None,
@@ -124,6 +133,37 @@ class FeaturePoolBridge:
                     if b["last_seen"] is None or ts > b["last_seen"]:
                         b["last_seen"] = ts
 
+        # ── usage runtime (journal d'exécution) ──────────────────────────
+        # Une ligne = un composant qui a réellement tourné. C'est une preuve
+        # d'usage plus directe que la relecture de logs, et elle ne dépend pas
+        # de ce que l'ingestion a conservé.
+        runtime_count = 0
+        runtime_ok = 0
+        runtime_fail = 0
+        for rec in runtime_records or []:
+            runtime_count += 1
+            name = str(rec.get("name") or "")
+            fid = self.map_entity(name) if name else None
+            if not fid:
+                unmapped[f"runtime:{name}"] += 1
+                continue
+            b = per_feature[fid]
+            b["events"] += 1  # une exécution compte comme un événement d'usage
+            b["observed_via"].add("runtime")
+            b["event_types"].add("RUNTIME_USAGE")
+            if rec.get("ok") is True:
+                b["ok"] += 1
+                runtime_ok += 1
+            elif rec.get("ok") is False:
+                b["fail"] += 1
+                runtime_fail += 1
+            ts = rec.get("timestamp")
+            if ts is not None:
+                if b["first_seen"] is None or ts < b["first_seen"]:
+                    b["first_seen"] = ts
+                if b["last_seen"] is None or ts > b["last_seen"]:
+                    b["last_seen"] = ts
+
         rows = []
         for fid, b in per_feature.items():
             feat = self._features.get(fid, {})
@@ -151,6 +191,18 @@ class FeaturePoolBridge:
             "features_observed": len(rows),
             "features_not_observed": max(0, len(self._features) - len(rows)),
             "total_events_scanned": total_events,
+            "usage_sources": {
+                "logs": {
+                    "events_scanned": total_events,
+                    "features_observed": sum(1 for b in per_feature.values() if "agent" in b["observed_via"] or "tool" in b["observed_via"] or "role" in b["observed_via"]),
+                },
+                "runtime": {
+                    "records": runtime_count,
+                    "ok": runtime_ok,
+                    "fail": runtime_fail,
+                    "features_observed": sum(1 for b in per_feature.values() if "runtime" in b["observed_via"]),
+                },
+            },
             "rows": rows[:300],
             "unmapped_entities": sorted(
                 [{"entity": k, "events": v} for k, v in unmapped.items()],

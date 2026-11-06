@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 787 passed** sur `tests/` seul (après P11) |
+| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 797 passed** sur `tests/` seul (après P13) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -420,6 +420,31 @@ onglet Pipeline  -> « 14 observées / 989 chargées — 4500 événements répa
 
 Les 4 blocs `<script>` du dashboard passent `node --check` après modification (un `const` dupliqué
 neutralise tout un bloc : c'est vérifié, pas supposé).
+
+### 4quaterdecies. Journal d'usage runtime + faux positif d'appariement (P13)
+
+Le compte « usage observé » dépendait entièrement de ce que l'ingestion de logs avait conservé. Nouveau
+journal d'exécution : `experiments/usage_recorder.py` écrit **une ligne par composant réellement
+exécuté** (`data/usage/feature_usage.jsonl`, append-only, `experiment_id` + `task_id` + horodatage), et
+le pont Feature Pool fusionne deux sources déclarées séparément :
+
+```
+usage_sources: {"logs": {...}, "runtime": {"records": 22, "features_observed": 1}}
+```
+
+Relevé réel sur un run de 3 tâches : 6 lignes = `ToolWorker` + l'outil **réellement détecté**
+(`math_is_prime`, `math_trig`, …). Une première version enregistrait les cinq outils de la famille du
+routeur — corrigée : l'émission se fait là où `detect_tool()` répond, pas après coup.
+
+**Faux positif trouvé pendant la mesure** : `math_gcd` comptait comme un usage de la fonctionnalité
+« C ». Le matcher de secours faisait `candidate_key in key` sans garde de longueur sur
+`candidate_key`, donc toute feature au nom court (une lettre, un acronyme) absorbait les entités qui la
+contenaient. Corrigé (les deux côtés doivent faire ≥ 6 caractères). Effet mesuré sur la base locale :
+**14 → 13** fonctionnalités observées — le quatorzième était ce faux positif.
+
+Mesures après correction, base locale : `CriticAgent 442`, `ToolWorker 311` (300 logs + 11 runtime),
+`SyntaxWorker 300`, `BugWorker 300`. Conteneur (base réduite à 18 k événements) : 2 observées dont
+`ToolWorker` via `runtime` sur 8 exécutions réelles.
 
 ## 2. Sondes HTTP réelles (serveur démarré)
 

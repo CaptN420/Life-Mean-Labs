@@ -119,6 +119,20 @@ class ExperimentRunner:
         # advertised an empty "traces" section. The sink is optional so the
         # runner stays usable standalone.
         self.trace_sink: Optional[Callable[[Dict[str, Any]], None]] = None
+        # Optional runtime usage recorder: proves WHAT executed, instead of
+        # inferring it later from ingested logs.
+        self.usage_sink: Optional[Callable[[Dict[str, Any]], None]] = None
+
+    def _emit_usage(self, kind: str, name: str, ok: Optional[bool] = None,
+                    extra: Optional[Dict[str, Any]] = None) -> None:
+        """Publish one executed component. Never breaks the run."""
+        sink = self.usage_sink
+        if sink is None or not name:
+            return
+        try:
+            sink({"kind": kind, "name": name, "ok": ok, "extra": extra or {}})
+        except Exception as exc:  # noqa: BLE001 - telemetry must not fail a task
+            logger.warning("usage sink failed for %s:%s: %s", kind, name, exc)
 
     def _emit_trace(self, rule: str, before: Dict[str, Any], after: Dict[str, Any],
                     agent_id: str = "") -> None:
@@ -447,6 +461,12 @@ class ExperimentRunner:
 
         # Auto-detect tool and extract parameters from task description
         detection = detect_tool(task.description)
+        if detection:
+            # Enregistré ici, pas après coup : c'est le SEUL outil réellement
+            # sélectionné (les listes de famille du routeur en annoncent cinq).
+            self._emit_usage("worker", "ToolWorker", extra={"task_id": task.task_id})
+            self._emit_usage("tool", str(detection.get("tool_name") or ""),
+                             extra={"task_id": task.task_id, "domain": task.domain})
         if not detection:
             raise UnsupportedTaskError(
                 f"UNSUPPORTED_TASK: no deterministic tool matches "

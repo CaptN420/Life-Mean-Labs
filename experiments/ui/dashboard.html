@@ -5755,7 +5755,8 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                         `${f.features_observed || 0} observées / ${f.features_loaded || 0} chargées` +
                         ` — ${cov.window || 'échantillon non déclaré'}` +
                         (cov.truncated ? ' (tronqué)' : '') +
-                        ` — ${cov.events_in_sampled_populations || 0} événements dans ces populations`;
+                        ` — ${cov.events_in_sampled_populations || 0} événements dans ces populations` +
+                        ` — ${cov.runtime_records || 0} exécutions réelles (journal runtime)`;
                 }
                 const tbody = document.querySelector('#pi-features-table tbody');
                 const rows = (f.rows || []).slice(0, 60);
