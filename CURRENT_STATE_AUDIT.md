@@ -446,6 +446,27 @@ Mesures après correction, base locale : `CriticAgent 442`, `ToolWorker 311` (30
 `SyntaxWorker 300`, `BugWorker 300`. Conteneur (base réduite à 18 k événements) : 2 observées dont
 `ToolWorker` via `runtime` sur 8 exécutions réelles.
 
+### 4quindecies. Onglet « Traces » — les décisions deviennent consultables (P14)
+
+Les traces `RoutingRule`/`ValidationRule` existaient dans l'API mais n'étaient lisibles qu'en JSON. Nouvel
+onglet **Traces** : sélection d'un run, filtre par règle (Toutes / Routing / Validation), table
+`heure · règle · tâche · entrée · sortie`, et une ligne de contexte qui dit d'où vient la donnée
+(« run rehydraté depuis le résumé persisté — 4/4 traces conservées », ou la raison quand il n'y en a pas).
+
+Vérifié au navigateur contre le conteneur (`:8080`) :
+
+```
+options   : exp_40f9b76b — COMPLETED (2 tâches), exp_bd923aee, exp_97f1c8e1, exp_3e1ae21c, exp_d58c53de…
+sélection : exp_40f9b76b
+note      : « run rehydraté depuis le résumé persisté — 4/4 traces conservées »
+compteur  : 4 / 4 traces   → filtre ValidationRule : 2 / 4 traces
+lignes    : ValidationRule task_d72593db  {answer 6, ground_truth 6}  -> {method deterministic, valid true}
+            RoutingRule    task_d72593db  {domain math, difficulty 1} -> {selected [math_validation_worker, …]}
+```
+
+Les 4 blocs `<script>` passent `node --check` ; `tests/test_dashboard_ui.py` + `test_dashboard_security.py` :
+49 passed.
+
 ## 2. Sondes HTTP réelles (serveur démarré)
 
 | Route | Code | Charge utile |

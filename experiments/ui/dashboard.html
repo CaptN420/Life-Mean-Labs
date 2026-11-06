@@ -667,6 +667,7 @@
             <button class="tab-btn" data-tab="packages" onclick="switchTab('packages', this)">Packages</button>
             <button class="tab-btn" data-tab="training" onclick="switchTab('training', this)">Training &amp; Models</button>
             <button class="tab-btn" data-tab="system" onclick="switchTab('system', this)">Système</button>
+            <button class="tab-btn" data-tab="traces" onclick="switchTab('traces', this)">Traces</button>
         </nav>
 
         <!-- ── Autopilot tab — the REAL experiment workflow (GOAL 7/8) ── -->
@@ -1679,6 +1680,35 @@
         </div>
     </div>
 
+    <!-- ── Traces déterministes : RoutingRule / ValidationRule d'un run ── -->
+    <div id="panel-traces" class="tab-panel">
+        <div class="card">
+            <h2>Traces déterministes</h2>
+            <p class="subtitle" style="font-size:.78rem;">
+                Chaque tâche produit deux décisions tracées : <code>RoutingRule</code> (domaine,
+                difficulté → workers et outils retenus) et <code>ValidationRule</code>
+                (réponse + vérité terrain → verdict). Un run sans trace n'a pas exécuté le pipeline
+                déterministe — c'est alors affiché comme tel.
+            </p>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.6rem 0;">
+                <select id="tr-run" style="min-width:300px;padding:.35rem;" onchange="trFetch()">
+                    <option value="">Chargement…</option>
+                </select>
+                <button class="tab-btn active" data-rule="all" onclick="trSetRule('all', this)">Toutes</button>
+                <button class="tab-btn" data-rule="RoutingRule" onclick="trSetRule('RoutingRule', this)">Routing</button>
+                <button class="tab-btn" data-rule="ValidationRule" onclick="trSetRule('ValidationRule', this)">Validation</button>
+                <span id="tr-count" class="subtitle" style="font-size:.78rem;"></span>
+            </div>
+            <div id="tr-note" class="subtitle" style="font-size:.78rem;margin-bottom:.4rem;"></div>
+            <div style="max-height:430px;overflow:auto;">
+                <table class="pi-table" id="tr-table">
+                    <thead><tr><th>Heure</th><th>Règle</th><th>Tâche</th><th>Entrée</th><th>Sortie</th></tr></thead>
+                    <tbody><tr><td colspan="5" class="empty-state">Aucune trace chargée.</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- ── Système : télémétrie réelle de l'hôte (Defender, journal d'événements) ── -->
     <div id="panel-system" class="tab-panel">
         <div class="card">
@@ -1836,6 +1866,7 @@
             if (name === 'agent-builder') { loadAgents(); }
             if (name === 'experiments') switchToManagedExperiments();
             if (name === 'system') sysLoad();
+            if (name === 'traces') trLoad();
         }
 
         // ── Cluster Tree ── experiments by subject + run-directory explorer ──
@@ -5467,6 +5498,99 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
             if (corr === 'explicit') return '<span class="pi-badge ok">explicite</span>';
             if (corr === 'probable') return '<span class="pi-badge warn">probable</span>';
             return '<span class="pi-badge">inconnue</span>';
+        }
+
+        // ── Traces déterministes ───────────────────────────────────────────
+        let TR_TRACES = [];
+        let TR_RULE = 'all';
+
+        async function trLoad() {
+            const sel = document.getElementById('tr-run');
+            if (!sel) return;
+            try {
+                const resp = await fetch(`${API_BASE}/experiments`);
+                const data = await resp.json();
+                const runs = Object.entries(data.experiments || {})
+                    .sort((a, b) => (b[1].start_time || 0) - (a[1].start_time || 0));
+                if (!runs.length) {
+                    sel.innerHTML = '<option value="">Aucun run disponible</option>';
+                    trRender([], 'Aucun run enregistré.');
+                    return;
+                }
+                const current = sel.value;
+                sel.innerHTML = runs.map(([id, st]) =>
+                    `<option value="${piEsc(id)}">${piEsc(id)} — ${piEsc(st.status || '?')}` +
+                    ` (${piEsc(st.tasks_completed ?? 0)} tâches)</option>`).join('');
+                if (current && runs.some(([id]) => id === current)) sel.value = current;
+                trFetch();
+            } catch (err) {
+                trRender([], 'Erreur de chargement: ' + err.message);
+            }
+        }
+
+        async function trFetch() {
+            const sel = document.getElementById('tr-run');
+            const id = sel ? sel.value : '';
+            if (!id) { trRender([], 'Sélectionne un run.'); return; }
+            try {
+                const resp = await fetch(`${API_BASE}/experiments/${encodeURIComponent(id)}/manifest`);
+                const d = await resp.json();
+                if (!resp.ok) throw new Error(d.error || ('HTTP ' + resp.status));
+                TR_TRACES = d.traces || [];
+                const note = document.getElementById('tr-note');
+                if (note) {
+                    const parts = [];
+                    if (d.rehydrated) parts.push('run rehydraté depuis le résumé persisté');
+                    const tot = (d.restored_totals || {}).traces;
+                    if (typeof tot === 'number' && d.traces) {
+                        parts.push(`${(d.traces || []).length}/${tot} traces conservées`);
+                    }
+                    if (d.traces_absent_reason) parts.push(d.traces_absent_reason);
+                    note.textContent = parts.join(' — ');
+                }
+                trRender(TR_TRACES, 'Aucune trace pour ce run.');
+            } catch (err) {
+                trRender([], 'Erreur: ' + err.message);
+            }
+        }
+
+        function trSetRule(rule, btn) {
+            TR_RULE = rule;
+            document.querySelectorAll('#panel-traces [data-rule]').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            trRender(TR_TRACES, 'Aucune trace pour ce run.');
+        }
+
+        function trRender(traces, emptyMsg) {
+            const tbody = document.querySelector('#tr-table tbody');
+            const counter = document.getElementById('tr-count');
+            if (!tbody) return;
+            const all = traces || [];
+            const shown = TR_RULE === 'all' ? all : all.filter(t => t.rule_name === TR_RULE);
+            if (counter) {
+                counter.textContent = `${shown.length} / ${all.length} traces` +
+                    (TR_RULE === 'all' ? '' : ` (règle ${TR_RULE})`);
+            }
+            if (!shown.length) {
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${piEsc(emptyMsg || 'Aucune trace.')}</td></tr>`;
+                return;
+            }
+            const short = (obj) => {
+                if (!obj || typeof obj !== 'object') return piEsc(String(obj));
+                const st = obj.state !== undefined ? obj.state : obj;
+                return piEsc(JSON.stringify(st)).slice(0, 220);
+            };
+            tbody.innerHTML = shown.slice(-200).reverse().map(t => {
+                const st = (t.input_snapshot || {}).state || {};
+                const ts = t.timestamp ? new Date(t.timestamp * 1000).toLocaleTimeString() : '';
+                return `<tr>
+                    <td>${piEsc(ts)}</td>
+                    <td><span class="pi-badge">${piEsc(t.rule_name)}</span></td>
+                    <td>${piEsc(st.task_id || '')}</td>
+                    <td style="font-family:monospace;font-size:.72rem;">${short(t.input_snapshot)}</td>
+                    <td style="font-family:monospace;font-size:.72rem;">${short(t.output_snapshot)}</td>
+                </tr>`;
+            }).join('');
         }
 
         // ── Système : télémétrie réelle de l'hôte ──────────────────────────
