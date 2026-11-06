@@ -79,6 +79,7 @@ class MathCall:
     """Résultat d'analyse : soit un appel d'outil prêt, soit une erreur motivée."""
 
     expression: str
+    operation: Optional[str] = None
     tool_name: Optional[str] = None
     kwargs: Optional[Dict[str, Any]] = None
     param_key: str = ""
@@ -94,6 +95,7 @@ class MathCall:
         """Traçabilité : ce qui a été demandé, reconnu, et retenu."""
         return {
             "expression": self.expression,
+            "operation": self.operation,
             "tool": self.tool_name,
             "parameters": dict(self.kwargs or {}),
             "unit": self.unit,
@@ -135,7 +137,7 @@ def _literal(token: str) -> Tuple[Optional[float], bool]:
     return None, False
 
 
-def _parse_angle_arg(raw: str, expression: str) -> MathCall:
+def _parse_angle_arg(raw: str, expression: str, name: str = "") -> MathCall:
     text = raw.strip()
     unit_match = re.search(_UNIT + r"\s*$", text, re.IGNORECASE)
     unit_token = ""
@@ -161,8 +163,8 @@ def _parse_angle_arg(raw: str, expression: str) -> MathCall:
         unit = "degrees"  # convention du générateur : "sin(144 degrees)"
 
     key = "angle_rad" if unit == "radians" else "angle_deg"
-    return MathCall(expression=expression, tool_name="trig", kwargs={key: value},
-                    param_key=key, unit=unit)
+    return MathCall(expression=expression, operation=name, tool_name="trig",
+                    kwargs={key: value}, param_key=key, unit=unit)
 
 
 def _parse_args(args_raw: str, spec: Dict[str, Any], expression: str,
@@ -187,7 +189,7 @@ def _parse_args(args_raw: str, spec: Dict[str, Any], expression: str,
             return MathCall(expression=expression,
                             error=f"{name} takes exactly one angle",
                             error_code=UNSUPPORTED_MATH_OPERATION)
-        return _parse_angle_arg(parts[0], expression)
+        return _parse_angle_arg(parts[0], expression, name)
 
     values: List[float] = []
     for part in parts:
@@ -207,14 +209,15 @@ def _parse_args(args_raw: str, spec: Dict[str, Any], expression: str,
         base = float(spec["base"])
         if len(values) == 2:
             base = values[1]
-        return MathCall(expression=expression, tool_name="log",
+        return MathCall(expression=expression, operation=name, tool_name="log",
                         kwargs={"value": values[0], "base": base},
                         param_key="value")
     if kind == "value":
-        return MathCall(expression=expression, tool_name=str(spec["tool"]),
+        return MathCall(expression=expression, operation=name,
+                        tool_name=str(spec["tool"]),
                         kwargs={"x": values[0]}, param_key="x")
     if kind == "power":
-        return MathCall(expression=expression, tool_name="pow",
+        return MathCall(expression=expression, operation=name, tool_name="pow",
                         kwargs={"base": values[0], "exponent": values[1]},
                         param_key="base")
     return MathCall(expression=expression,
@@ -258,7 +261,7 @@ def parse_math_task(description: str) -> Optional[MathCall]:
             return MathCall(expression=expression,
                             error="power operands must be numeric literals",
                             error_code=UNSUPPORTED_MATH_OPERATION)
-        return MathCall(expression=expression, tool_name="pow",
+        return MathCall(expression=expression, operation="pow", tool_name="pow",
                         kwargs={"base": left, "exponent": right},
                         param_key="base")
 

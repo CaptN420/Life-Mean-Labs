@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 864 passed** sur `tests/` seul (après P16) |
+| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 876 passed** sur `tests/` seul (après P17) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -530,6 +530,46 @@ expr: Calculate log(28)          | tool: math_log  | params: {'value': 28.0, 'ba
 61 tests dédiés (`tests/test_math_expressions.py`) : analyse, unités, bases, domaines invalides,
 entrées malformées, opérations inconnues, traçabilité, non-régression `gcd`/`lcm`/`factorial`/
 `fibonacci`/`is_prime`.
+
+### 4octodecies. Branchement complet : générateur, outils, run, dashboard (P17)
+
+Un outil supporté ne vaut que si une tâche peut l'atteindre. Le générateur n'émettait que `sin` et
+`log` ; `cos`, `tan`, `ln`, `log10`, `sqrt`, `exp`, `pow` étaient routables mais jamais produits.
+
+Générateur (`experiments/generation/task_generator.py`) : 11 familles émises, avec des domaines
+garantis — `tan` tiré hors des singularités (`_TAN_SAFE_ANGLES` exclut 90° + k·180°), logs sur des
+valeurs > 1, `sqrt` ≥ 0, `exp` sur 0..6, `pow` sous les deux formes `2^8` et `pow(2, 8)`.
+
+**Vérité terrain calculée par le même outil que la réponse** : `_compute_math_ground_truth` appelle
+`parse_math_task` + `MATH_TOOLS[...]`. Une divergence de convention (base du log, unité d'angle)
+devient impossible par construction au lieu d'être rattrapée après coup.
+
+Piège corrigé en route : `reasoning_type="calculation"` (le défaut) avait été branché sur la
+trigonométrie, ce qui transformait **toutes** les tâches mathématiques en sinus (mesuré : 300 tâches,
+3 familles). Corrigé — `calculation` reste varié, seuls `trig`/`trigonometry` forcent le trio.
+
+Mesure réelle (8 seeds × 80 tâches = 640 tâches, exécution complète par `ExperimentRunner`) :
+**640 tâches, 0 échec**, toutes les familles exercées (`tan` 50, `sin` 50, `log` 46, `exp` 45,
+`pow` 44, `ln` 43, `sqrt` 42, `log10` 37, `cos` 35, plus `gcd`/`lcm`/`factorial`/`is_prime`/`fibonacci`).
+
+Dashboard : `ExperimentState.error_codes()` agrège les erreurs par code machine
+(`MATH_DOMAIN_ERROR`, `UNSUPPORTED_MATH_OPERATION`…), exposé en `error_count` / `error_codes` et affiché
+sur la carte du run (`Erreurs: 3 [MATH_DOMAIN_ERROR×3]`). Une erreur non reconnue est classée
+`UNCLASSIFIED`, jamais inventée.
+
+9 tests dédiés (`tests/test_math_end_to_end.py`) ; 2 tests existants ajustés (jeux de règles de traces)
+pour admettre `MathExpressionRule` sans relâcher l'exigence sur les deux règles structurantes.
+
+
+**Complément `/manifest`** : le bloc `progress` n'exposait que `tasks_completed` — un run terminé annonçait
+24/24 sans dire s'il était bon. Il porte maintenant `tasks_valid`, `tasks_invalid`, `pass_rate`
+(`None` tant que rien n'est validé, jamais 0 trompeur). Mesuré dans le conteneur après rebuild :
+
+```
+progress: {status: COMPLETED, tasks_completed: 18, tasks_valid: 18, tasks_invalid: 0, pass_rate: 1.0}
+carte   : {status: COMPLETED, tasks_valid: 18, pass_rate: 1.0, error_count: 0, error_codes: {}}
+familles: cos, log, log10, pow, sin, sqrt, tan, exp, ln
+```
 
 ## 2. Sondes HTTP réelles (serveur démarré)
 

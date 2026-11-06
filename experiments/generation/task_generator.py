@@ -6,9 +6,14 @@ with deterministic ground truth computation.
 
 from __future__ import annotations
 
+import math
 import random
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
+
+# Angles (en degrés) où tan est défini : on exclut 90° + k·180° pour ne jamais
+# générer une tâche sans réponse dans le domaine réel.
+_TAN_SAFE_ANGLES = [a for a in range(0, 360, 5) if abs(math.cos(math.radians(a))) > 1e-6]
 
 
 class TaskGenerator:
@@ -187,13 +192,26 @@ class TaskGenerator:
             ("factorial", lambda: f"Calculate the factorial of {self._rng.randint(1, 10)}"),
             ("is_prime", lambda: f"Check if {self._rng.randint(2, 100)} is prime"),
             ("fibonacci", lambda: f"Find the {self._rng.randint(1, 15)}th Fibonacci number"),
-            ("trig", lambda: f"Calculate sin({self._rng.randint(0, 360)} degrees)"),
-            ("log", lambda: f"Calculate log({self._rng.randint(1, 100)})"),
+            # Trigonométrie : angles tirés hors des singularités de tan (90° + k·180°)
+            ("sin", lambda: f"Calculate sin({self._rng.randint(0, 360)} degrees)"),
+            ("cos", lambda: f"Calculate cos({self._rng.randint(0, 360)} degrees)"),
+            ("tan", lambda: f"Calculate tan({self._rng.choice(_TAN_SAFE_ANGLES)} degrees)"),
+            # Logarithmes : valeur > 1 (domaine réel, résultat non trivial)
+            ("log", lambda: f"Calculate log({self._rng.randint(2, 200)})"),
+            ("ln", lambda: f"Calculate ln({self._rng.randint(2, 200)})"),
+            ("log10", lambda: f"Calculate log10({self._rng.randint(2, 1000)})"),
+            ("sqrt", lambda: f"Calculate sqrt({self._rng.randint(0, 400)})"),
+            ("exp", lambda: f"Calculate exp({self._rng.randint(0, 6)})"),
+            ("pow", lambda: f"Calculate {self._rng.randint(2, 6)}^{self._rng.randint(2, 5)}"),
+            ("pow_call", lambda: f"Calculate pow({self._rng.randint(2, 6)}, {self._rng.randint(2, 5)})"),
         ]
 
         # Pick a task based on reasoning_type or random
-        if reasoning_type in ["gcd", "lcm", "factorial", "is_prime", "fibonacci", "trig", "log"]:
-            task_func = next((t[1] for t in tool_tasks if t[0] == reasoning_type), tool_tasks[0][1])
+        known = {name for name, _ in tool_tasks}
+        if reasoning_type in known:
+            task_func = next(t[1] for t in tool_tasks if t[0] == reasoning_type)
+        elif reasoning_type in ("trig", "trigonometry"):
+            task_func = self._rng.choice([t[1] for t in tool_tasks if t[0] in ("sin", "cos", "tan")])
         else:
             task_func = self._rng.choice(tool_tasks)[1]
 
@@ -262,6 +280,34 @@ class TaskGenerator:
 
         # Try to extract numbers from description
         numbers = [int(x) for x in re.findall(r'\d+', description)]
+
+        # ── Expressions : vérité terrain calculée par LE MÊME outil ──────────
+        # Le générateur et le runner partagent l'analyseur et l'outil : une
+        # divergence de convention (base du log, unité d'angle) devient
+        # impossible par construction au lieu d'être corrigée après coup.
+        try:
+            from library.tools.math import MATH_TOOLS
+            from library.tools.math_expressions import parse_math_task
+
+            call = parse_math_task(description)
+            if call is not None and call.ok:
+                out = MATH_TOOLS[call.tool_name]["fn"](**call.kwargs)
+                if out.get("valid"):
+                    if call.operation in ("sin", "cos", "tan"):
+                        return out.get(call.operation)
+                    if call.tool_name == "log":
+                        return out.get("log")
+                    if call.tool_name == "sqrt":
+                        return out.get("sqrt")
+                    if call.tool_name == "exp":
+                        return out.get("exp")
+                    if call.tool_name == "pow":
+                        return out.get("result")
+        except Exception as exc:  # noqa: BLE001 - repli sur le calcul historique
+            import logging
+            logging.getLogger(__name__).warning(
+                "math ground truth via tools failed for %r: %s", description, exc
+            )
 
         if not numbers:
             return None

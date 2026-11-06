@@ -126,7 +126,11 @@ def test_traces_are_persisted_and_rehydrated(monkeypatch, tmp_path):
     assert len(manifest["traces"]) == len(saved["observability"]["traces"])
     assert manifest["traces_absent_reason"] is None
     restored = fresh.get_observability("exp_traces")
-    assert {t["rule_name"] for t in restored["traces"]} == {"RoutingRule", "ValidationRule"}
+    # Les deux règles structurantes sont exigées ; `MathExpressionRule` s'ajoute
+    # sur les tâches mathématiques. Aucune autre règle n'est admise.
+    rules = {t["rule_name"] for t in restored["traces"]}
+    assert {"RoutingRule", "ValidationRule"} <= rules
+    assert rules <= {"RoutingRule", "ValidationRule", "MathExpressionRule"}
 
 
 def test_trace_limit_is_declared_not_silent(monkeypatch, tmp_path):

@@ -3983,6 +3983,7 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
                             <span class="experiment-stat">Completed: ${exp.tasks_completed}</span>
                             <span class="experiment-stat">Valid: ${exp.tasks_valid}</span>
                             <span class="experiment-stat">Pass Rate: ${((exp.pass_rate||0) * 100).toFixed(1)}%</span>
+                            ${exp.error_count ? `<span class="experiment-stat" style="color:#f59e0b;">Erreurs: ${exp.error_count}${exp.error_codes && Object.keys(exp.error_codes).length ? ' [' + Object.entries(exp.error_codes).map(([c,n]) => `${c}×${n}`).join(', ') + ']' : ''}</span>` : ''}
                         </div>
                         ${exp.errors && exp.errors.length > 0 ? `
                             <div class="error-list">

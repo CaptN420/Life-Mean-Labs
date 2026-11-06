@@ -156,6 +156,12 @@ class ExperimentProgress:
     active_agent: str = ""
     tasks_completed: int = 0
     tasks_total: int = 0
+    # Validation : sans ces trois champs, `/manifest` annonçait 24/24 tâches et
+    # aucun résultat — le lecteur devait croiser trois sources pour savoir si le
+    # run était bon. `pass_rate` est None quand rien n'a été validé (jamais 0).
+    tasks_valid: int = 0
+    tasks_invalid: int = 0
+    pass_rate: Optional[float] = None
     elapsed_seconds: float = 0.0
     tokens_consumed: int = 0
     errors: List[str] = field(default_factory=list)
@@ -172,6 +178,9 @@ class ExperimentProgress:
             "active_agent": self.active_agent,
             "tasks_completed": self.tasks_completed,
             "tasks_total": self.tasks_total,
+            "tasks_valid": self.tasks_valid,
+            "tasks_invalid": self.tasks_invalid,
+            "pass_rate": self.pass_rate,
             "elapsed_seconds": round(self.elapsed_seconds, 2),
             "tokens_consumed": self.tokens_consumed,
             "errors": self.errors[-10:],

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -44,6 +45,20 @@ class ExperimentState:
     # restart (the run itself is over; nothing is executing).
     rehydrated: bool = False
 
+    def error_codes(self) -> Dict[str, int]:
+        """Compte les erreurs par code machine (`MATH_DOMAIN_ERROR: ...`).
+
+        Les erreurs étaient affichées en vrac ; savoir qu'un run a 12
+        `UNSUPPORTED_MATH_OPERATION` et 0 `MATH_DOMAIN_ERROR` est l'information
+        qui dit *quoi* corriger. Aucun code reconnu ⇒ aucune entrée inventée.
+        """
+        codes: Dict[str, int] = {}
+        for err in self.errors:
+            match = re.match(r"\s*([A-Z][A-Z_]{3,})\s*:", str(err))
+            code = match.group(1) if match else "UNCLASSIFIED"
+            codes[code] = codes.get(code, 0) + 1
+        return codes
+
     def to_dict(self) -> Dict[str, Any]:
         # Lifecycle status is DERIVED from real state (GOAL 5/8) so the UI
         # never invents it: STARTING while running+just spawned, RUNNING while
@@ -71,6 +86,8 @@ class ExperimentState:
             "pass_rate": self.current_pass_rate,
             "avg_novelty_score": self.avg_novelty_score,
             "errors": self.errors[-10:],  # Last 10 errors
+            "error_count": len(self.errors),
+            "error_codes": self.error_codes(),
             "rehydrated": self.rehydrated,
         }
 
@@ -862,6 +879,9 @@ class ExperimentUIController:
                         current_round=index + 1,
                         total_rounds=total_tasks,
                         current_step=f"{completed}/{total_tasks} tasks",
+                        tasks_valid=valid,
+                        tasks_invalid=completed - valid,
+                        pass_rate=(valid / completed) if completed else None,
                         active_agent="deterministic_pipeline",
                         elapsed_seconds=round(time.time() - run_started, 1),
                     )
@@ -884,6 +904,9 @@ class ExperimentUIController:
                     tasks_total=total_tasks,
                     total_rounds=total_tasks,
                     current_step="finished",
+                    tasks_valid=valid,
+                    tasks_invalid=completed - valid,
+                    pass_rate=pass_rate,
                     elapsed_seconds=round(time.time() - run_started, 1),
                 )
 
