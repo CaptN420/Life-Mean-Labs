@@ -674,6 +674,25 @@ class ExperimentUIController:
                 # Observability is created BEFORE taking the lock (the helper
                 # acquires the same non-reentrant lock -> would deadlock here).
                 self._ensure_observability(experiment_id, config)
+                # Même journal d'usage que le pipeline déterministe : les agents
+                # de débat sont observés, pas seulement les workers.
+                try:
+                    from experiments.usage_recorder import FeatureUsageRecorder
+                    _deb_usage = FeatureUsageRecorder()
+
+                    def _deb_usage_sink(item: Dict[str, Any], _u=_deb_usage,
+                                        _exp=experiment_id) -> None:
+                        _u.record(
+                            str(item.get("kind", "")), str(item.get("name", "")),
+                            experiment_id=_exp,
+                            task_id=str((item.get("extra") or {}).get("task_id", "")),
+                            ok=item.get("ok"),
+                        )
+
+                    autopilot.usage_sink = _deb_usage_sink
+                except Exception as exc:  # noqa: BLE001 - best effort, et dit
+                    logger.warning("usage recorder unavailable for debate %s: %s",
+                                   experiment_id, exc)
                 with self._lock:
                     self._autopilots[experiment_id] = autopilot
                 # Deterministic validator is the authority; AutoPilot reuses it

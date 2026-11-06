@@ -19,7 +19,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from experiments.generation.schemas import GeneratedTask
 
@@ -70,6 +70,21 @@ class AutoPilot:
         self._engines: Dict[str, Any] = {}  # experiment_id -> DebateEngine
         self._results: Dict[str, List[DebateRunResult]] = {}  # experiment_id -> results
         self._lock = threading.Lock()
+        # Journal d'usage runtime (optionnel) : les agents qui ont RÉELLEMENT
+        # parlé dans un débat, pour que l'observation ne se limite pas au
+        # pipeline déterministe.
+        self.usage_sink: Optional[Callable[[Dict[str, Any]], None]] = None
+
+    def _emit_usage(self, kind: str, name: str,
+                    extra: Optional[Dict[str, Any]] = None) -> None:
+        """Publie un composant exécuté. Ne fait jamais échouer un débat."""
+        sink = self.usage_sink
+        if sink is None or not name:
+            return
+        try:
+            sink({"kind": kind, "name": name, "ok": None, "extra": extra or {}})
+        except Exception as exc:  # noqa: BLE001 - la télémétrie ne casse pas un run
+            logger.warning("usage sink failed for %s:%s: %s", kind, name, exc)
 
     def run_experiment(
         self,
@@ -291,6 +306,24 @@ class AutoPilot:
         # be validating a phantom, not evidence (GOAL 3). So we skip empty
         # trailing turns and use the last completed content turn.
         all_turns = engine.turn_manager.get_all_turns()
+
+        # Usage réel : une ligne par (agent, modèle) qui a produit un tour.
+        # `speaker` est le persona du tour ; un persona muet n'est pas compté.
+        _seen = set()
+        for _turn in all_turns:
+            _speaker = (getattr(_turn, "speaker", "") or "").strip()
+            if not _speaker or not (_turn.response or "").strip():
+                continue
+            _key = (_speaker, getattr(_turn, "model", None))
+            if _key in _seen:
+                continue
+            _seen.add(_key)
+            self._emit_usage("agent", _speaker, extra={
+                "task_id": task.task_id,
+                "role": getattr(_turn, "speaker_role", ""),
+                "model": getattr(_turn, "model", None),
+            })
+
         final_response = ""
         for t in reversed(all_turns):
             if (t.response or "").strip():

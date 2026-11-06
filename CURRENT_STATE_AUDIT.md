@@ -16,7 +16,7 @@
 | Non suivis | sondes de debug (`_*.py`, `_*.js`), `feature_pool_*.json/csv`, `artifacts/`, `Life_mean/results/` (1 Ko) |
 | Conteneur | `life_mean_realm-dashboard-1` **Up (healthy)** |
 | Image | construite il y a ~1 h, **antérieure à R2** |
-| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 797 passed** sur `tests/` seul (après P13) |
+| Tests de référence | **1 806 passed** `tests/` + `pipeline_inspector/tests` ; **1 803 passed** sur `tests/` seul (après P15) |
 
 ### Constat opérationnel n°1 — l'image Docker ne contient pas le code courant
 
@@ -466,6 +466,30 @@ lignes    : ValidationRule task_d72593db  {answer 6, ground_truth 6}  -> {method
 
 Les 4 blocs `<script>` passent `node --check` ; `tests/test_dashboard_ui.py` + `test_dashboard_security.py` :
 49 passed.
+
+### 4sexdecies. Le journal d'usage couvre les agents de débat (P15)
+
+Le journal runtime ne voyait que le pipeline déterministe (`ToolWorker` + outil détecté). Les débats
+multi-agents ne laissaient aucune trace d'usage : les personas réellement sollicités étaient invisibles
+du décompte.
+
+`AutoPilot` publie désormais une ligne par couple `(agent, modèle)` ayant produit **au moins un tour avec
+du contenu** — un persona muet (tour rejeté par le garde de répétition) n'est pas compté, sinon le journal
+mesurerait le casting au lieu de l'exécution. Le sink est optionnel et un sink qui lève ne casse jamais un
+débat (5 tests dédiés, dont un bout-en-bout sink → `FeatureUsageRecorder` → fichier JSONL).
+
+**Appariement des noms, deuxième correction** : la règle « ≥ 6 caractères des deux côtés » introduite en
+P13 bloquait un nom court légitime — `Stoic` ne trouvait pas `StoicAgent` (feature existante), alors que
+`math_gcd` devait rester non apparié. La règle est maintenant : **sous-chaîne, candidat ≥ 4 caractères,
+et un seul candidat possible** (ambiguïté ⇒ aucun match). Vérifié : `Nihilist → NihilistAgent`,
+`Existentialist → ExistentialistAgent`, `Pragmatist → PragmatistAgent`, `Socrates → SocratesThinker`,
+`Stoic → StoicAgent`, `math_gcd → aucun`.
+
+Mesure locale après correction : **12 features observées / 989** (contre 13 avec l'ancien matcher
+permissif — l'écart est le faux positif retiré), **1 161 exécutions runtime** enregistrées, et les outils
+non appariables (`math_gcd` 169, `math_fibonacci` 129, `math_factorial` 91…) restent listés dans
+`unmapped_entities` : ce sont des fonctions, pas des classes du pool — le dire vaut mieux que les
+rattacher de force.
 
 ## 2. Sondes HTTP réelles (serveur démarré)
 

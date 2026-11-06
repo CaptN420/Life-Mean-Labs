@@ -80,15 +80,25 @@ class FeaturePoolBridge:
         key = normalize_name(entity)
         if key in self._index:
             return self._index[key]
-        # Tolérance : suffixe/préfixe évident (worker/agent). Les DEUX côtés
-        # doivent être assez longs : sans le garde sur `candidate_key`, une
-        # fonctionnalité nommée « C » (ou tout nom court) était retournée pour
-        # n'importe quelle entité la contenant — `math_gcd` comptait comme usage
-        # de la feature « C ».
-        for candidate_key, fid in self._index.items():
-            if (len(key) >= 6 and len(candidate_key) >= 6
-                    and (key in candidate_key or candidate_key in key)):
-                return fid
+        # Tolérance : suffixe/préfixe évident (worker/agent, persona -> *Agent).
+        # Deux règles apprises en mesurant :
+        #   - une entité très courte (« C ») ne doit jamais absorber les autres
+        #     (`math_gcd` comptait comme usage de la feature « C ») ;
+        #   - un nom court mais SANS AMBIGUÏTÉ doit matcher : « Stoic » désigne
+        #     `StoicAgent`, et l'ancien garde de 6 caractères le ratait.
+        # Donc : sous-chaîne des deux côtés avec un minimum de 4 caractères sur
+        # le candidat, et seulement si un SEUL candidat correspond.
+        candidates: List[str] = []
+        if len(key) >= 3:
+            for candidate_key, fid in self._index.items():
+                if len(candidate_key) < 4:
+                    continue
+                if key in candidate_key or candidate_key in key:
+                    if fid not in candidates:
+                        candidates.append(fid)
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
         return None
 
     def usage(

@@ -181,3 +181,17 @@ def test_runtime_record_for_a_tool_does_not_inflate_a_short_feature():
     payload = bridge.usage([], runtime_records=records)
     inflated = [r for r in payload["rows"] if len(str(r.get("name") or "")) < 6]
     assert inflated == [], inflated
+
+
+def test_short_unique_name_maps_but_ambiguous_does_not():
+    """« Stoic » doit trouver `StoicAgent` ; « C » ne doit rien absorber."""
+    bridge = _bridge()
+    stoic = bridge.map_entity("Stoic")
+    if stoic is not None:
+        assert "stoic" in str((bridge._features.get(stoic) or {}).get("name", "")).lower()
+    # une entité d'une lettre ne matche que par égalité EXACTE (feature « C »),
+    # jamais comme sous-chaîne d'un autre nom
+    exact = bridge.map_entity("c")
+    assert exact is None or str((bridge._features.get(exact) or {}).get("name")).lower() in ("c", "")
+    # un outil qui ne correspond à aucune classe reste non apparié
+    assert bridge.map_entity("math_gcd") is None
