@@ -395,6 +395,32 @@ exactement là où la télémétrie système a un sens.
 Reste `BLOCKED_EXTERNAL` : le GPU / l'inférence locale (#17) — dépendances lourdes (`torch`,
 `llama_cpp`), décision d'installation qui revient à l'utilisateur, rien à corriger dans le code.
 
+### 4terdecies. Exposition UI : télémétrie système et couverture d'échantillon (P12)
+
+Deux données réelles étaient produites par l'API mais invisibles dans le dashboard :
+
+- **Onglet « Système »** (`panel-system`) : hôte (nom, plateforme, supporté), ligne `degraded`, cartes
+  Defender (temps réel / antivirus / anti-spyware / date de signature) et table des 5 derniers
+  événements système. Une source en échec affiche **sa raison** (texte rouge) au lieu d'une valeur
+  plausible.
+- **Ligne de couverture** dans la carte *Feature Pool ↔ Pipeline* : « 14 observées / 989 chargées —
+  4500 événements répartis sur 25 populations (tronqué) — 1 112 272 événements dans ces populations ».
+  Sans elle, « 14 » se lisait comme un total.
+
+Vérification réelle, navigateur piloté sur le dashboard hôte (`:8082`) :
+
+```
+onglet Système   -> « Hôte CN — Windows 11 — supporté: true », « ✔ Toutes les sources ont répondu »
+                    Defender: temps réel true, antivirus true, anti-spyware true,
+                    signature 05/11/2026 07:45:11
+                    événements: 566 Kernel-Power, 114 HttpService, 7040 Service Control Manager
+onglet Pipeline  -> « 14 observées / 989 chargées — 4500 événements répartis sur 25 populations »
+                    lignes: CriticAgent 442, IntegrationPlanner 304, SyntaxWorker 300
+```
+
+Les 4 blocs `<script>` du dashboard passent `node --check` après modification (un `const` dupliqué
+neutralise tout un bloc : c'est vérifié, pas supposé).
+
 ## 2. Sondes HTTP réelles (serveur démarré)
 
 | Route | Code | Charge utile |

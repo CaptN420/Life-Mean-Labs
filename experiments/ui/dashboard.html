@@ -665,7 +665,8 @@
             <button class="tab-btn" data-tab="skills" onclick="switchTab('skills', this)">Skills &amp; Tools</button>
             <button class="tab-btn" data-tab="pipeline" onclick="switchTab('pipeline', this)">Pipeline</button>
             <button class="tab-btn" data-tab="packages" onclick="switchTab('packages', this)">Packages</button>
-            <button class="tab-btn" data-tab="training" onclick="switchTab('training', this)">Training & Models</button>
+            <button class="tab-btn" data-tab="training" onclick="switchTab('training', this)">Training &amp; Models</button>
+            <button class="tab-btn" data-tab="system" onclick="switchTab('system', this)">Système</button>
         </nav>
 
         <!-- ── Autopilot tab — the REAL experiment workflow (GOAL 7/8) ── -->
@@ -1668,10 +1669,32 @@
         <div class="card" style="margin-top:1rem;">
             <h2>Feature Pool ↔ Pipeline</h2>
             <p class="subtitle" style="font-size:.75rem;">Usage observé ≠ validation. Aucun statut n'est modifié.</p>
+            <div id="pi-features-coverage" class="subtitle" style="font-size:.78rem;margin:.3rem 0;"></div>
             <div style="max-height:320px;overflow:auto;">
                 <table class="pi-table" id="pi-features-table">
                     <thead><tr><th>Feature</th><th>Statut</th><th>Événements</th><th>OK</th><th>Échecs</th><th>Via</th></tr></thead>
                     <tbody><tr><td colspan="6" class="empty-state">Aucune feature reliée.</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Système : télémétrie réelle de l'hôte (Defender, journal d'événements) ── -->
+    <div id="panel-system" class="tab-panel">
+        <div class="card">
+            <h2>Télémétrie système</h2>
+            <p class="subtitle" style="font-size:.78rem;">
+                Collectée en direct via <code>powershell Get-MpComputerStatus</code> et
+                <code>wevtutil</code> (aucune dépendance Python). Une source indisponible est
+                affichée comme telle, jamais inventée.
+            </p>
+            <div id="sys-degraded" class="subtitle" style="font-size:.8rem;margin:.4rem 0;"></div>
+            <div id="sys-host" style="font-size:.85rem;margin-bottom:.6rem;"></div>
+            <div id="sys-defender" class="grid" style="margin-bottom:.6rem;"></div>
+            <div style="max-height:320px;overflow:auto;">
+                <table class="pi-table" id="sys-events-table">
+                    <thead><tr><th>Heure</th><th>ID</th><th>Niveau</th><th>Source</th></tr></thead>
+                    <tbody><tr><td colspan="4" class="empty-state">Aucun événement chargé.</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -1812,6 +1835,7 @@
             if (name === 'packages') { pkLoad(); }
             if (name === 'agent-builder') { loadAgents(); }
             if (name === 'experiments') switchToManagedExperiments();
+            if (name === 'system') sysLoad();
         }
 
         // ── Cluster Tree ── experiments by subject + run-directory explorer ──
@@ -5445,6 +5469,71 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
             return '<span class="pi-badge">inconnue</span>';
         }
 
+        // ── Système : télémétrie réelle de l'hôte ──────────────────────────
+        async function sysLoad() {
+            const hostEl = document.getElementById('sys-host');
+            const degEl = document.getElementById('sys-degraded');
+            const defEl = document.getElementById('sys-defender');
+            const tbody = document.querySelector('#sys-events-table tbody');
+            if (hostEl) hostEl.textContent = 'Lecture…';
+            try {
+                const resp = await fetch(`${API_BASE}/sentinel/os?events=5`);
+                const d = await resp.json();
+                if (!resp.ok) throw new Error(d.error || ('HTTP ' + resp.status));
+
+                const host = d.host || {};
+                if (hostEl) {
+                    hostEl.innerHTML =
+                        `Hôte <strong>${piEsc(host.node)}</strong> — ${piEsc(host.platform)} ` +
+                        `${piEsc(host.release)} — supporté: <strong>${host.supported}</strong>`;
+                }
+                if (degEl) {
+                    const deg = d.degraded || [];
+                    degEl.innerHTML = deg.length
+                        ? `⚠ Sources indisponibles : <strong>${deg.join(', ')}</strong> — la raison est affichée ci-dessous.`
+                        : '✔ Toutes les sources ont répondu.';
+                }
+
+                const dfn = d.defender || {};
+                if (defEl) {
+                    if (dfn.ok) {
+                        defEl.innerHTML = [
+                            ['Protection temps réel', dfn.real_time_protection],
+                            ['Antivirus', dfn.antivirus_enabled],
+                            ['Anti-spyware', dfn.antispyware_enabled],
+                            ['Signature', dfn.signature_timestamp
+                                ? new Date(dfn.signature_timestamp * 1000).toLocaleString()
+                                : 'inconnue'],
+                        ].map(([k, v]) => `<div class="card" style="padding:.6rem;">
+                            <div class="subtitle" style="font-size:.72rem;">${k}</div>
+                            <div style="font-weight:600;">${piEsc(v)}</div></div>`).join('');
+                    } else {
+                        defEl.innerHTML = `<div class="card" style="padding:.6rem;">
+                            <div class="subtitle" style="font-size:.72rem;">Defender</div>
+                            <div style="color:var(--danger,#c0392b);">${piEsc(dfn.error || 'indisponible')}</div>
+                        </div>`;
+                    }
+                }
+
+                const log = d.event_log || {};
+                const evs = log.events || [];
+                if (tbody) {
+                    tbody.innerHTML = evs.length ? evs.map(e => `
+                        <tr>
+                            <td>${piEsc((e.time_created || '').replace('T', ' ').slice(0, 19))}</td>
+                            <td>${piEsc(e.event_id)}</td>
+                            <td><span class="pi-badge">${piEsc(e.level)}</span></td>
+                            <td>${piEsc(e.provider)}</td>
+                        </tr>`).join('')
+                        : `<tr><td colspan="4" class="empty-state">${piEsc(log.error || 'Aucun événement.')}</td></tr>`;
+                }
+            } catch (err) {
+                if (hostEl) hostEl.textContent = 'Erreur: ' + err.message;
+                if (degEl) degEl.textContent = '';
+                if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Erreur de lecture.</td></tr>';
+            }
+        }
+
         async function piGet(path) {
             const resp = await fetch(PI_BASE + path);
             const data = await resp.json();
@@ -5658,6 +5747,16 @@ ${r.errors && r.errors.length ? 'errors(' + r.errors.length + '): ' + escapeHtml
         async function piLoadFeatures() {
             try {
                 const f = await piGet('/features');
+                // Sans la couverture, « 14 observées » se lit comme un total.
+                const cov = f.coverage || {};
+                const coverageEl = document.getElementById('pi-features-coverage');
+                if (coverageEl) {
+                    coverageEl.textContent =
+                        `${f.features_observed || 0} observées / ${f.features_loaded || 0} chargées` +
+                        ` — ${cov.window || 'échantillon non déclaré'}` +
+                        (cov.truncated ? ' (tronqué)' : '') +
+                        ` — ${cov.events_in_sampled_populations || 0} événements dans ces populations`;
+                }
                 const tbody = document.querySelector('#pi-features-table tbody');
                 const rows = (f.rows || []).slice(0, 60);
                 if (!rows.length) {
